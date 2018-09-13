@@ -1,0 +1,13 @@
+[package]
+name = "fungui"
+version = "0.1.0"
+authors = ["Jens Pitkanen <jens@neon.moe>"]
+
+[dependencies]
+gl = "0.10"
+glutin = { version = "0.18", optional = true }
+png = "0.12"
+
+[features]
+default = ["window_bootstrap"]
+window_bootstrap = ["glutin"]
