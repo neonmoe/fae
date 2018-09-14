@@ -7,16 +7,20 @@ use std::mem;
 use std::ptr;
 
 static mut PROJECTION_MATRIX_LOCATION: GLint = -1;
+static VERT_SHADER_SOURCE: &'static str = include_str!("shaders/texquad.vert");
+static FRAG_SHADER_SOURCE: &'static str = include_str!("shaders/texquad.frag");
 
 pub fn initialize() {
-    // FIXME: Fix shader loading, it's broken in --release builds currently.
-    let create_shader = |t: GLuint, source: &str| {
+    let create_shader = |t: GLuint, source: &'static str| {
         let len = [source.len() as GLint].as_ptr();
-        let source = [source.as_ptr() as *const _].as_ptr();
+        let source = [source.as_ptr() as *const GLchar].as_ptr();
         let shader;
         unsafe {
             shader = gl::CreateShader(t);
+
+            // FIXME: This doesn't actually upload the source when ran with --release.
             gl::ShaderSource(shader, 1, source, len);
+
             gl::CompileShader(shader);
 
             let mut status = 0;
@@ -25,8 +29,7 @@ pub fn initialize() {
                 let mut info = [0; 1024];
                 gl::GetShaderInfoLog(shader, 1024, ptr::null_mut(), info.as_mut_ptr());
                 println!(
-                    "GLSL (status {}): {}",
-                    status,
+                    "GLSL error:\n{}",
                     String::from_utf8_lossy(&mem::transmute::<[i8; 1024], [u8; 1024]>(info)[..])
                 );
             }
@@ -34,8 +37,8 @@ pub fn initialize() {
         shader
     };
 
-    let vert_shader = create_shader(gl::VERTEX_SHADER, include_str!("shaders/texquad.vert"));
-    let frag_shader = create_shader(gl::FRAGMENT_SHADER, include_str!("shaders/texquad.frag"));
+    let vert_shader = create_shader(gl::VERTEX_SHADER, VERT_SHADER_SOURCE);
+    let frag_shader = create_shader(gl::FRAGMENT_SHADER, FRAG_SHADER_SOURCE);
 
     let program;
     unsafe {
@@ -120,9 +123,9 @@ pub fn initialize() {
     print_gl_errors("after initialization");
 }
 
-static MAX_QUADS: usize = 100_000;
+static MAX_QUADS: usize = 800_000;
 static mut CURRENT_QUAD_COUNT: usize = 0;
-static mut VERTICES: [[f32; 30]; 100_000] = [[0.0; 30]; 100_000];
+static mut VERTICES: [[f32; 30]; 800_000] = [[0.0; 30]; 800_000];
 
 pub fn draw_quad(x: f32, y: f32, w: f32, h: f32, z: f32, tx: f32, ty: f32, tw: f32, th: f32) {
     let (x0, y0, x1, y1, tx0, ty0, tx1, ty1) = (x, y, x + w, y + h, tx, ty, tx + tw, tx + th);

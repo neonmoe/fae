@@ -8,9 +8,15 @@ fn main() {
     while window.refresh() {
         time += 0.016;
         fungui::draw_quad(
-            170.0, //+ 50.0 * (time * 2.0).sin(),
-            90.0,  // + 50.0 * (time * 2.0).cos(),
-            300.0, 300.0, 0.0, 0.0, 0.0, 1.0, 1.0,
+            170.0 + 50.0 * (time * 2.0).sin(),
+            90.0 + 50.0 * (time * 2.0).cos(),
+            300.0,
+            300.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            1.0,
         );
         fungui::render(window.width, window.height);
     }

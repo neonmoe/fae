@@ -32,7 +32,7 @@ impl Window {
             // Print OpenGL version
             // TODO:
             println!(
-                "Gl Version: {:?}",
+                "OpenGL version: {:?}",
                 ::std::ffi::CStr::from_ptr(::std::mem::transmute::<*const u8, *const i8>(
                     gl::GetString(gl::VERSION)
                 ))
