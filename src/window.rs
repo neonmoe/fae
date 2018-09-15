@@ -1,6 +1,7 @@
 use gl;
 use glutin::dpi::*;
 use glutin::*;
+use std::env;
 
 pub struct Window {
     pub width: f64,
@@ -11,6 +12,12 @@ pub struct Window {
 
 impl Window {
     pub fn new(title: &str, logical_width: f64, logical_height: f64) -> Window {
+        // FIXME: Enable wayland support by not setting the backend to
+        // x11 automatically. Note: At the time of writing, wayland
+        // support in winit seems to be buggy. At the very least, it
+        // doesn't seem to work with the sway the
+        env::set_var("WINIT_UNIX_BACKEND", "x11");
+
         let events_loop = EventsLoop::new();
         let window = WindowBuilder::new()
             .with_title(title)
