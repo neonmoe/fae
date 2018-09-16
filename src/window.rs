@@ -2,12 +2,14 @@ use gl;
 use glutin::dpi::*;
 use glutin::*;
 use std::env;
+use ui::{self, MouseStatus};
 
 pub struct Window {
     pub width: f64,
     pub height: f64,
     gl_window: GlWindow,
     events_loop: EventsLoop,
+    mouse: MouseStatus,
 }
 
 impl Window {
@@ -34,16 +36,7 @@ impl Window {
 
         unsafe {
             gl::load_with(|symbol| gl_window.get_proc_address(symbol) as *const _);
-            gl::ClearColor(0.1, 0.1, 0.1, 1.0);
-
-            // Print OpenGL version
-            // TODO:
-            println!(
-                "OpenGL version: {:?}",
-                ::std::ffi::CStr::from_ptr(::std::mem::transmute::<*const u8, *const i8>(
-                    gl::GetString(gl::VERSION)
-                ))
-            );
+            gl::ClearColor(0.9, 0.9, 0.9, 1.0);
         }
 
         Window {
@@ -51,6 +44,12 @@ impl Window {
             height: logical_height,
             gl_window,
             events_loop,
+            mouse: MouseStatus {
+                x: 0.0,
+                y: 0.0,
+                last_pressed: false,
+                pressed: false,
+            },
         }
     }
 
@@ -64,11 +63,15 @@ impl Window {
         }
 
         let mut resized_logical_size = None;
+        let mut mouse_position = None;
+        let mut mouse_pressed = None;
         self.events_loop.poll_events(|event| match event {
             Event::WindowEvent { event, .. } => match event {
                 WindowEvent::CloseRequested => running = false,
-                WindowEvent::Resized(logical_size) => {
-                    resized_logical_size = Some(logical_size);
+                WindowEvent::Resized(logical_size) => resized_logical_size = Some(logical_size),
+                WindowEvent::CursorMoved { position, .. } => mouse_position = Some(position),
+                WindowEvent::MouseInput { state, .. } => {
+                    mouse_pressed = Some(state == ElementState::Pressed)
                 }
                 _ => (),
             },
@@ -86,6 +89,18 @@ impl Window {
             self.width = logical_size.width;
             self.height = logical_size.height;
         }
+
+        if let Some(position) = mouse_position {
+            self.mouse.x = position.x as f32;
+            self.mouse.y = position.y as f32;
+        }
+
+        self.mouse.last_pressed = self.mouse.pressed;
+        if let Some(pressed) = mouse_pressed {
+            self.mouse.pressed = pressed;
+        }
+
+        ui::update(self.width, self.height, self.mouse);
 
         running
     }

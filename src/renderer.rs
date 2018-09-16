@@ -7,32 +7,25 @@ use std::mem;
 use std::ptr;
 
 static mut PROJECTION_MATRIX_LOCATION: GLint = -1;
-static VERT_SHADER_SOURCE: &'static str = include_str!("shaders/texquad.vert");
-static FRAG_SHADER_SOURCE: &'static str = include_str!("shaders/texquad.frag");
+const VERT_SHADER_SOURCE: &'static str = include_str!("shaders/texquad.vert");
+const FRAG_SHADER_SOURCE: &'static str = include_str!("shaders/texquad.frag");
 
 pub fn initialize() {
-    let create_shader = |t: GLuint, source: &'static str| {
+    let create_shader = |t: GLuint, source: &str| {
         let len = [source.len() as GLint].as_ptr();
-        let source = [source.as_ptr() as *const GLchar].as_ptr();
+        let source_ptr = [source.as_ptr() as *const _].as_ptr();
         let shader;
         unsafe {
             shader = gl::CreateShader(t);
 
             // FIXME: This doesn't actually upload the source when ran with --release.
-            gl::ShaderSource(shader, 1, source, len);
+            gl::ShaderSource(shader, 1, source_ptr, len);
+
+            let mut uploaded = [0; 10];
+            gl::GetShaderSource(shader, 10, ptr::null_mut(), uploaded.as_mut_ptr());
+            println!("{:?}", uploaded);
 
             gl::CompileShader(shader);
-
-            let mut status = 0;
-            gl::GetShaderiv(shader, gl::COMPILE_STATUS, &mut status);
-            if status != gl::TRUE as GLint {
-                let mut info = [0; 1024];
-                gl::GetShaderInfoLog(shader, 1024, ptr::null_mut(), info.as_mut_ptr());
-                println!(
-                    "GLSL error:\n{}",
-                    String::from_utf8_lossy(&mem::transmute::<[i8; 1024], [u8; 1024]>(info)[..])
-                );
-            }
         }
         shader
     };
@@ -52,7 +45,7 @@ pub fn initialize() {
             let mut info = [0; 1024];
             gl::GetProgramInfoLog(program, 1024, ptr::null_mut(), info.as_mut_ptr());
             println!(
-                "Program linking failed: {}",
+                "Program linking failed:\n{}",
                 String::from_utf8_lossy(&mem::transmute::<[i8; 1024], [u8; 1024]>(info)[..])
             );
         }
@@ -96,7 +89,7 @@ pub fn initialize() {
 
     let mut tex = 0;
     unsafe {
-        let image = load_image("images/test.png").unwrap();
+        let image = load_image("images/gui.png").unwrap();
 
         gl::Enable(gl::BLEND);
         gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
@@ -127,8 +120,18 @@ static MAX_QUADS: usize = 800_000;
 static mut CURRENT_QUAD_COUNT: usize = 0;
 static mut VERTICES: [[f32; 30]; 800_000] = [[0.0; 30]; 800_000];
 
-pub fn draw_quad(x: f32, y: f32, w: f32, h: f32, z: f32, tx: f32, ty: f32, tw: f32, th: f32) {
-    let (x0, y0, x1, y1, tx0, ty0, tx1, ty1) = (x, y, x + w, y + h, tx, ty, tx + tw, tx + th);
+pub(crate) fn draw_quad(
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+    z: f32,
+    tx: f32,
+    ty: f32,
+    tw: f32,
+    th: f32,
+) {
+    let (x0, y0, x1, y1, tx0, ty0, tx1, ty1) = (x, y, x + w, y + h, tx, ty, tx + tw, ty + th);
     if unsafe { CURRENT_QUAD_COUNT } < MAX_QUADS {
         let quad: [f32; 30] = [
             x0, y0, z, tx0, ty0, x1, y0, z, tx1, ty0, x1, y1, z, tx1, ty1, x0, y0, z, tx0, ty0, x1,
@@ -145,7 +148,7 @@ pub fn draw_quad(x: f32, y: f32, w: f32, h: f32, z: f32, tx: f32, ty: f32, tw: f
     }
 }
 
-pub fn render(width: f64, height: f64) {
+pub(crate) fn render(width: f64, height: f64) {
     let m00 = 2.0 / width as f32;
     let m11 = -2.0 / height as f32;
     let matrix = [

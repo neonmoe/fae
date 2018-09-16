@@ -142,6 +142,7 @@ version = "0.1.0"
 dependencies = [
  "gl 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "glutin 0.18.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lazy_static 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "png 0.12.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 

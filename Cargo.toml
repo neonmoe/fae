@@ -7,6 +7,7 @@ authors = ["Jens Pitkanen <jens@neon.moe>"]
 gl = "0.10"
 glutin = { version = "0.18", optional = true }
 png = "0.12"
+lazy_static = "1.1"
 
 [features]
 default = ["window_bootstrap"]
