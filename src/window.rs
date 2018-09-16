@@ -36,7 +36,7 @@ impl Window {
 
         unsafe {
             gl::load_with(|symbol| gl_window.get_proc_address(symbol) as *const _);
-            gl::ClearColor(0.9, 0.9, 0.9, 1.0);
+            gl::ClearColor(0.85, 0.85, 0.85, 1.0);
         }
 
         Window {

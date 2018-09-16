@@ -14,7 +14,9 @@ lazy_static! {
             y: 0.0,
             last_pressed: false,
             pressed: false,
-        }
+        },
+        pressed_element: None,
+        hovering: false,
     });
 }
 
@@ -29,6 +31,7 @@ enum UIElementType {
 }
 
 struct UIElement {
+    id: usize,
     t: UIElementType,
     x: f32,
     y: f32,
@@ -48,6 +51,8 @@ impl UIElement {
 struct UIState {
     elements: Vec<UIElement>,
     mouse: MouseStatus,
+    pressed_element: Option<usize>,
+    hovering: bool,
 }
 
 pub struct UIStatus {
@@ -67,11 +72,15 @@ pub struct MouseStatus {
 pub fn update(width: f64, height: f64, mouse: MouseStatus) -> UIStatus {
     renderer::render(width, height);
     let mut state = UI_STATE.lock().unwrap();
+    if !state.mouse.pressed {
+        state.pressed_element = None;
+    }
+
     state.elements.clear();
     state.mouse = mouse;
-    UIStatus {
-        hovering_button: false,
-    }
+    let hovering_button = state.hovering;
+    state.hovering = false;
+    UIStatus { hovering_button }
 }
 
 pub fn label(_label: &str) {
@@ -88,23 +97,30 @@ pub fn button(_label: &str) -> bool {
     let mut element = new_element(&state, UIElementType::ButtonNormal);
     let hovered = element.is_point_inside(state.mouse.x, state.mouse.y);
     let just_released = !state.mouse.pressed && state.mouse.last_pressed;
-    if state.mouse.pressed && hovered {
+    let can_be_pressed =
+        state.pressed_element.is_none() || state.pressed_element.unwrap() == element.id;
+
+    if state.mouse.pressed && hovered && can_be_pressed {
         element.t = UIElementType::ButtonPressed;
+        state.pressed_element = Some(element.id);
     } else if hovered {
         element.t = UIElementType::ButtonHovered;
     }
+
     draw_element(&element);
     state.elements.push(element);
+    state.hovering |= hovered;
 
-    hovered && just_released
+    hovered && just_released && can_be_pressed
 }
 
 fn new_element(state: &UIState, t: UIElementType) -> UIElement {
     UIElement {
+        id: state.elements.len(),
         t,
         x: 30.0,
         y: if let Some(element) = state.elements.last() {
-            element.y + 16.0 + (TILE_SIZE + PADDING) * 2.5
+            element.y + 16.0 + TILE_SIZE + OUTER_TILE_WIDTH * 3.0
         } else {
             30.0
         },
@@ -115,7 +131,7 @@ fn new_element(state: &UIState, t: UIElementType) -> UIElement {
 
 #[cfg_attr(rustfmt, rustfmt_skip)]
 fn draw_element(element: &UIElement) {
-    let &UIElement { t, x, y, w, h } = element;
+    let &UIElement { t, x, y, w, h, .. } = element;
 
     if t != UIElementType::NoBackground {
         let tx = t as i32 as f32 / SHEET_LENGTH as f32; // The UV offset based on the element type
