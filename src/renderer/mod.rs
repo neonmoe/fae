@@ -1,7 +1,7 @@
 // FIXME: Get rid of as many unsafes as possible.
 
 mod text;
-pub(crate) use self::text::{initialize_font, queue_text};
+pub(crate) use self::text::{initialize_font, queue_text, DPI_SCALE};
 
 use gl;
 use gl::types::*;
@@ -9,10 +9,6 @@ use image::load_image;
 use std::error::Error;
 use std::mem;
 use std::ptr;
-
-static mut PROJECTION_MATRIX_LOCATION: GLint = -1;
-const VERT_SHADER_SOURCE: &'static str = include_str!("../shaders/texquad.vert");
-const FRAG_SHADER_SOURCE: &'static str = include_str!("../shaders/texquad.frag");
 
 const MAX_QUADS: usize = 16_000_000 / mem::size_of::<TexQuad>(); // 16 MB vertex buffers
 const TEXTURE_COUNT: usize = 2; // UI elements, glyph cache
@@ -22,6 +18,7 @@ type VertexBufferData = [TexQuad; MAX_QUADS];
 type Texture = GLuint;
 type VertexBufferObject = GLuint;
 type VertexArrayObject = GLuint;
+type ShaderProgram = GLuint;
 
 static mut QUAD_COUNTS: [usize; TEXTURE_COUNT] = [0; TEXTURE_COUNT];
 /// The textures are always in the same order:
@@ -29,51 +26,72 @@ static mut QUAD_COUNTS: [usize; TEXTURE_COUNT] = [0; TEXTURE_COUNT];
 static mut TEXTURES: [Texture; TEXTURE_COUNT] = [0; TEXTURE_COUNT];
 static mut VBOS: [VertexBufferObject; TEXTURE_COUNT] = [0; TEXTURE_COUNT];
 static mut VAOS: [VertexArrayObject; TEXTURE_COUNT] = [0; TEXTURE_COUNT];
+static mut SHADER_PROGRAMS: [ShaderProgram; TEXTURE_COUNT] = [0; TEXTURE_COUNT];
 static mut VERTEX_BUFFERS: [VertexBufferData; TEXTURE_COUNT] =
     [[[0.0; 30]; MAX_QUADS]; TEXTURE_COUNT];
 
+static mut PROJECTION_MATRIX_LOCATION: GLint = -1;
+const VERTEX_SHADER_SOURCE: [&'static str; TEXTURE_COUNT] = [
+    include_str!("../shaders/texquad.vert"),
+    include_str!("../shaders/text.vert"),
+];
+const FRAGMENT_SHADER_SOURCE: [&'static str; TEXTURE_COUNT] = [
+    include_str!("../shaders/texquad.frag"),
+    include_str!("../shaders/text.frag"),
+];
+
 pub fn initialize() -> Result<(), Box<Error>> {
-    let create_shader = |t: GLuint, source: &str| {
-        let len = [source.len() as GLint].as_ptr();
-        let source_ptr = [source.as_ptr() as *const _].as_ptr();
-        let shader;
+    let create_program = |vert_source: &str, frag_source: &str| {
+        let create_shader = |t: GLuint, source: &str| {
+            let len = [source.len() as GLint].as_ptr();
+            let source_ptr = [source.as_ptr() as *const _].as_ptr();
+            let shader;
+            unsafe {
+                shader = gl::CreateShader(t);
+
+                // FIXME: This doesn't actually upload the source when ran with --release.
+                gl::ShaderSource(shader, 1, source_ptr, len);
+
+                let mut uploaded = [0; 10];
+                gl::GetShaderSource(shader, 10, ptr::null_mut(), uploaded.as_mut_ptr());
+
+                gl::CompileShader(shader);
+            }
+            shader
+        };
+
+        let vert_shader = create_shader(gl::VERTEX_SHADER, vert_source);
+        let frag_shader = create_shader(gl::FRAGMENT_SHADER, frag_source);
+
+        let program;
         unsafe {
-            shader = gl::CreateShader(t);
+            program = gl::CreateProgram();
+            gl::AttachShader(program, vert_shader);
+            gl::AttachShader(program, frag_shader);
+            gl::LinkProgram(program);
+            let mut link_status = 0;
+            gl::GetProgramiv(program, gl::LINK_STATUS, &mut link_status);
+            if link_status != gl::TRUE as GLint {
+                let mut info = [0; 1024];
+                gl::GetProgramInfoLog(program, 1024, ptr::null_mut(), info.as_mut_ptr());
+                println!(
+                    "Program linking failed:\n{}",
+                    String::from_utf8_lossy(&mem::transmute::<[i8; 1024], [u8; 1024]>(info)[..])
+                );
+            }
+            gl::UseProgram(program);
 
-            // FIXME: This doesn't actually upload the source when ran with --release.
-            gl::ShaderSource(shader, 1, source_ptr, len);
-
-            let mut uploaded = [0; 10];
-            gl::GetShaderSource(shader, 10, ptr::null_mut(), uploaded.as_mut_ptr());
-
-            gl::CompileShader(shader);
+            PROJECTION_MATRIX_LOCATION =
+                gl::GetUniformLocation(program, "projection_matrix\0".as_ptr() as *const _);
         }
-        shader
+        program
     };
 
-    let vert_shader = create_shader(gl::VERTEX_SHADER, VERT_SHADER_SOURCE);
-    let frag_shader = create_shader(gl::FRAGMENT_SHADER, FRAG_SHADER_SOURCE);
-
-    let program;
     unsafe {
-        program = gl::CreateProgram();
-        gl::AttachShader(program, vert_shader);
-        gl::AttachShader(program, frag_shader);
-        gl::LinkProgram(program);
-        let mut link_status = 0;
-        gl::GetProgramiv(program, gl::LINK_STATUS, &mut link_status);
-        if link_status != gl::TRUE as GLint {
-            let mut info = [0; 1024];
-            gl::GetProgramInfoLog(program, 1024, ptr::null_mut(), info.as_mut_ptr());
-            println!(
-                "Program linking failed:\n{}",
-                String::from_utf8_lossy(&mem::transmute::<[i8; 1024], [u8; 1024]>(info)[..])
-            );
+        for i in 0..TEXTURE_COUNT {
+            let program = create_program(VERTEX_SHADER_SOURCE[i], FRAGMENT_SHADER_SOURCE[i]);
+            SHADER_PROGRAMS[i] = program;
         }
-        gl::UseProgram(program);
-
-        PROJECTION_MATRIX_LOCATION =
-            gl::GetUniformLocation(program, "projection_matrix\0".as_ptr() as *const _);
     }
 
     unsafe {
@@ -90,7 +108,10 @@ pub fn initialize() -> Result<(), Box<Error>> {
         gl::Enable(gl::BLEND);
         gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
 
-        TEXTURES = [create_texture(); TEXTURE_COUNT];
+        for i in 0..TEXTURE_COUNT {
+            TEXTURES[i] = create_texture();
+        }
+
         gl::BindTexture(gl::TEXTURE_2D, TEXTURES[0]);
         gl::TexImage2D(
             gl::TEXTURE_2D,
@@ -102,6 +123,21 @@ pub fn initialize() -> Result<(), Box<Error>> {
             gl::RGBA as GLuint, /* Format of the data */
             gl::UNSIGNED_BYTE,  /* Type of the data*/
             image.pixels.as_ptr() as *const _,
+        );
+
+        // This creates the glyph cache texture
+        gl::BindTexture(gl::TEXTURE_2D, TEXTURES[1]);
+        gl::TexImage2D(
+            gl::TEXTURE_2D,
+            0,
+            gl::RED as GLint, /* Components in texture */
+            text::GLYPH_CACHE_WIDTH as GLint,
+            text::GLYPH_CACHE_HEIGHT as GLint,
+            0,
+            gl::RED as GLuint, /* Format of the data */
+            gl::UNSIGNED_BYTE, /* Type of the data*/
+            vec![0; (text::GLYPH_CACHE_WIDTH * text::GLYPH_CACHE_HEIGHT) as usize].as_ptr()
+                as *const _,
         );
     }
 
@@ -191,14 +227,14 @@ pub(crate) fn render(width: f64, height: f64) {
     let matrix = [
         m00, 0.0, 0.0, -1.0, 0.0, m11, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
     ];
-    unsafe {
-        gl::UniformMatrix4fv(PROJECTION_MATRIX_LOCATION, 1, gl::FALSE, matrix.as_ptr());
-    }
 
     text::draw_text();
 
     for tex_index in 0..TEXTURE_COUNT {
         unsafe {
+            gl::UseProgram(SHADER_PROGRAMS[tex_index]);
+            gl::UniformMatrix4fv(PROJECTION_MATRIX_LOCATION, 1, gl::FALSE, matrix.as_ptr());
+
             gl::BindVertexArray(VAOS[tex_index]);
             gl::BindTexture(gl::TEXTURE_2D, TEXTURES[tex_index]);
             gl::BindBuffer(gl::ARRAY_BUFFER, VBOS[tex_index]);

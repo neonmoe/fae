@@ -151,5 +151,5 @@ fn draw_element(element: &UIElement, text: &str) {
         }
     }
 
-    renderer::queue_text(x, y + 14.0, 0.0, 16.0, text);
+    renderer::queue_text(x, y, 0.0, 16.0, text);
 }

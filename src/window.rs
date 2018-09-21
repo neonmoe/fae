@@ -1,7 +1,9 @@
 use gl;
 use glutin::dpi::*;
+use glutin::os::unix::{WindowBuilderExt, XWindowType};
 use glutin::*;
 use renderer;
+use renderer::DPI_SCALE;
 use std::env;
 use std::error::Error;
 use ui::{self, MouseStatus};
@@ -15,7 +17,12 @@ pub struct Window {
 }
 
 impl Window {
-    pub fn new(title: &str, logical_width: f64, logical_height: f64) -> Result<Window, Box<Error>> {
+    pub fn new(
+        title: &str,
+        logical_width: f64,
+        logical_height: f64,
+        dialog: bool,
+    ) -> Result<Window, Box<Error>> {
         // FIXME: Enable wayland support by not setting the backend to
         // x11 automatically. Note: At the time of writing, wayland
         // support in winit seems to be buggy. At the very least, it
@@ -25,7 +32,12 @@ impl Window {
         let events_loop = EventsLoop::new();
         let window = WindowBuilder::new()
             .with_title(title)
-            .with_dimensions(LogicalSize::new(logical_width, logical_height));
+            .with_dimensions(LogicalSize::new(logical_width, logical_height))
+            .with_x11_window_type(if dialog {
+                XWindowType::Dialog
+            } else {
+                XWindowType::Normal
+            });
         let context = ContextBuilder::new()
             .with_vsync(true)
             .with_gl(GlRequest::Specific(Api::OpenGl, (3, 3)))
@@ -34,9 +46,6 @@ impl Window {
 
         unsafe {
             gl_window.make_current()?;
-        }
-
-        unsafe {
             gl::load_with(|symbol| gl_window.get_proc_address(symbol) as *const _);
             gl::ClearColor(0.85, 0.85, 0.85, 1.0);
         }
@@ -86,6 +95,7 @@ impl Window {
         if let Some(logical_size) = resized_logical_size {
             let dpi_factor = self.gl_window.get_hidpi_factor();
             let physical_size = logical_size.to_physical(dpi_factor);
+
             let (width, height): (u32, u32) = physical_size.into();
             unsafe {
                 gl::Viewport(0, 0, width as i32, height as i32);
@@ -93,6 +103,9 @@ impl Window {
             self.gl_window.resize(physical_size);
             self.width = logical_size.width;
             self.height = logical_size.height;
+
+            let mut lock = DPI_SCALE.lock().unwrap();
+            *lock = dpi_factor as f32;
         }
 
         if let Some(position) = mouse_position {

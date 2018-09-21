@@ -13,7 +13,11 @@ lazy_static! {
         cache: None,
         cached_glyphs: Vec::new(),
     });
+    pub(crate) static ref DPI_SCALE: Mutex<f32> = Mutex::new(1.0);
 }
+
+pub(crate) const GLYPH_CACHE_WIDTH: u32 = 1024;
+pub(crate) const GLYPH_CACHE_HEIGHT: u32 = 1024;
 
 type Depth = f32;
 
@@ -26,7 +30,11 @@ struct TextCache<'a> {
 pub(crate) fn initialize_font(font_data: &'static [u8]) -> Result<(), Box<Error>> {
     let cache = TextCache {
         font: Some(Font::from_bytes(font_data)?),
-        cache: Some(RefCell::new(Cache::builder().dimensions(512, 512).build())),
+        cache: Some(RefCell::new(
+            Cache::builder()
+                .dimensions(GLYPH_CACHE_WIDTH, GLYPH_CACHE_HEIGHT)
+                .build(),
+        )),
         cached_glyphs: Vec::with_capacity(1000),
     };
     let mut lock = TEXT_CACHE.lock()?;
@@ -36,7 +44,15 @@ pub(crate) fn initialize_font(font_data: &'static [u8]) -> Result<(), Box<Error>
 
 pub(crate) fn queue_text(x: f32, y: f32, z: f32, font_size: f32, text: &str) {
     let mut cache = TEXT_CACHE.lock().unwrap();
-    let scale = Scale::uniform(font_size);
+    let dpi;
+    let scale;
+    {
+        let lock = DPI_SCALE.lock().unwrap();
+        dpi = *lock;
+        scale = Scale::uniform(font_size * 4.0 / 3.0 * dpi)
+    }
+    let x = x * dpi;
+    let y = y * dpi;
     let mut glyphs = Vec::new();
     if let Some(ref font) = &cache.font {
         let v_metrics = font.v_metrics(scale);
@@ -46,7 +62,7 @@ pub(crate) fn queue_text(x: f32, y: f32, z: f32, font_size: f32, text: &str) {
         for c in text.nfc() {
             if c.is_control() {
                 if c == '\r' {
-                    caret = point(0.0, caret.y + advance_height);
+                    caret = point(x, caret.y + advance_height);
                 }
                 continue;
             }
@@ -87,20 +103,23 @@ pub(crate) fn draw_text() {
                 rect.min.y as GLint,
                 rect.width() as GLint,
                 rect.height() as GLint,
-                gl::RGBA as GLuint,
+                gl::RED as GLuint,
                 gl::UNSIGNED_BYTE,
                 data.as_ptr() as *const _,
             );
         };
         cache.cache_queued(upload_new_texture).ok();
 
+        let lock = DPI_SCALE.lock().unwrap();
+        let dpi = *lock;
+
         for g in &text_cache.cached_glyphs {
             if let Ok(Some((uv_rect, screen_rect))) = cache.rect_for(0, &g.0) {
                 draw_quad(
-                    screen_rect.min.x as f32,
-                    screen_rect.min.y as f32,
-                    screen_rect.width() as f32,
-                    screen_rect.height() as f32,
+                    screen_rect.min.x as f32 / dpi,
+                    screen_rect.min.y as f32 / dpi,
+                    screen_rect.width() as f32 / dpi,
+                    screen_rect.height() as f32 / dpi,
                     g.1,
                     uv_rect.min.x,
                     uv_rect.min.y,
