@@ -10,6 +10,22 @@ static mut PROJECTION_MATRIX_LOCATION: GLint = -1;
 const VERT_SHADER_SOURCE: &'static str = include_str!("shaders/texquad.vert");
 const FRAG_SHADER_SOURCE: &'static str = include_str!("shaders/texquad.frag");
 
+const MAX_QUADS: usize = 16_000_000 / mem::size_of::<TexQuad>(); // 16 MB vertex buffers
+const TEXTURE_COUNT: usize = 2; // UI elements, glyph cache
+
+type TexQuad = [f32; 30];
+type VertexBufferData = [TexQuad; MAX_QUADS];
+type Texture = GLuint;
+type VertexBufferObject = GLuint;
+type VertexArrayObject = GLuint;
+
+static mut QUAD_COUNTS: [usize; TEXTURE_COUNT] = [0; TEXTURE_COUNT];
+static mut TEXTURES: [Texture; TEXTURE_COUNT] = [0; TEXTURE_COUNT];
+static mut VBOS: [VertexBufferObject; TEXTURE_COUNT] = [0; TEXTURE_COUNT];
+static mut VAOS: [VertexArrayObject; TEXTURE_COUNT] = [0; TEXTURE_COUNT];
+static mut VERTEX_BUFFERS: [VertexBufferData; TEXTURE_COUNT] =
+    [[[0.0; 30]; MAX_QUADS]; TEXTURE_COUNT];
+
 pub fn initialize() {
     let create_shader = |t: GLuint, source: &str| {
         let len = [source.len() as GLint].as_ptr();
@@ -23,7 +39,6 @@ pub fn initialize() {
 
             let mut uploaded = [0; 10];
             gl::GetShaderSource(shader, 10, ptr::null_mut(), uploaded.as_mut_ptr());
-            println!("{:?}", uploaded);
 
             gl::CompileShader(shader);
         }
@@ -55,51 +70,22 @@ pub fn initialize() {
             gl::GetUniformLocation(program, "projection_matrix\0".as_ptr() as *const _);
     }
 
-    let mut vao = 0;
     unsafe {
-        gl::GenVertexArrays(1, &mut vao);
-        gl::BindVertexArray(vao);
-
-        let mut buffer = 0;
-        gl::GenBuffers(1, &mut buffer);
-        gl::BindBuffer(gl::ARRAY_BUFFER, buffer);
-
-        /* Setup position attribute */
-        gl::VertexAttribPointer(
-            0,             /* Attrib location */
-            3,             /* Components */
-            gl::FLOAT,     /* Type */
-            gl::FALSE,     /* Normalize */
-            20,            /* Stride: sizeof(f32) * (Total component count)*/
-            0 as *const _, /* Offset */
-        );
-        gl::EnableVertexAttribArray(0 /* Attribute location */);
-
-        /* Setup texture coordinate attribute */
-        gl::VertexAttribPointer(
-            1,              /* Attrib location */
-            2,              /* Components */
-            gl::FLOAT,      /* Type */
-            gl::FALSE,      /* Normalize */
-            20,             /* Stride: sizeof(f32) * (Total component count)*/
-            12 as *const _, /* Offset: sizeof(f32) * (Position's component count) */
-        );
-        gl::EnableVertexAttribArray(1 /* Attribute location */);
+        for i in 0..TEXTURE_COUNT {
+            let (vao, vbo) = create_vao();
+            VAOS[i] = vao;
+            VBOS[i] = vbo;
+        }
     }
 
-    let mut tex = 0;
     unsafe {
         let image = load_image("images/gui.png").unwrap();
 
         gl::Enable(gl::BLEND);
         gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
 
-        gl::GenTextures(1, &mut tex);
-        gl::BindTexture(gl::TEXTURE_2D, tex);
-        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::REPEAT as GLint);
-        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, gl::REPEAT as GLint);
-        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as GLint);
-        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::NEAREST as GLint);
+        TEXTURES = [create_texture(); TEXTURE_COUNT];
+        gl::BindTexture(gl::TEXTURE_2D, TEXTURES[0]);
         gl::TexImage2D(
             gl::TEXTURE_2D,
             0,
@@ -116,10 +102,60 @@ pub fn initialize() {
     print_gl_errors("after initialization");
 }
 
-static MAX_QUADS: usize = 800_000;
-static mut CURRENT_QUAD_COUNT: usize = 0;
-static mut VERTICES: [[f32; 30]; 800_000] = [[0.0; 30]; 800_000];
+unsafe fn create_vao() -> (VertexArrayObject, VertexBufferObject) {
+    let mut vao = 0;
+    gl::GenVertexArrays(1, &mut vao);
+    gl::BindVertexArray(vao);
 
+    let mut vbo = 0;
+    gl::GenBuffers(1, &mut vbo);
+    gl::BindBuffer(gl::ARRAY_BUFFER, vbo);
+
+    /* Setup position attribute */
+    gl::VertexAttribPointer(
+        0,             /* Attrib location */
+        3,             /* Components */
+        gl::FLOAT,     /* Type */
+        gl::FALSE,     /* Normalize */
+        20,            /* Stride: sizeof(f32) * (Total component count)*/
+        0 as *const _, /* Offset */
+    );
+    gl::EnableVertexAttribArray(0 /* Attribute location */);
+
+    /* Setup texture coordinate attribute */
+    gl::VertexAttribPointer(
+        1,              /* Attrib location */
+        2,              /* Components */
+        gl::FLOAT,      /* Type */
+        gl::FALSE,      /* Normalize */
+        20,             /* Stride: sizeof(f32) * (Total component count)*/
+        12 as *const _, /* Offset: sizeof(f32) * (Position's component count) */
+    );
+    gl::EnableVertexAttribArray(1 /* Attribute location */);
+
+    (vao, vbo)
+}
+
+unsafe fn create_texture() -> GLuint {
+    let mut tex = 0;
+    gl::GenTextures(1, &mut tex);
+    gl::BindTexture(gl::TEXTURE_2D, tex);
+    gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::REPEAT as GLint);
+    gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, gl::REPEAT as GLint);
+    gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as GLint);
+    gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::NEAREST as GLint);
+    tex
+}
+
+pub(crate) fn draw_text(_x: f32, _y: f32, _z: f32, _font_size: f32, _text: &str) {
+    // TODO: Implement this
+    // Queue glyphs to rusttype cache
+    // Upload texture from cache
+    // Loop through the glyphs to render them, much like draw_quad
+}
+
+/// Pretty much just a safe public wrapper for queue_quad. Used when
+/// drawing UI element sprites.
 pub(crate) fn draw_quad(
     x: f32,
     y: f32,
@@ -131,20 +167,37 @@ pub(crate) fn draw_quad(
     tw: f32,
     th: f32,
 ) {
+    queue_quad(x, y, w, h, z, tx, ty, tw, th, 0);
+}
+
+fn queue_quad(
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+    z: f32,
+    tx: f32,
+    ty: f32,
+    tw: f32,
+    th: f32,
+    tex_index: usize,
+) {
     let (x0, y0, x1, y1, tx0, ty0, tx1, ty1) = (x, y, x + w, y + h, tx, ty, tx + tw, ty + th);
-    if unsafe { CURRENT_QUAD_COUNT } < MAX_QUADS {
-        let quad: [f32; 30] = [
+    if unsafe { QUAD_COUNTS[tex_index] } < MAX_QUADS {
+        let quad: TexQuad = [
             x0, y0, z, tx0, ty0, x1, y0, z, tx1, ty0, x1, y1, z, tx1, ty1, x0, y0, z, tx0, ty0, x1,
             y1, z, tx1, ty1, x0, y1, z, tx0, ty1,
         ];
         unsafe {
             ptr::copy(
                 quad.as_ptr(),
-                VERTICES[CURRENT_QUAD_COUNT].as_mut_ptr(),
-                mem::size_of::<[f32; 30]>(),
+                VERTEX_BUFFERS[tex_index][QUAD_COUNTS[tex_index]].as_mut_ptr(),
+                mem::size_of::<TexQuad>(),
             );
-            CURRENT_QUAD_COUNT += 1;
+            QUAD_COUNTS[tex_index] += 1;
         }
+    } else {
+        println!("Too many quads!");
     }
 }
 
@@ -155,18 +208,24 @@ pub(crate) fn render(width: f64, height: f64) {
         m00, 0.0, 0.0, -1.0, 0.0, m11, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
     ];
     unsafe {
-        if CURRENT_QUAD_COUNT == MAX_QUADS {
-            println!("Too many quads!");
-        }
         gl::UniformMatrix4fv(PROJECTION_MATRIX_LOCATION, 1, gl::FALSE, matrix.as_ptr());
-        gl::BufferData(
-            gl::ARRAY_BUFFER,
-            (mem::size_of::<[f32; 30]>() * CURRENT_QUAD_COUNT) as isize,
-            VERTICES.as_ptr() as *const _,
-            gl::STREAM_DRAW,
-        );
-        gl::DrawArrays(gl::TRIANGLES, 0, CURRENT_QUAD_COUNT as i32 * 6);
-        CURRENT_QUAD_COUNT = 0;
+    }
+
+    for tex_index in 0..TEXTURE_COUNT {
+        unsafe {
+            gl::BindVertexArray(VAOS[tex_index]);
+            gl::BindTexture(gl::TEXTURE_2D, TEXTURES[tex_index]);
+            gl::BindBuffer(gl::ARRAY_BUFFER, VBOS[tex_index]);
+
+            gl::BufferData(
+                gl::ARRAY_BUFFER,
+                (mem::size_of::<TexQuad>() * QUAD_COUNTS[tex_index]) as isize,
+                VERTEX_BUFFERS[tex_index].as_ptr() as *const _,
+                gl::STREAM_DRAW,
+            );
+            gl::DrawArrays(gl::TRIANGLES, 0, QUAD_COUNTS[tex_index] as i32 * 6);
+            QUAD_COUNTS[tex_index] = 0;
+        }
     }
 }
 

@@ -83,15 +83,15 @@ pub fn update(width: f64, height: f64, mouse: MouseStatus) -> UIStatus {
     UIStatus { hovering_button }
 }
 
-pub fn label(_label: &str) {
+pub fn label(label: &str) {
     let mut state = UI_STATE.lock().unwrap();
 
     let element = new_element(&state, UIElementType::Panel);
-    draw_element(&element);
+    draw_element(&element, label);
     state.elements.push(element);
 }
 
-pub fn button(_label: &str) -> bool {
+pub fn button(label: &str) -> bool {
     let mut state = UI_STATE.lock().unwrap();
 
     let mut element = new_element(&state, UIElementType::ButtonNormal);
@@ -107,7 +107,7 @@ pub fn button(_label: &str) -> bool {
         element.t = UIElementType::ButtonHovered;
     }
 
-    draw_element(&element);
+    draw_element(&element, label);
     state.elements.push(element);
     state.hovering |= hovered;
 
@@ -130,7 +130,7 @@ fn new_element(state: &UIState, t: UIElementType) -> UIElement {
 }
 
 #[cfg_attr(rustfmt, rustfmt_skip)]
-fn draw_element(element: &UIElement) {
+fn draw_element(element: &UIElement, text: &str) {
     let &UIElement { t, x, y, w, h, .. } = element;
 
     if t != UIElementType::NoBackground {
@@ -150,4 +150,6 @@ fn draw_element(element: &UIElement) {
             renderer::draw_quad(x[xi], y[yi], w[xi], h[yi], 0.0, tx[xi], ty[yi], tw, th);
         }
     }
+
+    renderer::draw_text(x, y + 14.0, 0.0, 16.0, text);
 }
