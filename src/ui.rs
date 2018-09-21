@@ -147,9 +147,9 @@ fn draw_element(element: &UIElement, text: &str) {
         for i in 0..9 {
             let xi = i % 3;
             let yi = i / 3;
-            renderer::draw_quad(x[xi], y[yi], w[xi], h[yi], 0.0, tx[xi], ty[yi], tw, th);
+            renderer::draw_quad(x[xi], y[yi], w[xi], h[yi], 0.0, tx[xi], ty[yi], tw, th, 0);
         }
     }
 
-    renderer::draw_text(x, y + 14.0, 0.0, 16.0, text);
+    renderer::queue_text(x, y + 14.0, 0.0, 16.0, text);
 }

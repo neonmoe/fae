@@ -1,7 +1,9 @@
 use gl;
 use glutin::dpi::*;
 use glutin::*;
+use renderer;
 use std::env;
+use std::error::Error;
 use ui::{self, MouseStatus};
 
 pub struct Window {
@@ -13,7 +15,7 @@ pub struct Window {
 }
 
 impl Window {
-    pub fn new(title: &str, logical_width: f64, logical_height: f64) -> Window {
+    pub fn new(title: &str, logical_width: f64, logical_height: f64) -> Result<Window, Box<Error>> {
         // FIXME: Enable wayland support by not setting the backend to
         // x11 automatically. Note: At the time of writing, wayland
         // support in winit seems to be buggy. At the very least, it
@@ -28,10 +30,10 @@ impl Window {
             .with_vsync(true)
             .with_gl(GlRequest::Specific(Api::OpenGl, (3, 3)))
             .with_gl_profile(GlProfile::Core);
-        let gl_window = GlWindow::new(window, context, &events_loop).unwrap();
+        let gl_window = GlWindow::new(window, context, &events_loop)?;
 
         unsafe {
-            gl_window.make_current().unwrap();
+            gl_window.make_current()?;
         }
 
         unsafe {
@@ -39,7 +41,10 @@ impl Window {
             gl::ClearColor(0.85, 0.85, 0.85, 1.0);
         }
 
-        Window {
+        renderer::initialize()?;
+        renderer::initialize_font(include_bytes!("fonts/FiraSans.ttf"))?;
+
+        Ok(Window {
             width: logical_width,
             height: logical_height,
             gl_window,
@@ -50,7 +55,7 @@ impl Window {
                 last_pressed: false,
                 pressed: false,
             },
-        }
+        })
     }
 
     pub fn refresh(&mut self) -> bool {

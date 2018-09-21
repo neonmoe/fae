@@ -4,6 +4,8 @@ extern crate glutin;
 #[macro_use]
 extern crate lazy_static;
 extern crate png;
+extern crate rusttype;
+extern crate unicode_normalization;
 
 #[cfg(feature = "window_bootstrap")]
 mod window;

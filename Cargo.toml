@@ -5,9 +5,11 @@ authors = ["Jens Pitkanen <jens@neon.moe>"]
 
 [dependencies]
 gl = "0.10"
-glutin = { version = "0.18", optional = true }
 png = "0.12"
 lazy_static = "1.1"
+rusttype = { version = "0.7", features = ["gpu_cache"] }
+unicode-normalization = "0.1"
+glutin = { version = "0.18", optional = true }
 
 [features]
 default = ["window_bootstrap"]

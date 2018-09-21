@@ -2,8 +2,7 @@ extern crate fungui as ui;
 extern crate gl;
 
 fn main() {
-    let mut window = ui::Window::new(file!(), 320.0, 240.0);
-    ui::initialize();
+    let mut window = ui::Window::new(file!(), 320.0, 240.0).unwrap();
     let mut counter: i64 = 0;
     while window.refresh() {
         ui::label(&format!("Counter: {}", counter));

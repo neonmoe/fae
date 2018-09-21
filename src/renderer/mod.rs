@@ -1,14 +1,18 @@
 // FIXME: Get rid of as many unsafes as possible.
 
+mod text;
+pub(crate) use self::text::{initialize_font, queue_text};
+
 use gl;
 use gl::types::*;
 use image::load_image;
+use std::error::Error;
 use std::mem;
 use std::ptr;
 
 static mut PROJECTION_MATRIX_LOCATION: GLint = -1;
-const VERT_SHADER_SOURCE: &'static str = include_str!("shaders/texquad.vert");
-const FRAG_SHADER_SOURCE: &'static str = include_str!("shaders/texquad.frag");
+const VERT_SHADER_SOURCE: &'static str = include_str!("../shaders/texquad.vert");
+const FRAG_SHADER_SOURCE: &'static str = include_str!("../shaders/texquad.frag");
 
 const MAX_QUADS: usize = 16_000_000 / mem::size_of::<TexQuad>(); // 16 MB vertex buffers
 const TEXTURE_COUNT: usize = 2; // UI elements, glyph cache
@@ -20,13 +24,15 @@ type VertexBufferObject = GLuint;
 type VertexArrayObject = GLuint;
 
 static mut QUAD_COUNTS: [usize; TEXTURE_COUNT] = [0; TEXTURE_COUNT];
+/// The textures are always in the same order:
+/// [GUI elements spritesheet, Glyph Cache]
 static mut TEXTURES: [Texture; TEXTURE_COUNT] = [0; TEXTURE_COUNT];
 static mut VBOS: [VertexBufferObject; TEXTURE_COUNT] = [0; TEXTURE_COUNT];
 static mut VAOS: [VertexArrayObject; TEXTURE_COUNT] = [0; TEXTURE_COUNT];
 static mut VERTEX_BUFFERS: [VertexBufferData; TEXTURE_COUNT] =
     [[[0.0; 30]; MAX_QUADS]; TEXTURE_COUNT];
 
-pub fn initialize() {
+pub fn initialize() -> Result<(), Box<Error>> {
     let create_shader = |t: GLuint, source: &str| {
         let len = [source.len() as GLint].as_ptr();
         let source_ptr = [source.as_ptr() as *const _].as_ptr();
@@ -79,7 +85,7 @@ pub fn initialize() {
     }
 
     unsafe {
-        let image = load_image("images/gui.png").unwrap();
+        let image = load_image("images/gui.png")?;
 
         gl::Enable(gl::BLEND);
         gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
@@ -100,6 +106,7 @@ pub fn initialize() {
     }
 
     print_gl_errors("after initialization");
+    Ok(())
 }
 
 unsafe fn create_vao() -> (VertexArrayObject, VertexBufferObject) {
@@ -147,30 +154,7 @@ unsafe fn create_texture() -> GLuint {
     tex
 }
 
-pub(crate) fn draw_text(_x: f32, _y: f32, _z: f32, _font_size: f32, _text: &str) {
-    // TODO: Implement this
-    // Queue glyphs to rusttype cache
-    // Upload texture from cache
-    // Loop through the glyphs to render them, much like draw_quad
-}
-
-/// Pretty much just a safe public wrapper for queue_quad. Used when
-/// drawing UI element sprites.
 pub(crate) fn draw_quad(
-    x: f32,
-    y: f32,
-    w: f32,
-    h: f32,
-    z: f32,
-    tx: f32,
-    ty: f32,
-    tw: f32,
-    th: f32,
-) {
-    queue_quad(x, y, w, h, z, tx, ty, tw, th, 0);
-}
-
-fn queue_quad(
     x: f32,
     y: f32,
     w: f32,
@@ -210,6 +194,8 @@ pub(crate) fn render(width: f64, height: f64) {
     unsafe {
         gl::UniformMatrix4fv(PROJECTION_MATRIX_LOCATION, 1, gl::FALSE, matrix.as_ptr());
     }
+
+    text::draw_text();
 
     for tex_index in 0..TEXTURE_COUNT {
         unsafe {
