@@ -41,52 +41,6 @@ const FRAGMENT_SHADER_SOURCE: [&'static str; TEXTURE_COUNT] = [
 ];
 
 pub fn initialize() -> Result<(), Box<Error>> {
-    let create_program = |vert_source: &str, frag_source: &str| {
-        let create_shader = |t: GLuint, source: &str| {
-            let len = [source.len() as GLint].as_ptr();
-            let source_ptr = [source.as_ptr() as *const _].as_ptr();
-            let shader;
-            unsafe {
-                shader = gl::CreateShader(t);
-
-                // FIXME: This doesn't actually upload the source when ran with --release.
-                gl::ShaderSource(shader, 1, source_ptr, len);
-
-                let mut uploaded = [0; 10];
-                gl::GetShaderSource(shader, 10, ptr::null_mut(), uploaded.as_mut_ptr());
-
-                gl::CompileShader(shader);
-            }
-            shader
-        };
-
-        let vert_shader = create_shader(gl::VERTEX_SHADER, vert_source);
-        let frag_shader = create_shader(gl::FRAGMENT_SHADER, frag_source);
-
-        let program;
-        unsafe {
-            program = gl::CreateProgram();
-            gl::AttachShader(program, vert_shader);
-            gl::AttachShader(program, frag_shader);
-            gl::LinkProgram(program);
-            let mut link_status = 0;
-            gl::GetProgramiv(program, gl::LINK_STATUS, &mut link_status);
-            if link_status != gl::TRUE as GLint {
-                let mut info = [0; 1024];
-                gl::GetProgramInfoLog(program, 1024, ptr::null_mut(), info.as_mut_ptr());
-                println!(
-                    "Program linking failed:\n{}",
-                    String::from_utf8_lossy(&mem::transmute::<[i8; 1024], [u8; 1024]>(info)[..])
-                );
-            }
-            gl::UseProgram(program);
-
-            PROJECTION_MATRIX_LOCATION =
-                gl::GetUniformLocation(program, "projection_matrix\0".as_ptr() as *const _);
-        }
-        program
-    };
-
     unsafe {
         for i in 0..TEXTURE_COUNT {
             let program = create_program(VERTEX_SHADER_SOURCE[i], FRAGMENT_SHADER_SOURCE[i]);
@@ -143,6 +97,53 @@ pub fn initialize() -> Result<(), Box<Error>> {
 
     print_gl_errors("after initialization");
     Ok(())
+}
+
+fn create_program(vert_source: &str, frag_source: &str) -> ShaderProgram {
+    let vert_shader = create_shader(gl::VERTEX_SHADER, vert_source);
+    let frag_shader = create_shader(gl::FRAGMENT_SHADER, frag_source);
+
+    let program;
+    unsafe {
+        program = gl::CreateProgram();
+        gl::AttachShader(program, vert_shader);
+        gl::AttachShader(program, frag_shader);
+        gl::LinkProgram(program);
+        let mut link_status = 0;
+        gl::GetProgramiv(program, gl::LINK_STATUS, &mut link_status);
+        if link_status != gl::TRUE as GLint {
+            let mut info = [0; 1024];
+            gl::GetProgramInfoLog(program, 1024, ptr::null_mut(), info.as_mut_ptr());
+            println!(
+                "Program linking failed:\n{}",
+                String::from_utf8_lossy(&mem::transmute::<[i8; 1024], [u8; 1024]>(info)[..])
+            );
+        }
+        gl::UseProgram(program);
+
+        PROJECTION_MATRIX_LOCATION =
+            gl::GetUniformLocation(program, "projection_matrix\0".as_ptr() as *const _);
+    }
+
+    program
+}
+
+fn create_shader(t: GLuint, source: &str) -> GLuint {
+    let len = [source.len() as GLint].as_ptr();
+    let source_ptr = [source.as_ptr() as *const _].as_ptr();
+    let shader;
+    unsafe {
+        shader = gl::CreateShader(t);
+
+        // FIXME: This doesn't actually upload the source when ran with --release.
+        gl::ShaderSource(shader, 1, source_ptr, len);
+
+        let mut uploaded = [0; 10];
+        gl::GetShaderSource(shader, 10, ptr::null_mut(), uploaded.as_mut_ptr());
+
+        gl::CompileShader(shader);
+    }
+    shader
 }
 
 unsafe fn create_vao() -> (VertexArrayObject, VertexBufferObject) {
