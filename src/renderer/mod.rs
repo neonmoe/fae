@@ -43,6 +43,12 @@ const FRAGMENT_SHADER_SOURCE: [&'static str; TEXTURE_COUNT] = [
 
 pub fn initialize(ui_spritesheet_image: Vec<u8>) -> Result<(), Box<Error>> {
     unsafe {
+        gl::Enable(gl::DEPTH_TEST);
+        gl::Enable(gl::BLEND);
+        gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
+    }
+
+    unsafe {
         for i in 0..TEXTURE_COUNT {
             let program = create_program(VERTEX_SHADER_SOURCE[i], FRAGMENT_SHADER_SOURCE[i]);
             SHADER_PROGRAMS[i] = program;
@@ -58,9 +64,6 @@ pub fn initialize(ui_spritesheet_image: Vec<u8>) -> Result<(), Box<Error>> {
     }
 
     unsafe {
-        gl::Enable(gl::BLEND);
-        gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
-
         for i in 0..TEXTURE_COUNT {
             TEXTURES[i] = create_texture();
         }
@@ -192,18 +195,17 @@ unsafe fn create_texture() -> GLuint {
 }
 
 pub(crate) fn draw_quad(
-    x: f32,
-    y: f32,
-    w: f32,
-    h: f32,
+    x0: f32,
+    y0: f32,
+    x1: f32,
+    y1: f32,
     z: f32,
-    tx: f32,
-    ty: f32,
-    tw: f32,
-    th: f32,
+    tx0: f32,
+    ty0: f32,
+    tx1: f32,
+    ty1: f32,
     tex_index: usize,
 ) {
-    let (x0, y0, x1, y1, tx0, ty0, tx1, ty1) = (x, y, x + w, y + h, tx, ty, tx + tw, ty + th);
     if unsafe { QUAD_COUNTS[tex_index] } < MAX_QUADS {
         let quad: TexQuad = [
             x0, y0, z, tx0, ty0, x1, y0, z, tx1, ty0, x1, y1, z, tx1, ty1, x0, y0, z, tx0, ty0, x1,

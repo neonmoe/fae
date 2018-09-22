@@ -125,7 +125,7 @@ impl Window {
             running = false;
         }
         unsafe {
-            gl::Clear(gl::COLOR_BUFFER_BIT);
+            gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
         }
 
         let mut resized_logical_size = None;
@@ -144,6 +144,7 @@ impl Window {
             _ => (),
         });
 
+        /* Resize event handling */
         if let Some(logical_size) = resized_logical_size {
             let dpi_factor = self.gl_window.get_hidpi_factor();
             let physical_size = logical_size.to_physical(dpi_factor);
@@ -159,16 +160,19 @@ impl Window {
             renderer::update_dpi(dpi_factor as f32);
         }
 
+        /* Mouse move event handling */
         if let Some(position) = mouse_position {
             self.mouse.x = position.x as f32;
             self.mouse.y = position.y as f32;
         }
 
+        /* Mouse button event handling */
         self.mouse.last_pressed = self.mouse.pressed;
         if let Some(pressed) = mouse_pressed {
             self.mouse.pressed = pressed;
         }
 
+        renderer::render(self.width, self.height);
         ui::update(self.width, self.height, self.mouse);
 
         running

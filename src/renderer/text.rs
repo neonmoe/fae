@@ -124,13 +124,13 @@ pub(crate) fn draw_text() {
                 draw_quad(
                     screen_rect.min.x as f32 / dpi,
                     screen_rect.min.y as f32 / dpi,
-                    screen_rect.width() as f32 / dpi,
-                    screen_rect.height() as f32 / dpi,
+                    screen_rect.max.x as f32 / dpi,
+                    screen_rect.max.y as f32 / dpi,
                     g.1,
                     uv_rect.min.x,
                     uv_rect.min.y,
-                    uv_rect.width(),
-                    uv_rect.height(),
+                    uv_rect.max.x,
+                    uv_rect.max.y,
                     1,
                 );
             }
