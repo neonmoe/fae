@@ -99,13 +99,29 @@ pub fn initialize() -> Result<(), Box<Error>> {
     Ok(())
 }
 
+#[inline]
 fn create_program(vert_source: &str, frag_source: &str) -> ShaderProgram {
-    let vert_shader = create_shader(gl::VERTEX_SHADER, vert_source);
-    let frag_shader = create_shader(gl::FRAGMENT_SHADER, frag_source);
-
     let program;
     unsafe {
         program = gl::CreateProgram();
+
+        let vert_shader = gl::CreateShader(gl::VERTEX_SHADER);
+        gl::ShaderSource(
+            vert_shader,
+            1,
+            [vert_source.as_ptr() as *const _].as_ptr(),
+            [vert_source.len() as GLint].as_ptr(),
+        );
+        gl::CompileShader(vert_shader);
+        let frag_shader = gl::CreateShader(gl::FRAGMENT_SHADER);
+        gl::ShaderSource(
+            frag_shader,
+            1,
+            [frag_source.as_ptr() as *const _].as_ptr(),
+            [frag_source.len() as GLint].as_ptr(),
+        );
+        gl::CompileShader(frag_shader);
+
         gl::AttachShader(program, vert_shader);
         gl::AttachShader(program, frag_shader);
         gl::LinkProgram(program);
@@ -128,24 +144,7 @@ fn create_program(vert_source: &str, frag_source: &str) -> ShaderProgram {
     program
 }
 
-fn create_shader(t: GLuint, source: &str) -> GLuint {
-    let len = [source.len() as GLint].as_ptr();
-    let source_ptr = [source.as_ptr() as *const _].as_ptr();
-    let shader;
-    unsafe {
-        shader = gl::CreateShader(t);
-
-        // FIXME: This doesn't actually upload the source when ran with --release.
-        gl::ShaderSource(shader, 1, source_ptr, len);
-
-        let mut uploaded = [0; 10];
-        gl::GetShaderSource(shader, 10, ptr::null_mut(), uploaded.as_mut_ptr());
-
-        gl::CompileShader(shader);
-    }
-    shader
-}
-
+#[inline]
 unsafe fn create_vao() -> (VertexArrayObject, VertexBufferObject) {
     let mut vao = 0;
     gl::GenVertexArrays(1, &mut vao);
@@ -180,6 +179,7 @@ unsafe fn create_vao() -> (VertexArrayObject, VertexBufferObject) {
     (vao, vbo)
 }
 
+#[inline]
 unsafe fn create_texture() -> GLuint {
     let mut tex = 0;
     gl::GenTextures(1, &mut tex);
