@@ -1,5 +1,6 @@
 use gl;
 use glutin::dpi::*;
+#[cfg(unix)]
 use glutin::os::unix::{WindowBuilderExt, XWindowType};
 use glutin::*;
 use renderer;
@@ -30,14 +31,12 @@ impl Window {
         env::set_var("WINIT_UNIX_BACKEND", "x11");
 
         let events_loop = EventsLoop::new();
-        let window = WindowBuilder::new()
+        let mut window = WindowBuilder::new()
             .with_title(title)
-            .with_dimensions(LogicalSize::new(logical_width, logical_height))
-            .with_x11_window_type(if dialog {
-                XWindowType::Dialog
-            } else {
-                XWindowType::Normal
-            });
+            .with_dimensions(LogicalSize::new(logical_width, logical_height));
+        if dialog {
+            window = Window::window_as_dialog(window);
+        }
         let context = ContextBuilder::new()
             .with_vsync(true)
             .with_gl(GlRequest::Specific(Api::OpenGl, (3, 3)))
@@ -121,5 +120,14 @@ impl Window {
         ui::update(self.width, self.height, self.mouse);
 
         running
+    }
+
+    #[cfg(unix)]
+    fn window_as_dialog(window: WindowBuilder) -> WindowBuilder {
+        window.with_x11_window_type(XWindowType::Dialog)
+    }
+    #[cfg(not(unix))]
+    fn window_as_dialog(window: WindowBuilder) -> WindowBuilder {
+        window
     }
 }

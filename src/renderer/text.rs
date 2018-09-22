@@ -53,7 +53,7 @@ pub(crate) fn queue_text(x: f32, y: f32, z: f32, font_size: f32, text: &str) {
     }
     let x = x * dpi;
     let y = y * dpi;
-    let mut glyphs = Vec::new();
+    let mut glyphs = Vec::with_capacity(text.len());
     if let Some(ref font) = &cache.font {
         let v_metrics = font.v_metrics(scale);
         let advance_height = v_metrics.ascent - v_metrics.descent + v_metrics.line_gap;
@@ -80,22 +80,22 @@ pub(crate) fn queue_text(x: f32, y: f32, z: f32, font_size: f32, text: &str) {
     cache.cached_glyphs.extend_from_slice(&glyphs);
 }
 
-// FIXME: The text isn't rendering nice. Possible reason: No
-// glTexImage2D is called for the glyph cache, so subimage might not
-// have a good time with that.
 pub(crate) fn draw_text() {
     let mut text_cache = TEXT_CACHE.lock().unwrap();
 
     if let Some(ref cache) = &text_cache.cache {
         let mut cache = cache.borrow_mut();
-        let tex = unsafe { TEXTURES[1] };
 
         for glyph in &text_cache.cached_glyphs {
             cache.queue_glyph(0, glyph.0.clone());
         }
 
-        let upload_new_texture = |rect: Rect<u32>, data: &[u8]| unsafe {
+        unsafe {
+            let tex = TEXTURES[1];
             gl::BindTexture(gl::TEXTURE_2D, tex);
+        }
+
+        let upload_new_texture = |rect: Rect<u32>, data: &[u8]| unsafe {
             gl::TexSubImage2D(
                 gl::TEXTURE_2D,
                 0,
@@ -129,6 +129,10 @@ pub(crate) fn draw_text() {
                 );
             }
         }
+
+        // FIXME: The line below is just for debugging purposes, to
+        // see what the cache contains.
+        draw_quad(200.0, 100.0, 1024.0, 1024.0, 0.5, 0.0, 0.0, 1.0, 1.0, 1);
     }
 
     text_cache.cached_glyphs.clear();

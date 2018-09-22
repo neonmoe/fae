@@ -89,7 +89,7 @@ pub fn initialize() -> Result<(), Box<Error>> {
             text::GLYPH_CACHE_HEIGHT as GLint,
             0,
             gl::RED as GLuint, /* Format of the data */
-            gl::UNSIGNED_BYTE, /* Type of the data*/
+            gl::UNSIGNED_BYTE, /* Type of the data */
             vec![0; (text::GLYPH_CACHE_WIDTH * text::GLYPH_CACHE_HEIGHT) as usize].as_ptr()
                 as *const _,
         );
