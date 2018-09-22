@@ -27,7 +27,7 @@ struct TextCache<'a> {
     cached_glyphs: Vec<(PositionedGlyph<'a>, Depth)>,
 }
 
-pub fn initialize_font(font_data: &'static [u8]) -> Result<(), Box<Error>> {
+pub fn initialize_font(font_data: Vec<u8>) -> Result<(), Box<Error>> {
     let cache = TextCache {
         font: Some(Font::from_bytes(font_data)?),
         cache: Some(RefCell::new(
@@ -135,10 +135,6 @@ pub(crate) fn draw_text() {
                 );
             }
         }
-
-        // FIXME: The line below is just for debugging purposes, to
-        // see what the cache contains.
-        draw_quad(200.0, 100.0, 1024.0, 1024.0, 0.5, 0.0, 0.0, 1.0, 1.0, 1);
     }
 
     text_cache.cached_glyphs.clear();

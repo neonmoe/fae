@@ -1,4 +1,4 @@
-// FIXME: Get rid of as many unsafes as possible.
+// FIXME: Consider cleaning up some unnecessary unsafes
 
 mod text;
 pub(crate) use self::text::queue_text;
@@ -8,7 +8,6 @@ use gl;
 use gl::types::*;
 use image::load_image;
 use std::error::Error;
-use std::io::Read;
 use std::mem;
 use std::ptr;
 
@@ -42,7 +41,7 @@ const FRAGMENT_SHADER_SOURCE: [&'static str; TEXTURE_COUNT] = [
     include_str!("../shaders/text.frag"),
 ];
 
-pub fn initialize<R: Read>(ui_spritesheet_image: R) -> Result<(), Box<Error>> {
+pub fn initialize(ui_spritesheet_image: Vec<u8>) -> Result<(), Box<Error>> {
     unsafe {
         for i in 0..TEXTURE_COUNT {
             let program = create_program(VERTEX_SHADER_SOURCE[i], FRAGMENT_SHADER_SOURCE[i]);
@@ -66,7 +65,7 @@ pub fn initialize<R: Read>(ui_spritesheet_image: R) -> Result<(), Box<Error>> {
             TEXTURES[i] = create_texture();
         }
 
-        let image = load_image(ui_spritesheet_image).unwrap();
+        let image = load_image(&*ui_spritesheet_image).unwrap();
         gl::BindTexture(gl::TEXTURE_2D, TEXTURES[0]);
         gl::TexImage2D(
             gl::TEXTURE_2D,

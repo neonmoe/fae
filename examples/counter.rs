@@ -2,14 +2,12 @@ extern crate fungui as ui;
 extern crate gl;
 
 fn main() {
-    let mut window = ui::Window::new(
-        file!(),
-        150.0,
-        170.0,
-        true,
-        ui::resources::DEFAULT_UI_SPRITESHEET,
-        ui::resources::DEFAULT_FONT,
-    ).unwrap();
+    let mut window = ui::Window::new(ui::WindowSettings {
+        width: 150.0,
+        height: 170.0,
+        is_dialog: true,
+        ..Default::default()
+    }).unwrap();
 
     let mut counter: i64 = 0;
     while window.refresh() {

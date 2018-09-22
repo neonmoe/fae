@@ -4,9 +4,68 @@ use glutin::dpi::*;
 use glutin::os::unix::{WindowBuilderExt, XWindowType};
 use glutin::*;
 use renderer;
+#[cfg(feature = "default_resources")]
+use resources;
+use std::default::Default;
 use std::env;
 use std::error::Error;
+use std::fmt;
 use ui::{self, MouseStatus};
+
+pub struct WindowSettings {
+    pub title: String,
+    pub width: f64,
+    pub height: f64,
+    pub is_dialog: bool,
+    pub ui_spritesheet: Vec<u8>,
+    pub font: Vec<u8>,
+}
+
+impl Default for WindowSettings {
+    fn default() -> WindowSettings {
+        WindowSettings {
+            title: env::current_exe()
+                .ok()
+                .and_then(|p| p.file_name().map(|s| s.to_os_string()))
+                .and_then(|s| s.into_string().ok())
+                .unwrap_or(String::new()),
+            width: 320.0,
+            height: 240.0,
+            is_dialog: true,
+            ui_spritesheet: get_default_resource(Resource::UiSpritesheet),
+            font: get_default_resource(Resource::Font),
+        }
+    }
+}
+
+enum Resource {
+    UiSpritesheet,
+    Font,
+}
+
+impl fmt::Display for Resource {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Resource::UiSpritesheet => write!(f, "ui_spritesheet"),
+            Resource::Font => write!(f, "font"),
+        }
+    }
+}
+
+#[cfg(feature = "default_resources")]
+fn get_default_resource(res: Resource) -> Vec<u8> {
+    match res {
+        Resource::UiSpritesheet => resources::DEFAULT_UI_SPRITESHEET.to_vec(),
+        Resource::Font => resources::DEFAULT_FONT.to_vec(),
+    }
+}
+#[cfg(not(feature = "default_resources"))]
+fn get_default_resource(res: Resource) -> Vec<u8> {
+    panic!(
+        "default_resources feature is disabled, but no {} was provided!",
+        res
+    );
+}
 
 pub struct Window {
     pub width: f64,
@@ -17,14 +76,7 @@ pub struct Window {
 }
 
 impl Window {
-    pub fn new(
-        title: &str,
-        logical_width: f64,
-        logical_height: f64,
-        dialog: bool,
-        ui_spritesheet: &[u8],
-        font: &'static [u8],
-    ) -> Result<Window, Box<Error>> {
+    pub fn new(settings: WindowSettings) -> Result<Window, Box<Error>> {
         // FIXME: Enable wayland support by not setting the backend to
         // x11 automatically. Note: At the time of writing, wayland
         // support in winit seems to be buggy. At the very least, it
@@ -33,9 +85,9 @@ impl Window {
 
         let events_loop = EventsLoop::new();
         let mut window = WindowBuilder::new()
-            .with_title(title)
-            .with_dimensions(LogicalSize::new(logical_width, logical_height));
-        if dialog {
+            .with_title(settings.title)
+            .with_dimensions(LogicalSize::new(settings.width, settings.height));
+        if settings.is_dialog {
             window = Window::window_as_dialog(window);
         }
         let context = ContextBuilder::new()
@@ -50,12 +102,12 @@ impl Window {
             gl::ClearColor(0.85, 0.85, 0.85, 1.0);
         }
 
-        renderer::initialize(ui_spritesheet)?;
-        renderer::initialize_font(font)?;
+        renderer::initialize(settings.ui_spritesheet)?;
+        renderer::initialize_font(settings.font)?;
 
         Ok(Window {
-            width: logical_width,
-            height: logical_height,
+            width: settings.width,
+            height: settings.height,
             gl_window,
             events_loop,
             mouse: MouseStatus {

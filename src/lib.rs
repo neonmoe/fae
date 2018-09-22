@@ -10,7 +10,7 @@ extern crate unicode_normalization;
 #[cfg(feature = "window_bootstrap")]
 mod window;
 #[cfg(feature = "window_bootstrap")]
-pub use window::Window;
+pub use window::*;
 
 #[cfg(feature = "default_resources")]
 pub mod resources;
