@@ -13,7 +13,7 @@ lazy_static! {
         cache: None,
         cached_glyphs: Vec::new(),
     });
-    pub(crate) static ref DPI_SCALE: Mutex<f32> = Mutex::new(1.0);
+    static ref DPI_SCALE: Mutex<f32> = Mutex::new(1.0);
 }
 
 pub(crate) const GLYPH_CACHE_WIDTH: u32 = 1024;
@@ -27,7 +27,7 @@ struct TextCache<'a> {
     cached_glyphs: Vec<(PositionedGlyph<'a>, Depth)>,
 }
 
-pub(crate) fn initialize_font(font_data: &'static [u8]) -> Result<(), Box<Error>> {
+pub fn initialize_font(font_data: &'static [u8]) -> Result<(), Box<Error>> {
     let cache = TextCache {
         font: Some(Font::from_bytes(font_data)?),
         cache: Some(RefCell::new(
@@ -40,6 +40,11 @@ pub(crate) fn initialize_font(font_data: &'static [u8]) -> Result<(), Box<Error>
     let mut lock = TEXT_CACHE.lock()?;
     *lock = cache;
     Ok(())
+}
+
+pub fn update_dpi(dpi: f32) {
+    let mut lock = DPI_SCALE.lock().unwrap();
+    *lock = dpi;
 }
 
 pub(crate) fn queue_text(x: f32, y: f32, z: f32, font_size: f32, text: &str) {

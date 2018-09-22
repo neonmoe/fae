@@ -12,6 +12,9 @@ mod window;
 #[cfg(feature = "window_bootstrap")]
 pub use window::Window;
 
+#[cfg(feature = "default_resources")]
+pub mod resources;
+
 mod image;
 mod renderer;
 mod ui;

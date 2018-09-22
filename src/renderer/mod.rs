@@ -1,12 +1,14 @@
 // FIXME: Get rid of as many unsafes as possible.
 
 mod text;
-pub(crate) use self::text::{initialize_font, queue_text, DPI_SCALE};
+pub(crate) use self::text::queue_text;
+pub use self::text::{initialize_font, update_dpi};
 
 use gl;
 use gl::types::*;
 use image::load_image;
 use std::error::Error;
+use std::io::Read;
 use std::mem;
 use std::ptr;
 
@@ -40,7 +42,7 @@ const FRAGMENT_SHADER_SOURCE: [&'static str; TEXTURE_COUNT] = [
     include_str!("../shaders/text.frag"),
 ];
 
-pub fn initialize() -> Result<(), Box<Error>> {
+pub fn initialize<R: Read>(ui_spritesheet_image: R) -> Result<(), Box<Error>> {
     unsafe {
         for i in 0..TEXTURE_COUNT {
             let program = create_program(VERTEX_SHADER_SOURCE[i], FRAGMENT_SHADER_SOURCE[i]);
@@ -57,8 +59,6 @@ pub fn initialize() -> Result<(), Box<Error>> {
     }
 
     unsafe {
-        let image = load_image("images/gui.png")?;
-
         gl::Enable(gl::BLEND);
         gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
 
@@ -66,6 +66,7 @@ pub fn initialize() -> Result<(), Box<Error>> {
             TEXTURES[i] = create_texture();
         }
 
+        let image = load_image(ui_spritesheet_image).unwrap();
         gl::BindTexture(gl::TEXTURE_2D, TEXTURES[0]);
         gl::TexImage2D(
             gl::TEXTURE_2D,

@@ -4,7 +4,6 @@ use glutin::dpi::*;
 use glutin::os::unix::{WindowBuilderExt, XWindowType};
 use glutin::*;
 use renderer;
-use renderer::DPI_SCALE;
 use std::env;
 use std::error::Error;
 use ui::{self, MouseStatus};
@@ -23,6 +22,8 @@ impl Window {
         logical_width: f64,
         logical_height: f64,
         dialog: bool,
+        ui_spritesheet: &[u8],
+        font: &'static [u8],
     ) -> Result<Window, Box<Error>> {
         // FIXME: Enable wayland support by not setting the backend to
         // x11 automatically. Note: At the time of writing, wayland
@@ -49,8 +50,8 @@ impl Window {
             gl::ClearColor(0.85, 0.85, 0.85, 1.0);
         }
 
-        renderer::initialize()?;
-        renderer::initialize_font(include_bytes!("fonts/FiraSans.ttf"))?;
+        renderer::initialize(ui_spritesheet)?;
+        renderer::initialize_font(font)?;
 
         Ok(Window {
             width: logical_width,
@@ -103,8 +104,7 @@ impl Window {
             self.width = logical_size.width;
             self.height = logical_size.height;
 
-            let mut lock = DPI_SCALE.lock().unwrap();
-            *lock = dpi_factor as f32;
+            renderer::update_dpi(dpi_factor as f32);
         }
 
         if let Some(position) = mouse_position {

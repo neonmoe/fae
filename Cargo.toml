@@ -12,5 +12,6 @@ unicode-normalization = "0.1"
 glutin = { version = "0.18", optional = true }
 
 [features]
-default = ["window_bootstrap"]
+default = ["window_bootstrap", "default_resources"]
 window_bootstrap = ["glutin"]
+default_resources = []

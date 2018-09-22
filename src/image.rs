@@ -1,6 +1,6 @@
 use png;
 use std::error::Error;
-use std::fs::File;
+use std::io::Read;
 
 pub struct Image {
     pub pixels: Vec<u8>,
@@ -8,9 +8,8 @@ pub struct Image {
     pub height: i32,
 }
 
-pub fn load_image(path: &str) -> Result<Image, Box<Error>> {
-    let file = File::open(path)?;
-    let decoder = png::Decoder::new(file);
+pub fn load_image<R: Read>(bytes: R) -> Result<Image, Box<Error>> {
+    let decoder = png::Decoder::new(bytes);
     let (info, mut reader) = decoder.read_info()?;
     let mut pixels = vec![0; info.buffer_size()];
     reader.next_frame(&mut pixels)?;
