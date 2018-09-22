@@ -49,7 +49,7 @@ pub(crate) fn queue_text(x: f32, y: f32, z: f32, font_size: f32, text: &str) {
     {
         let lock = DPI_SCALE.lock().unwrap();
         dpi = *lock;
-        scale = Scale::uniform(font_size * 4.0 / 3.0 * dpi)
+        scale = Scale::uniform(font_size * dpi)
     }
     let x = x * dpi;
     let y = y * dpi;
@@ -93,6 +93,7 @@ pub(crate) fn draw_text() {
         unsafe {
             let tex = TEXTURES[1];
             gl::BindTexture(gl::TEXTURE_2D, tex);
+            gl::PixelStorei(gl::UNPACK_ALIGNMENT, 1);
         }
 
         let upload_new_texture = |rect: Rect<u32>, data: &[u8]| unsafe {

@@ -5,3 +5,8 @@ lightweight GUIs. Main features / ideas of the crate:
 - Lightweight (not a wrapper for another UI library, like GTK or Qt)
 - No native controls (because of the above point) -> graphics are
   implemented using OpenGL
+
+## Current status
+The crate is still very much in development and the API is changing
+all the time. Wouldn't recommend using this crate for anything
+currently. However, there is one working example, `counter`.
