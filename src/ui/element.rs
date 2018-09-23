@@ -1,5 +1,6 @@
 use super::*;
 use std::collections::hash_map::DefaultHasher;
+use std::default::Default;
 use std::hash::{Hash, Hasher};
 
 #[derive(Clone, Copy, PartialEq)]
@@ -19,14 +20,24 @@ pub struct Rect {
     pub y1: f32,
 }
 
-#[derive(Clone, Copy)]
-pub struct UIElementDimensions {
-    pub relative: Rect,
-    pub anchors: Rect,
+impl Rect {
+    pub fn width(&self) -> f32 {
+        self.x1 - self.x0
+    }
+    pub fn height(&self) -> f32 {
+        self.y1 - self.y0
+    }
 }
 
-impl UIElementDimensions {
-    pub(crate) fn absolute(&self) -> (f32, f32, f32, f32) {
+#[derive(Clone, Copy)]
+pub struct UIElementLayout {
+    pub relative: Rect,
+    pub anchors: Rect,
+    pub justification: Justify,
+}
+
+impl UIElementLayout {
+    pub(crate) fn absolute(&self) -> Rect {
         let lock = WINDOW_DIMENSIONS.lock().unwrap();
         let (width, height) = *lock;
         let x0o = width * self.anchors.x0;
@@ -34,7 +45,32 @@ impl UIElementDimensions {
         let y0o = height * self.anchors.y0;
         let y1o = height * self.anchors.y1;
         let Rect { x0, y0, x1, y1 } = self.relative;
-        (x0 + x0o, y0 + y0o, x1 + x1o, y1 + y1o)
+        Rect {
+            x0: x0 + x0o,
+            y0: y0 + y0o,
+            x1: x1 + x1o,
+            y1: y1 + y1o,
+        }
+    }
+}
+
+impl Default for UIElementLayout {
+    fn default() -> UIElementLayout {
+        UIElementLayout {
+            relative: Rect {
+                x0: 0.0,
+                y0: 0.0,
+                x1: 0.0,
+                y1: 0.0,
+            },
+            anchors: Rect {
+                x0: 0.0,
+                y0: 0.0,
+                x1: 0.0,
+                y1: 0.0,
+            },
+            justification: Justify::Center,
+        }
     }
 }
 
@@ -42,7 +78,7 @@ impl UIElementDimensions {
 pub(crate) struct UIElement {
     pub(crate) identifier: String,
     pub(crate) kind: UIElementKind,
-    pub(crate) dimensions: UIElementDimensions,
+    pub(crate) layout: UIElementLayout,
 }
 
 impl UIElement {
@@ -51,7 +87,7 @@ impl UIElement {
     }
 
     pub(crate) fn is_point_inside(&self, x: f32, y: f32) -> bool {
-        let (x0, y0, x1, y1) = self.dimensions.absolute();
+        let Rect { x0, y0, x1, y1 } = self.layout.absolute();
         !(x < x0 - PADDING - OUTER_TILE_WIDTH
             || x >= x1 + PADDING + OUTER_TILE_WIDTH
             || y < y0 - PADDING - OUTER_TILE_WIDTH

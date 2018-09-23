@@ -5,6 +5,7 @@ use rusttype::*;
 use std::cell::RefCell;
 use std::error::Error;
 use std::sync::Mutex;
+use ui;
 use unicode_normalization::UnicodeNormalization;
 
 lazy_static! {
@@ -27,6 +28,13 @@ struct TextCache<'a> {
     cached_glyphs: Vec<(PositionedGlyph<'a>, Depth)>,
 }
 
+#[derive(Clone, Copy)]
+pub enum Justify {
+    Left,
+    Right,
+    Center,
+}
+
 pub fn initialize_font(font_data: Vec<u8>) -> Result<(), Box<Error>> {
     let cache = TextCache {
         font: Some(Font::from_bytes(font_data)?),
@@ -47,8 +55,77 @@ pub fn update_dpi(dpi: f32) {
     *lock = dpi;
 }
 
-pub(crate) fn queue_text(x: f32, y: f32, z: f32, font_size: f32, text: &str) {
+// TODO: Handling newlines and centering things properly on the y-axis
+pub(crate) fn queue_text(
+    area: ui::Rect,
+    z: f32,
+    font_size: f32,
+    text: &str,
+    justification: Justify,
+) {
     let mut cache = TEXT_CACHE.lock().unwrap();
+    let initial_glyphs = collect_glyphs(&mut cache, area.x0, area.y0, z, font_size, text);
+
+    let final_glyphs;
+    match justification {
+        Justify::Left => final_glyphs = initial_glyphs,
+        Justify::Right => {
+            if let Some((width, _)) = measure_text(&initial_glyphs) {
+                let xo = area.width() - width;
+                final_glyphs =
+                    collect_glyphs(&mut cache, area.x0 + xo, area.y0, z, font_size, text);
+            } else {
+                final_glyphs = initial_glyphs;
+            }
+        }
+        Justify::Center => {
+            if let Some((width, _)) = measure_text(&initial_glyphs) {
+                let xo = (area.width() - width) / 2.0;
+                final_glyphs =
+                    collect_glyphs(&mut cache, area.x0 + xo, area.y0, z, font_size, text);
+            } else {
+                final_glyphs = initial_glyphs;
+            }
+        }
+    }
+    cache.cached_glyphs.extend_from_slice(&final_glyphs);
+}
+
+fn measure_text(glyphs: &Vec<(PositionedGlyph, f32)>) -> Option<(f32, f32)> {
+    let mut result: Option<ui::Rect> = None;
+    for (glyph, _) in glyphs {
+        if let Some(glyph_rect) = glyph.pixel_bounding_box() {
+            if let Some(ref mut rect) = result {
+                rect.x0 = rect.x0.min(glyph_rect.min.x as f32);
+                rect.y0 = rect.y0.min(glyph_rect.min.y as f32);
+                rect.x1 = rect.x1.max(glyph_rect.max.x as f32);
+                rect.y1 = rect.y1.max(glyph_rect.max.y as f32);
+            } else {
+                result = Some(ui::Rect {
+                    x0: glyph_rect.min.x as f32,
+                    y0: glyph_rect.min.y as f32,
+                    x1: glyph_rect.max.x as f32,
+                    y1: glyph_rect.max.y as f32,
+                });
+            }
+        }
+    }
+
+    if let Some(rect) = result {
+        Some((rect.x1 - rect.x0, rect.y1 - rect.y0))
+    } else {
+        None
+    }
+}
+
+fn collect_glyphs<'a>(
+    cache: &mut TextCache<'a>,
+    x: f32,
+    y: f32,
+    z: f32,
+    font_size: f32,
+    text: &str,
+) -> Vec<(PositionedGlyph<'a>, f32)> {
     let dpi;
     let scale;
     {
@@ -82,7 +159,7 @@ pub(crate) fn queue_text(x: f32, y: f32, z: f32, font_size: f32, text: &str) {
             glyphs.push((glyph, z));
         }
     }
-    cache.cached_glyphs.extend_from_slice(&glyphs);
+    glyphs
 }
 
 pub(crate) fn draw_text() {

@@ -1,6 +1,6 @@
 mod element;
 
-use renderer;
+use renderer::{self, Justify};
 use std::collections::hash_map::HashMap;
 use std::sync::Mutex;
 
@@ -16,7 +16,7 @@ const NORMAL_UI_TEXT_DEPTH: f32 = NORMAL_UI_ELEMENT_DEPTH - 0.1;
 
 lazy_static! {
     static ref UI_STATE: Mutex<UIState> = Mutex::new(UIState {
-        element_dimensions: HashMap::new(),
+        element_layouts: HashMap::new(),
         elements: HashMap::new(),
         last_element: None,
         mouse: MouseStatus {
@@ -32,7 +32,7 @@ lazy_static! {
 }
 
 struct UIState {
-    element_dimensions: HashMap<u64, UIElementDimensions>,
+    element_layouts: HashMap<u64, UIElementLayout>,
     elements: HashMap<u64, UIElement>,
     last_element: Option<UIElement>,
     mouse: MouseStatus,
@@ -61,10 +61,10 @@ pub struct MouseStatus {
 
 // TODO: Implement loading multiple elements' dimensions from a
 // configuration file
-pub fn define_element_dimensions(label: &str, dimensions: UIElementDimensions) {
+pub fn define_element_layout(label: &str, dimensions: UIElementLayout) {
     let mut state = UI_STATE.lock().unwrap();
     state
-        .element_dimensions
+        .element_layouts
         .insert(element_hash(label), dimensions);
 }
 
@@ -90,41 +90,35 @@ pub fn update(width: f64, height: f64, mouse: MouseStatus) -> UIStatus {
     UIStatus { hovering_button }
 }
 
+// TODO: Improve automatic layouting
 fn new_element(state: &UIState, identifier: String, kind: UIElementKind) -> UIElement {
     let y = if let Some(ref element) = state.last_element {
-        element.dimensions.relative.y0 + 16.0 + TILE_SIZE + OUTER_TILE_WIDTH * 3.0
+        element.layout.relative.y0 + 16.0 + TILE_SIZE + OUTER_TILE_WIDTH * 3.0
     } else {
         30.0
     };
     let mut element = UIElement {
         identifier,
         kind,
-        dimensions: UIElementDimensions {
+        layout: UIElementLayout {
             relative: Rect {
                 x0: 30.0,
                 y0: y,
                 x1: 30.0 + 88.0,
                 y1: y + 16.0,
             },
-            anchors: Rect {
-                x0: 0.0,
-                y0: 0.0,
-                x1: 0.0,
-                y1: 0.0,
-            },
+            ..Default::default()
         },
     };
-    if let Some(loaded_dims) = state.element_dimensions.get(&element.id()) {
-        element.dimensions = *loaded_dims;
+    if let Some(loaded_layout) = state.element_layouts.get(&element.id()) {
+        element.layout = *loaded_layout;
     }
     element
 }
 
 fn draw_element(element: &UIElement, text: &str) {
-    let &UIElement {
-        kind, dimensions, ..
-    } = element;
-    let (x0, y0, x1, y1) = dimensions.absolute();
+    let &UIElement { kind, layout, .. } = element;
+    let Rect { x0, y0, x1, y1 } = layout.absolute();
 
     if kind != UIElementKind::NoBackground {
         let tx = kind as i32 as f32 / SHEET_LENGTH as f32; // The UV offset based on the element type
@@ -148,7 +142,11 @@ fn draw_element(element: &UIElement, text: &str) {
         }
     }
 
-    // TODO: Center text by default
-    // TODO: Add text justification options
-    renderer::queue_text(x0, y0, NORMAL_UI_TEXT_DEPTH, 16.0, text);
+    renderer::queue_text(
+        layout.absolute(),
+        NORMAL_UI_TEXT_DEPTH,
+        16.0,
+        text,
+        layout.justification,
+    );
 }

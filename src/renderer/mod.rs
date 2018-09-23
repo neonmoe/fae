@@ -1,8 +1,7 @@
 // FIXME: Consider cleaning up some unnecessary unsafes
 
 mod text;
-pub(crate) use self::text::queue_text;
-pub use self::text::{initialize_font, update_dpi};
+pub use self::text::*;
 
 use gl;
 use gl::types::*;

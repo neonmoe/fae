@@ -19,9 +19,9 @@ fn main() {
         ..Default::default()
     }).unwrap();
 
-    ui::define_element_dimensions(
+    ui::define_element_layout(
         "counter",
-        ui::UIElementDimensions {
+        ui::UIElementLayout {
             relative: ui::Rect {
                 x0: 16.0,
                 y0: 16.0,
@@ -34,12 +34,13 @@ fn main() {
                 x1: 0.4,
                 y1: 1.0,
             },
+            justification: ui::Justify::Left,
         },
     );
 
-    ui::define_element_dimensions(
+    ui::define_element_layout(
         "add",
-        ui::UIElementDimensions {
+        ui::UIElementLayout {
             relative: ui::Rect {
                 x0: 16.0,
                 y0: 16.0,
@@ -52,12 +53,13 @@ fn main() {
                 x1: 0.7,
                 y1: 1.0,
             },
+            justification: ui::Justify::Center,
         },
     );
 
-    ui::define_element_dimensions(
+    ui::define_element_layout(
         "sub",
-        ui::UIElementDimensions {
+        ui::UIElementLayout {
             relative: ui::Rect {
                 x0: 8.0,
                 y0: 16.0,
@@ -70,6 +72,7 @@ fn main() {
                 x1: 1.0,
                 y1: 1.0,
             },
+            justification: ui::Justify::Center,
         },
     );
 
