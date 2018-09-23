@@ -11,13 +11,13 @@ fn main() {
 
     let mut counter: i64 = 0;
     while window.refresh() {
-        ui::label(&format!("Counter: {}", counter));
+        ui::label("counter", &format!("Counter: {}", counter));
 
-        if ui::button("Add") {
+        if ui::button("add", "Add") {
             counter += 1;
         }
 
-        if ui::button("Subtract") {
+        if ui::button("sub", "Subtract") {
             counter -= 1;
         }
     }

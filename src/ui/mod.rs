@@ -16,6 +16,7 @@ const NORMAL_UI_TEXT_DEPTH: f32 = NORMAL_UI_ELEMENT_DEPTH - 0.1;
 
 lazy_static! {
     static ref UI_STATE: Mutex<UIState> = Mutex::new(UIState {
+        element_dimensions: HashMap::new(),
         elements: HashMap::new(),
         last_element: None,
         mouse: MouseStatus {
@@ -31,6 +32,7 @@ lazy_static! {
 }
 
 struct UIState {
+    element_dimensions: HashMap<u64, UIElementDimensions>,
     elements: HashMap<u64, UIElement>,
     last_element: Option<UIElement>,
     mouse: MouseStatus,
@@ -57,6 +59,15 @@ pub struct MouseStatus {
     pub pressed: bool,
 }
 
+// TODO: Implement loading multiple elements' dimensions from a
+// configuration file
+pub fn define_element_dimensions(label: &str, dimensions: UIElementDimensions) {
+    let mut state = UI_STATE.lock().unwrap();
+    state
+        .element_dimensions
+        .insert(element_hash(label), dimensions);
+}
+
 /// If using the Window provided by this crate, you don't need to call
 /// this function. Window calls it inside refresh().
 pub fn update(width: f64, height: f64, mouse: MouseStatus) -> UIStatus {
@@ -79,48 +90,44 @@ pub fn update(width: f64, height: f64, mouse: MouseStatus) -> UIStatus {
     UIStatus { hovering_button }
 }
 
-fn new_element(state: &UIState, identifier: String, t: UIElementType) -> UIElement {
+fn new_element(state: &UIState, identifier: String, kind: UIElementKind) -> UIElement {
     let y = if let Some(ref element) = state.last_element {
-        element.y0 + 16.0 + TILE_SIZE + OUTER_TILE_WIDTH * 3.0
+        element.dimensions.relative.y0 + 16.0 + TILE_SIZE + OUTER_TILE_WIDTH * 3.0
     } else {
         30.0
     };
-    let e = UIElement {
+    let mut element = UIElement {
         identifier,
-        t,
-        x0: 30.0,
-        y0: y,
-        x1: 30.0 + 88.0,
-        y1: y + 16.0,
-        anchor_x: 0.0,
-        anchor_y: 0.0,
+        kind,
+        dimensions: UIElementDimensions {
+            relative: Rect {
+                x0: 30.0,
+                y0: y,
+                x1: 30.0 + 88.0,
+                y1: y + 16.0,
+            },
+            anchors: Rect {
+                x0: 0.0,
+                y0: 0.0,
+                x1: 0.0,
+                y1: 0.0,
+            },
+        },
     };
-    e
-}
-
-fn apply_anchor(ax: f32, ay: f32, x0: f32, y0: f32, x1: f32, y1: f32) -> (f32, f32, f32, f32) {
-    let lock = WINDOW_DIMENSIONS.lock().unwrap();
-    let (width, height) = *lock;
-    let xo = width * ax;
-    let yo = height * ay;
-    (x0 + xo, y0 + yo, x1 + xo, y1 + yo)
+    if let Some(loaded_dims) = state.element_dimensions.get(&element.id()) {
+        element.dimensions = *loaded_dims;
+    }
+    element
 }
 
 fn draw_element(element: &UIElement, text: &str) {
     let &UIElement {
-        t,
-        x0,
-        y0,
-        x1,
-        y1,
-        anchor_x,
-        anchor_y,
-        ..
+        kind, dimensions, ..
     } = element;
-    let (x0, y0, x1, y1) = apply_anchor(anchor_x, anchor_y, x0, y0, x1, y1);
+    let (x0, y0, x1, y1) = dimensions.absolute();
 
-    if t != UIElementType::NoBackground {
-        let tx = t as i32 as f32 / SHEET_LENGTH as f32; // The UV offset based on the element type
+    if kind != UIElementKind::NoBackground {
+        let tx = kind as i32 as f32 / SHEET_LENGTH as f32; // The UV offset based on the element type
         let ty = 0.0;
         let tw = 1.0 / (3.0 * SHEET_LENGTH as f32); // UV width of a spritesheet tile
         let th = 1.0 / 3.0; // UV height of a spritesheet tile
@@ -141,5 +148,7 @@ fn draw_element(element: &UIElement, text: &str) {
         }
     }
 
+    // TODO: Center text by default
+    // TODO: Add text justification options
     renderer::queue_text(x0, y0, NORMAL_UI_TEXT_DEPTH, 16.0, text);
 }

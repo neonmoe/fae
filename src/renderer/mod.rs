@@ -43,7 +43,7 @@ const FRAGMENT_SHADER_SOURCE: [&'static str; TEXTURE_COUNT] = [
 
 pub fn initialize(ui_spritesheet_image: Vec<u8>) -> Result<(), Box<Error>> {
     unsafe {
-        gl::Enable(gl::DEPTH_TEST);
+        //gl::Enable(gl::DEPTH_TEST);
         gl::Enable(gl::BLEND);
         gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
     }

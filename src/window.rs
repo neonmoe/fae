@@ -125,7 +125,7 @@ impl Window {
             running = false;
         }
         unsafe {
-            gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
+            gl::Clear(gl::COLOR_BUFFER_BIT);
         }
 
         let mut resized_logical_size = None;
