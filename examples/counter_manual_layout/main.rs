@@ -8,83 +8,52 @@
 //! will be a way to configure your UI during runtime, with the option
 //! of exporting the UI's state into said configuration file.
 
-extern crate fungui as ui;
+extern crate fungui;
 extern crate gl;
 
+use fungui::{element, layout, Window, WindowSettings};
+
 fn main() {
-    let mut window = ui::Window::new(ui::WindowSettings {
+    let mut window = Window::new(WindowSettings {
         width: 300.0,
         height: 48.0,
         is_dialog: true,
         ..Default::default()
     }).unwrap();
 
-    ui::define_element_layout(
+    layout::define_element_layout(
         "counter",
-        ui::UIElementLayout {
-            relative: ui::Rect {
-                x0: 16.0,
-                y0: 16.0,
-                x1: -16.0,
-                y1: -16.0,
-            },
-            anchors: ui::Rect {
-                x0: 0.0,
-                y0: 0.0,
-                x1: 0.4,
-                y1: 1.0,
-            },
-            justification: ui::Justify::Left,
-        },
+        layout::UIElementLayout::new()
+            .relative(16.0, 16.0, -16.0, -16.0)
+            .anchors(0.0, 0.0, 0.4, 1.0)
+            .alignment(layout::Alignment::Left),
     );
 
-    ui::define_element_layout(
+    layout::define_element_layout(
         "add",
-        ui::UIElementLayout {
-            relative: ui::Rect {
-                x0: 16.0,
-                y0: 16.0,
-                x1: -8.0,
-                y1: -16.0,
-            },
-            anchors: ui::Rect {
-                x0: 0.4,
-                y0: 0.0,
-                x1: 0.7,
-                y1: 1.0,
-            },
-            justification: ui::Justify::Center,
-        },
+        layout::UIElementLayout::new()
+            .relative(16.0, 16.0, -8.0, -16.0)
+            .anchors(0.4, 0.0, 0.7, 1.0)
+            .alignment(layout::Alignment::Center),
     );
 
-    ui::define_element_layout(
+    layout::define_element_layout(
         "sub",
-        ui::UIElementLayout {
-            relative: ui::Rect {
-                x0: 8.0,
-                y0: 16.0,
-                x1: -16.0,
-                y1: -16.0,
-            },
-            anchors: ui::Rect {
-                x0: 0.7,
-                y0: 0.0,
-                x1: 1.0,
-                y1: 1.0,
-            },
-            justification: ui::Justify::Center,
-        },
+        layout::UIElementLayout::new()
+            .relative(8.0, 16.0, -16.0, -16.0)
+            .anchors(0.7, 0.0, 1.0, 1.0)
+            .alignment(layout::Alignment::Center),
     );
 
     let mut counter: i64 = 0;
     while window.refresh() {
-        ui::label("counter", &format!("Counter: {}", counter));
+        element::label("counter", &format!("Counter: {}", counter));
 
-        if ui::button("add", "Add") {
+        if element::button("add", "Add") {
             counter += 1;
         }
 
-        if ui::button("sub", "Subtract") {
+        if element::button("sub", "Subtract") {
             counter -= 1;
         }
     }

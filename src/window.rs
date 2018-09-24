@@ -10,14 +10,64 @@ use std::default::Default;
 use std::env;
 use std::error::Error;
 use std::fmt;
+use text;
 use ui::{self, MouseStatus};
 
+/// Defines a window.
 pub struct WindowSettings {
+    /// Title of the window. Default value: Name of the executable file
     pub title: String,
+    /// Width of the window in logical pixels. Default value: `320.0`
     pub width: f64,
+    /// Height of the window in logical pixels. Default value: `240.0`
     pub height: f64,
+    /// Whether or not the application is a dialog. Default value: `true`
+    ///
+    /// This only affects x11 environments, where it sets the window
+    /// type to dialog. In [tiling
+    /// environments](https://en.wikipedia.org/wiki/Tiling_window_manager),
+    /// like i3 and sway, this can cause the window to pop up as a
+    /// floating window, not a tiled one. This is useful for
+    /// applications that have very fixed layouts, and are supposed to
+    /// be opened for very short amounts of time at a time, like small
+    /// utilities.
     pub is_dialog: bool,
+    /// The bytes of a .png file with an alpha channel, which will be
+    /// used as the application's spritesheet. Default value:
+    /// `resources::DEFAULT_UI_SPRITESHEET.to_vec()`
+    ///
+    /// ![Default GUI][gui]
+    ///
+    /// The layout of the gui spritesheet is very important. Say `H`
+    /// is the height of the texture. When the rendering engine is
+    /// looking for a specific element's sprite, it will look for
+    /// `HxH` areas in the texture, and consider these areas to
+    /// consist of a uniform 3x3 grid. The center tile will be
+    /// stretched to the width and height of a given element, the top
+    /// and bottom tiles will stretch to the width of the element, and
+    /// the left and right tiles will stretch to the height of the
+    /// element. The corner tiles will only be stretched uniformly, as
+    /// described in the following section.
+    ///
+    /// The resolution of the texture is irrelevant, as all tiles will
+    /// be stretched to be 16x16 logical pixels, except for the
+    /// width/height stretching cases described in the previous
+    /// section. To not lose pixel density in HiDPI situations, make
+    /// your tiles 32x32 or higher. At 32x32 tiles, your spritesheet's
+    /// height would be 96px.
+    ///
+    /// The elements should all be on one row, and right next to each
+    /// other. For a reference, cut up the default
+    /// [`gui.png`][gui] into 16x16 chunks, and modify
+    /// from there.
+    ///
+    /// [gui]: https://git.neon.moe/neon/fungui/raw/branch/master/src/resources/gui.png
     pub ui_spritesheet: Vec<u8>,
+    /// The bytes of a .ttf file that will be used as the
+    /// application's font. Default value: `resources::DEFAULT_FONT.to_vec()`
+    ///
+    /// The default font provided by the `default_resources` feature
+    /// is Fira Sans.
     pub font: Vec<u8>,
 }
 
@@ -67,15 +117,22 @@ fn get_default_resource(res: Resource) -> Vec<u8> {
     );
 }
 
+/// Manages the window and propagates events to the UI system.
 pub struct Window {
-    pub width: f64,
-    pub height: f64,
+    width: f64,
+    height: f64,
+    dpi: f64,
     gl_window: GlWindow,
     events_loop: EventsLoop,
     mouse: MouseStatus,
 }
 
 impl Window {
+    /// Creates a new `Window`.
+    ///
+    /// Can result in an error if window creation fails, OpenGL
+    /// context creation fails, or resources defined in the `settings`
+    /// can't be loaded.
     pub fn new(settings: WindowSettings) -> Result<Window, Box<Error>> {
         // FIXME: Enable wayland support by not setting the backend to
         // x11 automatically. Note: At the time of writing, wayland
@@ -102,12 +159,13 @@ impl Window {
             gl::ClearColor(0.85, 0.85, 0.85, 1.0);
         }
 
-        renderer::initialize(settings.ui_spritesheet)?;
-        renderer::initialize_font(settings.font)?;
+        renderer::initialize_renderer(settings.ui_spritesheet)?;
+        text::initialize_font(settings.font)?;
 
         Ok(Window {
             width: settings.width,
             height: settings.height,
+            dpi: 1.0,
             gl_window,
             events_loop,
             mouse: MouseStatus {
@@ -119,6 +177,9 @@ impl Window {
         })
     }
 
+    /// Re-renders the window, polls for new events, and passes them
+    /// on to the UI system. **Note**: Because of vsync, this function
+    /// will hang for a while (usually 16ms at max).
     pub fn refresh(&mut self) -> bool {
         let mut running = true;
         if let Err(_) = self.gl_window.swap_buffers() {
@@ -156,8 +217,7 @@ impl Window {
             self.gl_window.resize(physical_size);
             self.width = logical_size.width;
             self.height = logical_size.height;
-
-            renderer::update_dpi(dpi_factor as f32);
+            self.dpi = dpi_factor;
         }
 
         /* Mouse move event handling */
@@ -172,8 +232,7 @@ impl Window {
             self.mouse.pressed = pressed;
         }
 
-        renderer::render(self.width, self.height);
-        ui::update(self.width, self.height, self.mouse);
+        ui::update(self.width, self.height, self.dpi as f32, self.mouse);
 
         running
     }

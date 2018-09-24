@@ -1,10 +1,13 @@
-mod element;
+pub mod element;
+pub mod layout;
 
-use renderer::{self, Justify};
+use renderer;
 use std::collections::hash_map::HashMap;
 use std::sync::Mutex;
+use text;
 
-pub use self::element::*;
+use self::element::*;
+use self::layout::*;
 
 const TILE_SIZE: f32 = 16.0;
 const OUTER_TILE_WIDTH: f32 = 4.0;
@@ -61,16 +64,23 @@ pub struct MouseStatus {
 
 // TODO: Implement loading multiple elements' dimensions from a
 // configuration file
-pub fn define_element_layout(label: &str, dimensions: UIElementLayout) {
+/// Defines a specific layout for elements with the given
+/// identifier.
+///
+/// [See the `layout` documentation for an
+/// example](index.html#setting-layout-manually-from-code).
+pub fn define_element_layout(identifier: &str, dimensions: UIElementLayout) {
     let mut state = UI_STATE.lock().unwrap();
     state
         .element_layouts
-        .insert(element_hash(label), dimensions);
+        .insert(element_hash(identifier), dimensions);
 }
 
-/// If using the Window provided by this crate, you don't need to call
-/// this function. Window calls it inside refresh().
-pub fn update(width: f64, height: f64, mouse: MouseStatus) -> UIStatus {
+/// Handled by the `window_bootstrap` feature, if in use.
+pub fn update(width: f64, height: f64, dpi: f32, mouse: MouseStatus) -> UIStatus {
+    renderer::render(width, height);
+    text::update_dpi(dpi);
+
     {
         let mut dimensions = WINDOW_DIMENSIONS.lock().unwrap();
         *dimensions = (width as f32, height as f32);
@@ -93,22 +103,14 @@ pub fn update(width: f64, height: f64, mouse: MouseStatus) -> UIStatus {
 // TODO: Improve automatic layouting
 fn new_element(state: &UIState, identifier: String, kind: UIElementKind) -> UIElement {
     let y = if let Some(ref element) = state.last_element {
-        element.layout.relative.y0 + 16.0 + TILE_SIZE + OUTER_TILE_WIDTH * 3.0
+        element.layout.relative.top + 16.0 + TILE_SIZE + OUTER_TILE_WIDTH * 3.0
     } else {
         30.0
     };
     let mut element = UIElement {
         identifier,
         kind,
-        layout: UIElementLayout {
-            relative: Rect {
-                x0: 30.0,
-                y0: y,
-                x1: 30.0 + 88.0,
-                y1: y + 16.0,
-            },
-            ..Default::default()
-        },
+        layout: UIElementLayout::new().relative(30.0, y, 30.0 + 88.0, y + 16.0),
     };
     if let Some(loaded_layout) = state.element_layouts.get(&element.id()) {
         element.layout = *loaded_layout;
@@ -118,35 +120,41 @@ fn new_element(state: &UIState, identifier: String, kind: UIElementKind) -> UIEl
 
 fn draw_element(element: &UIElement, text: &str) {
     let &UIElement { kind, layout, .. } = element;
-    let Rect { x0, y0, x1, y1 } = layout.absolute();
+    let Rect {
+        left,
+        top,
+        right,
+        bottom,
+    } = layout.absolute();
 
     if kind != UIElementKind::NoBackground {
         let tx = kind as i32 as f32 / SHEET_LENGTH as f32; // The UV offset based on the element type
         let ty = 0.0;
         let tw = 1.0 / (3.0 * SHEET_LENGTH as f32); // UV width of a spritesheet tile
         let th = 1.0 / 3.0; // UV height of a spritesheet tile
-        let x0_ = [x0 - TILE_SIZE - PADDING, x0 - PADDING, x1 + PADDING];
-        let y0_ = [y0 - TILE_SIZE - PADDING, y0 - PADDING, y1 + PADDING];
-        let x1_ = [x0 - PADDING, x1 + PADDING, x1 + PADDING + TILE_SIZE];
-        let y1_ = [y0 - PADDING, y1 + PADDING, y1 + PADDING + TILE_SIZE];
         let tx = [tx, tx + tw, tx + tw * 2.0];
         let ty = [ty, ty + th, ty + th * 2.0];
+
+        let left_ = [left - TILE_SIZE - PADDING, left - PADDING, right + PADDING];
+        let top_ = [top - TILE_SIZE - PADDING, top - PADDING, bottom + PADDING];
+        let right_ = [left_[1], left_[2], left_[2] + TILE_SIZE];
+        let bottom_ = [top_[1], top_[2], top_[2] + TILE_SIZE];
         let z = NORMAL_UI_ELEMENT_DEPTH;
 
         for i in 0..9 {
             let xi = i % 3;
             let yi = i / 3;
-            let (x0, y0, x1, y1) = (x0_[xi], y0_[yi], x1_[xi], y1_[yi]);
+            let (left, top, right, bottom) = (left_[xi], top_[yi], right_[xi], bottom_[yi]);
             let (tx0, ty0, tx1, ty1) = (tx[xi], ty[yi], tx[xi] + tw, ty[yi] + th);
-            renderer::draw_quad(x0, y0, x1, y1, z, tx0, ty0, tx1, ty1, 0);
+            renderer::draw_quad(left, top, right, bottom, z, tx0, ty0, tx1, ty1, 0);
         }
     }
 
-    renderer::queue_text(
+    text::queue_text(
         layout.absolute(),
         NORMAL_UI_TEXT_DEPTH,
         16.0,
         text,
-        layout.justification,
+        layout.alignment,
     );
 }

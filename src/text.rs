@@ -1,11 +1,12 @@
-use super::*;
 use gl;
+use gl::types::*;
+use renderer;
 use rusttype::gpu_cache::Cache;
 use rusttype::*;
 use std::cell::RefCell;
 use std::error::Error;
 use std::sync::Mutex;
-use ui;
+use ui::layout;
 use unicode_normalization::UnicodeNormalization;
 
 lazy_static! {
@@ -28,13 +29,26 @@ struct TextCache<'a> {
     cached_glyphs: Vec<(PositionedGlyph<'a>, Depth)>,
 }
 
-#[derive(Clone, Copy)]
-pub enum Justify {
+/// Defines the alignment of text.
+#[derive(Clone, Copy, Debug)]
+pub enum Alignment {
+    /// Text is aligned to the left.
     Left,
+    /// Text is aligned to the right.
     Right,
+    /// Text is centered.
     Center,
 }
 
+/// Initialize fonts. Handled by `window_bootstrap`. This must be done
+/// before any drawing calls.
+///
+/// `font_data` should a Vec of the bytes of a .ttf file. To load the
+/// image at compile-time, you could run the following (of course,
+/// with your own path):
+/// ```
+/// fungui::initialize_font(include_bytes!("resources/FiraSans.ttf").to_vec());
+/// ```
 pub fn initialize_font(font_data: Vec<u8>) -> Result<(), Box<Error>> {
     let cache = TextCache {
         font: Some(Font::from_bytes(font_data)?),
@@ -50,39 +64,39 @@ pub fn initialize_font(font_data: Vec<u8>) -> Result<(), Box<Error>> {
     Ok(())
 }
 
-pub fn update_dpi(dpi: f32) {
+pub(crate) fn update_dpi(dpi: f32) {
     let mut lock = DPI_SCALE.lock().unwrap();
     *lock = dpi;
 }
 
 // TODO: Handling newlines and centering things properly on the y-axis
 pub(crate) fn queue_text(
-    area: ui::Rect,
+    area: layout::Rect,
     z: f32,
     font_size: f32,
     text: &str,
-    justification: Justify,
+    alignment: Alignment,
 ) {
     let mut cache = TEXT_CACHE.lock().unwrap();
-    let initial_glyphs = collect_glyphs(&mut cache, area.x0, area.y0, z, font_size, text);
+    let initial_glyphs = collect_glyphs(&mut cache, area.left, area.top, z, font_size, text);
 
     let final_glyphs;
-    match justification {
-        Justify::Left => final_glyphs = initial_glyphs,
-        Justify::Right => {
+    match alignment {
+        Alignment::Left => final_glyphs = initial_glyphs,
+        Alignment::Right => {
             if let Some((width, _)) = measure_text(&initial_glyphs) {
                 let xo = area.width() - width;
                 final_glyphs =
-                    collect_glyphs(&mut cache, area.x0 + xo, area.y0, z, font_size, text);
+                    collect_glyphs(&mut cache, area.left + xo, area.top, z, font_size, text);
             } else {
                 final_glyphs = initial_glyphs;
             }
         }
-        Justify::Center => {
+        Alignment::Center => {
             if let Some((width, _)) = measure_text(&initial_glyphs) {
                 let xo = (area.width() - width) / 2.0;
                 final_glyphs =
-                    collect_glyphs(&mut cache, area.x0 + xo, area.y0, z, font_size, text);
+                    collect_glyphs(&mut cache, area.left + xo, area.top, z, font_size, text);
             } else {
                 final_glyphs = initial_glyphs;
             }
@@ -92,27 +106,30 @@ pub(crate) fn queue_text(
 }
 
 fn measure_text(glyphs: &Vec<(PositionedGlyph, f32)>) -> Option<(f32, f32)> {
-    let mut result: Option<ui::Rect> = None;
+    let mut result: Option<layout::Rect> = None;
+    let lock = DPI_SCALE.lock().unwrap();
+    let dpi = *lock;
+
     for (glyph, _) in glyphs {
         if let Some(glyph_rect) = glyph.pixel_bounding_box() {
             if let Some(ref mut rect) = result {
-                rect.x0 = rect.x0.min(glyph_rect.min.x as f32);
-                rect.y0 = rect.y0.min(glyph_rect.min.y as f32);
-                rect.x1 = rect.x1.max(glyph_rect.max.x as f32);
-                rect.y1 = rect.y1.max(glyph_rect.max.y as f32);
+                rect.left = rect.left.min(glyph_rect.min.x as f32 / dpi);
+                rect.top = rect.top.min(glyph_rect.min.y as f32 / dpi);
+                rect.right = rect.right.max(glyph_rect.max.x as f32 / dpi);
+                rect.bottom = rect.bottom.max(glyph_rect.max.y as f32 / dpi);
             } else {
-                result = Some(ui::Rect {
-                    x0: glyph_rect.min.x as f32,
-                    y0: glyph_rect.min.y as f32,
-                    x1: glyph_rect.max.x as f32,
-                    y1: glyph_rect.max.y as f32,
+                result = Some(layout::Rect {
+                    left: glyph_rect.min.x as f32 / dpi,
+                    top: glyph_rect.min.y as f32 / dpi,
+                    right: glyph_rect.max.x as f32 / dpi,
+                    bottom: glyph_rect.max.y as f32 / dpi,
                 });
             }
         }
     }
 
     if let Some(rect) = result {
-        Some((rect.x1 - rect.x0, rect.y1 - rect.y0))
+        Some((rect.right - rect.left, rect.bottom - rect.top))
     } else {
         None
     }
@@ -173,7 +190,7 @@ pub(crate) fn draw_text() {
         }
 
         unsafe {
-            let tex = TEXTURES[1];
+            let tex = renderer::get_texture(1);
             gl::BindTexture(gl::TEXTURE_2D, tex);
             gl::PixelStorei(gl::UNPACK_ALIGNMENT, 1);
         }
@@ -198,7 +215,7 @@ pub(crate) fn draw_text() {
 
         for g in &text_cache.cached_glyphs {
             if let Ok(Some((uv_rect, screen_rect))) = cache.rect_for(0, &g.0) {
-                draw_quad(
+                renderer::draw_quad(
                     screen_rect.min.x as f32 / dpi,
                     screen_rect.min.y as f32 / dpi,
                     screen_rect.max.x as f32 / dpi,

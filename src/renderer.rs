@@ -1,14 +1,12 @@
 // FIXME: Consider cleaning up some unnecessary unsafes
 
-mod text;
-pub use self::text::*;
-
 use gl;
 use gl::types::*;
 use image::load_image;
 use std::error::Error;
 use std::mem;
 use std::ptr;
+use text;
 
 const MAX_QUADS: usize = 16_000_000 / mem::size_of::<TexQuad>(); // 16 MB vertex buffers
 const TEXTURE_COUNT: usize = 2; // UI elements, glyph cache
@@ -32,17 +30,26 @@ static mut VERTEX_BUFFERS: [VertexBufferData; TEXTURE_COUNT] =
 
 static mut PROJECTION_MATRIX_LOCATION: GLint = -1;
 const VERTEX_SHADER_SOURCE: [&'static str; TEXTURE_COUNT] = [
-    include_str!("../shaders/texquad.vert"),
-    include_str!("../shaders/text.vert"),
+    include_str!("shaders/texquad.vert"),
+    include_str!("shaders/text.vert"),
 ];
 const FRAGMENT_SHADER_SOURCE: [&'static str; TEXTURE_COUNT] = [
-    include_str!("../shaders/texquad.frag"),
-    include_str!("../shaders/text.frag"),
+    include_str!("shaders/texquad.frag"),
+    include_str!("shaders/text.frag"),
 ];
 
-pub fn initialize(ui_spritesheet_image: Vec<u8>) -> Result<(), Box<Error>> {
+/// Initialize the UI rendering system. Handled by
+/// `window_bootstrap`. This must be done after window and context
+/// creation, but before any drawing calls.
+///
+/// `ui_spritesheet_image` should a Vec of the bytes of a .png file
+/// with an alpha channel. To load the image at compile-time, you
+/// could run the following (of course, with your own path):
+/// ```no_run
+/// fungui::initialize_renderer(include_bytes!("resources/gui.png").to_vec());
+/// ```
+pub fn initialize_renderer(ui_spritesheet_image: Vec<u8>) -> Result<(), Box<Error>> {
     unsafe {
-        //gl::Enable(gl::DEPTH_TEST);
         gl::Enable(gl::BLEND);
         gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
     }
@@ -251,6 +258,10 @@ pub(crate) fn render(width: f64, height: f64) {
             QUAD_COUNTS[tex_index] = 0;
         }
     }
+}
+
+pub(crate) unsafe fn get_texture(index: usize) -> GLuint {
+    TEXTURES[index]
 }
 
 fn print_gl_errors(context: &str) {

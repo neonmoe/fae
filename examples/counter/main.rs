@@ -1,8 +1,10 @@
-extern crate fungui as ui;
+extern crate fungui;
 extern crate gl;
 
+use fungui::{element, Window, WindowSettings};
+
 fn main() {
-    let mut window = ui::Window::new(ui::WindowSettings {
+    let mut window = Window::new(WindowSettings {
         width: 150.0,
         height: 170.0,
         is_dialog: true,
@@ -11,13 +13,13 @@ fn main() {
 
     let mut counter: i64 = 0;
     while window.refresh() {
-        ui::label("counter", &format!("Counter: {}", counter));
+        element::label("counter", &format!("Counter: {}", counter));
 
-        if ui::button("add", "Add") {
+        if element::button("add", "Add") {
             counter += 1;
         }
 
-        if ui::button("sub", "Subtract") {
+        if element::button("sub", "Subtract") {
             counter -= 1;
         }
     }
