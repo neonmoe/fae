@@ -1,7 +1,5 @@
 use gl;
 use glutin::dpi::*;
-#[cfg(unix)]
-use glutin::os::unix::{WindowBuilderExt, XWindowType};
 use glutin::*;
 use renderer;
 #[cfg(feature = "default_resources")]
@@ -237,11 +235,29 @@ impl Window {
         running
     }
 
-    #[cfg(unix)]
+    #[cfg(
+        any(
+            target_os = "linux",
+            target_os = "dragonfly",
+            target_os = "freebsd",
+            target_os = "openbsd"
+        )
+    )]
     fn window_as_dialog(window: WindowBuilder) -> WindowBuilder {
+        use glutin::os::unix::{WindowBuilderExt, XWindowType};
         window.with_x11_window_type(XWindowType::Dialog)
     }
-    #[cfg(not(unix))]
+
+    #[cfg(
+        not(
+            any(
+                target_os = "linux",
+                target_os = "dragonfly",
+                target_os = "freebsd",
+                target_os = "openbsd"
+            )
+        )
+    )]
     fn window_as_dialog(window: WindowBuilder) -> WindowBuilder {
         window
     }
