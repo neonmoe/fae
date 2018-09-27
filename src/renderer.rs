@@ -27,6 +27,7 @@ static mut VAOS: [VertexArrayObject; TEXTURE_COUNT] = [0; TEXTURE_COUNT];
 static mut SHADER_PROGRAMS: [ShaderProgram; TEXTURE_COUNT] = [0; TEXTURE_COUNT];
 static mut VERTEX_BUFFERS: [VertexBufferData; TEXTURE_COUNT] =
     [[[0.0; 30]; MAX_QUADS]; TEXTURE_COUNT];
+static mut ALLOCATED_BUFFER_SIZES: [isize; TEXTURE_COUNT] = [-1; TEXTURE_COUNT];
 
 static mut PROJECTION_MATRIX_LOCATION: GLint = -1;
 const VERTEX_SHADER_SOURCE: [&'static str; TEXTURE_COUNT] = [
@@ -241,6 +242,10 @@ pub(crate) fn render(width: f64, height: f64) {
 
     for tex_index in 0..TEXTURE_COUNT {
         unsafe {
+            if QUAD_COUNTS[tex_index] == 0 {
+                continue;
+            }
+
             gl::UseProgram(SHADER_PROGRAMS[tex_index]);
             gl::UniformMatrix4fv(PROJECTION_MATRIX_LOCATION, 1, gl::FALSE, matrix.as_ptr());
 
@@ -248,12 +253,16 @@ pub(crate) fn render(width: f64, height: f64) {
             gl::BindTexture(gl::TEXTURE_2D, TEXTURES[tex_index]);
             gl::BindBuffer(gl::ARRAY_BUFFER, VBOS[tex_index]);
 
-            gl::BufferData(
-                gl::ARRAY_BUFFER,
-                (mem::size_of::<TexQuad>() * QUAD_COUNTS[tex_index]) as isize,
-                VERTEX_BUFFERS[tex_index].as_ptr() as *const _,
-                gl::STREAM_DRAW,
-            );
+            let buffer_length = (mem::size_of::<TexQuad>() * QUAD_COUNTS[tex_index]) as isize;
+            let buffer_ptr = VERTEX_BUFFERS[tex_index].as_ptr() as *const _;
+
+            if buffer_length < ALLOCATED_BUFFER_SIZES[tex_index] {
+                gl::BufferSubData(gl::ARRAY_BUFFER, 0, buffer_length, buffer_ptr);
+            } else {
+                ALLOCATED_BUFFER_SIZES[tex_index] = buffer_length;
+                gl::BufferData(gl::ARRAY_BUFFER, buffer_length, buffer_ptr, gl::STREAM_DRAW);
+            }
+
             gl::DrawArrays(gl::TRIANGLES, 0, QUAD_COUNTS[tex_index] as i32 * 6);
             QUAD_COUNTS[tex_index] = 0;
         }
