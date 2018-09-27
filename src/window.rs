@@ -7,7 +7,6 @@ use resources;
 use std::default::Default;
 use std::env;
 use std::error::Error;
-use std::fmt;
 use text;
 use ui::{self, MouseStatus};
 
@@ -76,43 +75,32 @@ impl Default for WindowSettings {
                 .ok()
                 .and_then(|p| p.file_name().map(|s| s.to_os_string()))
                 .and_then(|s| s.into_string().ok())
-                .unwrap_or(String::new()),
+                .unwrap_or_default(),
             width: 320.0,
             height: 240.0,
             is_dialog: true,
-            ui_spritesheet: get_default_resource(Resource::UiSpritesheet),
-            font: get_default_resource(Resource::Font),
-        }
-    }
-}
-
-enum Resource {
-    UiSpritesheet,
-    Font,
-}
-
-impl fmt::Display for Resource {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            Resource::UiSpritesheet => write!(f, "ui_spritesheet"),
-            Resource::Font => write!(f, "font"),
+            ui_spritesheet: get_default_ui_spritesheet(),
+            font: get_default_font(),
         }
     }
 }
 
 #[cfg(feature = "default_resources")]
-fn get_default_resource(res: Resource) -> Vec<u8> {
-    match res {
-        Resource::UiSpritesheet => resources::DEFAULT_UI_SPRITESHEET.to_vec(),
-        Resource::Font => resources::DEFAULT_FONT.to_vec(),
-    }
+fn get_default_ui_spritesheet() -> Vec<u8> {
+    resources::DEFAULT_UI_SPRITESHEET.to_vec()
 }
 #[cfg(not(feature = "default_resources"))]
-fn get_default_resource(res: Resource) -> Vec<u8> {
-    panic!(
-        "default_resources feature is disabled, but no {} was provided!",
-        res
-    );
+fn get_default_ui_spritesheet() -> Vec<u8> {
+    panic!("default_resources feature is disabled, but no UI spritesheet was provided!");
+}
+
+#[cfg(feature = "default_resources")]
+fn get_default_font() -> Vec<u8> {
+    resources::DEFAULT_FONT.to_vec()
+}
+#[cfg(not(feature = "default_resources"))]
+fn get_default_font() -> Vec<u8> {
+    panic!("default_resources feature is disabled, but no font was provided!");
 }
 
 /// Manages the window and propagates events to the UI system.
@@ -157,7 +145,7 @@ impl Window {
             gl::ClearColor(0.85, 0.85, 0.85, 1.0);
         }
 
-        renderer::initialize_renderer(settings.ui_spritesheet)?;
+        renderer::initialize_renderer(&settings.ui_spritesheet)?;
         text::initialize_font(settings.font)?;
 
         Ok(Window {
@@ -179,10 +167,7 @@ impl Window {
     /// on to the UI system. **Note**: Because of vsync, this function
     /// will hang for a while (usually 16ms at max).
     pub fn refresh(&mut self) -> bool {
-        let mut running = true;
-        if let Err(_) = self.gl_window.swap_buffers() {
-            running = false;
-        }
+        let mut running = self.gl_window.swap_buffers().is_ok();
         unsafe {
             gl::Clear(gl::COLOR_BUFFER_BIT);
         }
@@ -190,17 +175,18 @@ impl Window {
         let mut resized_logical_size = None;
         let mut mouse_position = None;
         let mut mouse_pressed = None;
-        self.events_loop.poll_events(|event| match event {
-            Event::WindowEvent { event, .. } => match event {
-                WindowEvent::CloseRequested => running = false,
-                WindowEvent::Resized(logical_size) => resized_logical_size = Some(logical_size),
-                WindowEvent::CursorMoved { position, .. } => mouse_position = Some(position),
-                WindowEvent::MouseInput { state, .. } => {
-                    mouse_pressed = Some(state == ElementState::Pressed)
+        self.events_loop.poll_events(|event| {
+            if let Event::WindowEvent { event, .. } = event {
+                match event {
+                    WindowEvent::CloseRequested => running = false,
+                    WindowEvent::Resized(logical_size) => resized_logical_size = Some(logical_size),
+                    WindowEvent::CursorMoved { position, .. } => mouse_position = Some(position),
+                    WindowEvent::MouseInput { state, .. } => {
+                        mouse_pressed = Some(state == ElementState::Pressed)
+                    }
+                    _ => (),
                 }
-                _ => (),
-            },
-            _ => (),
+            }
         });
 
         /* Resize event handling */
@@ -235,29 +221,23 @@ impl Window {
         running
     }
 
-    #[cfg(
-        any(
-            target_os = "linux",
-            target_os = "dragonfly",
-            target_os = "freebsd",
-            target_os = "openbsd"
-        )
-    )]
+    #[cfg(any(
+        target_os = "linux",
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "openbsd"
+    ))]
     fn window_as_dialog(window: WindowBuilder) -> WindowBuilder {
         use glutin::os::unix::{WindowBuilderExt, XWindowType};
         window.with_x11_window_type(XWindowType::Dialog)
     }
 
-    #[cfg(
-        not(
-            any(
-                target_os = "linux",
-                target_os = "dragonfly",
-                target_os = "freebsd",
-                target_os = "openbsd"
-            )
-        )
-    )]
+    #[cfg(not(any(
+        target_os = "linux",
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "openbsd"
+    )))]
     fn window_as_dialog(window: WindowBuilder) -> WindowBuilder {
         window
     }

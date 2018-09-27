@@ -144,9 +144,9 @@ fn draw_element(element: &UIElement, text: &str) {
         for i in 0..9 {
             let xi = i % 3;
             let yi = i / 3;
-            let (left, top, right, bottom) = (left_[xi], top_[yi], right_[xi], bottom_[yi]);
-            let (tx0, ty0, tx1, ty1) = (tx[xi], ty[yi], tx[xi] + tw, ty[yi] + th);
-            renderer::draw_quad(left, top, right, bottom, z, tx0, ty0, tx1, ty1, 0);
+            let coords = (left_[xi], top_[yi], right_[xi], bottom_[yi]);
+            let texcoords = (tx[xi], ty[yi], tx[xi] + tw, ty[yi] + th);
+            renderer::draw_quad(coords, texcoords, z, 0);
         }
     }
 

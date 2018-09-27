@@ -52,12 +52,8 @@ pub struct UIElementLayout {
     pub(crate) alignment: Alignment,
 }
 
-impl UIElementLayout {
-    /// Creates a new `UIElementLayout`.
-    ///
-    /// Default `relative` and `anchors` are zeroed, and `alignment`
-    /// is `Alignment::Center`.
-    pub fn new() -> UIElementLayout {
+impl Default for UIElementLayout {
+    fn default() -> UIElementLayout {
         UIElementLayout {
             relative: Rect {
                 left: 0.0,
@@ -72,6 +68,18 @@ impl UIElementLayout {
                 bottom: 0.0,
             },
             alignment: Alignment::Center,
+        }
+    }
+}
+
+impl UIElementLayout {
+    /// Creates a new `UIElementLayout`.
+    ///
+    /// Default `relative` and `anchors` are zeroed, and `alignment`
+    /// is `Alignment::Center`.
+    pub fn new() -> UIElementLayout {
+        UIElementLayout {
+            ..Default::default()
         }
     }
 

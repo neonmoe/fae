@@ -30,11 +30,11 @@ static mut VERTEX_BUFFERS: [VertexBufferData; TEXTURE_COUNT] =
 static mut ALLOCATED_BUFFER_SIZES: [isize; TEXTURE_COUNT] = [-1; TEXTURE_COUNT];
 
 static mut PROJECTION_MATRIX_LOCATION: GLint = -1;
-const VERTEX_SHADER_SOURCE: [&'static str; TEXTURE_COUNT] = [
+const VERTEX_SHADER_SOURCE: [&str; TEXTURE_COUNT] = [
     include_str!("shaders/texquad.vert"),
     include_str!("shaders/text.vert"),
 ];
-const FRAGMENT_SHADER_SOURCE: [&'static str; TEXTURE_COUNT] = [
+const FRAGMENT_SHADER_SOURCE: [&str; TEXTURE_COUNT] = [
     include_str!("shaders/texquad.frag"),
     include_str!("shaders/text.frag"),
 ];
@@ -47,9 +47,9 @@ const FRAGMENT_SHADER_SOURCE: [&'static str; TEXTURE_COUNT] = [
 /// with an alpha channel. To load the image at compile-time, you
 /// could run the following (of course, with your own path):
 /// ```no_run
-/// fungui::initialize_renderer(include_bytes!("resources/gui.png").to_vec());
+/// fungui::initialize_renderer(include_bytes!("resources/gui.png"));
 /// ```
-pub fn initialize_renderer(ui_spritesheet_image: Vec<u8>) -> Result<(), Box<Error>> {
+pub fn initialize_renderer(ui_spritesheet_image: &[u8]) -> Result<(), Box<Error>> {
     unsafe {
         gl::Enable(gl::BLEND);
         gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
@@ -71,11 +71,11 @@ pub fn initialize_renderer(ui_spritesheet_image: Vec<u8>) -> Result<(), Box<Erro
     }
 
     unsafe {
-        for i in 0..TEXTURE_COUNT {
-            TEXTURES[i] = create_texture();
+        for tex in TEXTURES.iter_mut() {
+            *tex = create_texture();
         }
 
-        let image = load_image(&*ui_spritesheet_image).unwrap();
+        let image = load_image(ui_spritesheet_image).unwrap();
         gl::BindTexture(gl::TEXTURE_2D, TEXTURES[0]);
         gl::TexImage2D(
             gl::TEXTURE_2D,
@@ -137,7 +137,7 @@ fn create_program(vert_source: &str, frag_source: &str) -> ShaderProgram {
         gl::LinkProgram(program);
         let mut link_status = 0;
         gl::GetProgramiv(program, gl::LINK_STATUS, &mut link_status);
-        if link_status != gl::TRUE as GLint {
+        if link_status as u8 != gl::TRUE {
             let mut info = [0; 1024];
             gl::GetProgramInfoLog(program, 1024, ptr::null_mut(), info.as_mut_ptr());
             println!(
@@ -147,6 +147,8 @@ fn create_program(vert_source: &str, frag_source: &str) -> ShaderProgram {
         }
         gl::UseProgram(program);
 
+        // FIXME: Convert projection matrix location to an array
+        // because there's more than one program now
         PROJECTION_MATRIX_LOCATION =
             gl::GetUniformLocation(program, "projection_matrix\0".as_ptr() as *const _);
     }
@@ -166,12 +168,12 @@ unsafe fn create_vao() -> (VertexArrayObject, VertexBufferObject) {
 
     /* Setup position attribute */
     gl::VertexAttribPointer(
-        0,             /* Attrib location */
-        3,             /* Components */
-        gl::FLOAT,     /* Type */
-        gl::FALSE,     /* Normalize */
-        20,            /* Stride: sizeof(f32) * (Total component count)*/
-        0 as *const _, /* Offset */
+        0,           /* Attrib location */
+        3,           /* Components */
+        gl::FLOAT,   /* Type */
+        gl::FALSE,   /* Normalize */
+        20,          /* Stride: sizeof(f32) * (Total component count)*/
+        ptr::null(), /* Offset */
     );
     gl::EnableVertexAttribArray(0 /* Attribute location */);
 
@@ -202,17 +204,13 @@ unsafe fn create_texture() -> GLuint {
 }
 
 pub(crate) fn draw_quad(
-    x0: f32,
-    y0: f32,
-    x1: f32,
-    y1: f32,
+    coords: (f32, f32, f32, f32),
+    texcoords: (f32, f32, f32, f32),
     z: f32,
-    tx0: f32,
-    ty0: f32,
-    tx1: f32,
-    ty1: f32,
     tex_index: usize,
 ) {
+    let (x0, y0, x1, y1) = coords;
+    let (tx0, ty0, tx1, ty1) = texcoords;
     if unsafe { QUAD_COUNTS[tex_index] } < MAX_QUADS {
         let quad: TexQuad = [
             x0, y0, z, tx0, ty0, x1, y0, z, tx1, ty0, x1, y1, z, tx1, ty1, x0, y0, z, tx0, ty0, x1,
