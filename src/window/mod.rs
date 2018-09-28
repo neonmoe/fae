@@ -1,3 +1,6 @@
+mod frame_timer;
+
+use self::frame_timer::FrameTimer;
 use gl;
 use glutin::dpi::*;
 use glutin::*;
@@ -111,6 +114,7 @@ pub struct Window {
     gl_window: GlWindow,
     events_loop: EventsLoop,
     mouse: MouseStatus,
+    frame_timer: FrameTimer,
 }
 
 impl Window {
@@ -160,6 +164,7 @@ impl Window {
                 last_pressed: false,
                 pressed: false,
             },
+            frame_timer: FrameTimer::new(),
         })
     }
 
@@ -167,7 +172,12 @@ impl Window {
     /// on to the UI system. **Note**: Because of vsync, this function
     /// will hang for a while (usually 16ms at max).
     pub fn refresh(&mut self) -> bool {
-        let mut running = self.gl_window.swap_buffers().is_ok();
+        let mut running = true;
+
+        self.frame_timer.end_frame();
+        let _ = self.gl_window.swap_buffers();
+        self.frame_timer.begin_frame();
+
         unsafe {
             gl::Clear(gl::COLOR_BUFFER_BIT);
         }
