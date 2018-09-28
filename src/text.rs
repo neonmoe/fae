@@ -72,7 +72,6 @@ pub(crate) fn update_dpi(dpi: f32) {
     *lock = dpi;
 }
 
-// TODO: Handling newlines and centering things properly on the y-axis
 pub(crate) fn queue_text(
     area: layout::Rect,
     z: f32,
@@ -203,7 +202,7 @@ fn collect_glyphs<'a>(
         let chars: Vec<char> = text.nfc().collect();
         let mut i = 0;
         let mut current_word_length = 0;
-        while i < text.len() {
+        while i < chars.len() {
             let c = chars[i];
             i += 1;
             if c.is_control() {

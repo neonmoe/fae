@@ -10,6 +10,7 @@ use resources;
 use std::default::Default;
 use std::env;
 use std::error::Error;
+use std::time::Duration;
 use text;
 use ui::{self, MouseStatus};
 
@@ -229,6 +230,13 @@ impl Window {
         ui::update(self.width, self.height, self.dpi as f32, self.mouse);
 
         running
+    }
+
+    /// Returns the average duration of the last 60 frames. A "frame"
+    /// includes operations between the latest refresh() and the one
+    /// before that, except waiting for vsync.
+    pub fn avg_frame_duration(&self) -> Duration {
+        self.frame_timer.avg_frame_duration()
     }
 
     #[cfg(any(
