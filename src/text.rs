@@ -96,10 +96,15 @@ pub(crate) fn queue_text(
                 final_glyphs.extend_from_slice(&row);
             }
         }
+
         Alignment::Right => {
             for row in rows {
                 if let Some((width, _)) = measure_text(&row) {
-                    let offset = area.width() - width;
+                    let dpi = {
+                        let lock = DPI_SCALE.lock().unwrap();
+                        *lock
+                    };
+                    let offset = (area.width() - width) * dpi;
                     let row = offset_glyphs(row, offset, 0.0);
                     final_glyphs.extend_from_slice(&row);
                 } else {
@@ -107,10 +112,15 @@ pub(crate) fn queue_text(
                 }
             }
         }
+
         Alignment::Center => {
             for row in rows {
                 if let Some((width, _)) = measure_text(&row) {
-                    let offset = (area.width() - width) / 2.0;
+                    let dpi = {
+                        let lock = DPI_SCALE.lock().unwrap();
+                        *lock
+                    };
+                    let offset = (area.width() - width) / 2.0 * dpi;
                     let row = offset_glyphs(row, offset, 0.0);
                     final_glyphs.extend_from_slice(&row);
                 } else {

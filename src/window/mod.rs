@@ -177,11 +177,10 @@ impl Window {
 
         self.frame_timer.end_frame();
         let _ = self.gl_window.swap_buffers();
-        self.frame_timer.begin_frame();
-
         unsafe {
             gl::Clear(gl::COLOR_BUFFER_BIT);
         }
+        self.frame_timer.begin_frame();
 
         let mut resized_logical_size = None;
         let mut mouse_position = None;
