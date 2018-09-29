@@ -16,16 +16,26 @@ type TexQuad = [f32; 30];
 type Texture = GLuint;
 type VertexBufferObject = GLuint;
 type VertexArrayObject = GLuint;
-type ShaderProgram = GLuint;
+
+#[derive(Clone, Debug)]
+struct ShaderProgram {
+    program: GLuint,
+    projection_matrix_location: GLint,
+}
+
+#[derive(Clone, Debug)]
+struct Attributes {
+    vbo: VertexBufferObject,
+    vao: VertexArrayObject,
+    vbo_data: Vec<TexQuad>,
+    allocated_vbo_data_size: isize,
+}
 
 #[derive(Clone, Debug)]
 struct DrawCall {
     texture: Texture,
-    vbo: VertexBufferObject,
-    vao: VertexArrayObject,
     program: ShaderProgram,
-    vbo_data: Vec<TexQuad>,
-    allocated_vbo_data_size: isize,
+    attributes: Attributes,
 }
 
 #[derive(Debug)]
@@ -38,18 +48,22 @@ lazy_static! {
         calls: vec![
             DrawCall {
                 texture: 0,
-                vbo: 0,
-                vao: 0,
-                program: 0,
-                vbo_data: Vec::new(),
-                allocated_vbo_data_size: 0,
+                program: ShaderProgram {
+                    program: 0,
+                    projection_matrix_location: 0,
+                },
+                attributes: Attributes {
+                    vbo: 0,
+                    vao: 0,
+                    vbo_data: Vec::new(),
+                    allocated_vbo_data_size: 0,
+                },
             };
             TEXTURE_COUNT
         ]
     });
 }
 
-static mut PROJECTION_MATRIX_LOCATION: GLint = -1;
 const VERTEX_SHADER_SOURCE: [&str; TEXTURE_COUNT] = [
     include_str!("shaders/texquad.vert"),
     include_str!("shaders/text.vert"),
@@ -82,9 +96,7 @@ pub fn initialize_renderer(ui_spritesheet_image: &[u8]) -> Result<(), Box<Error>
     }
 
     for call in draw_state.calls.iter_mut() {
-        let (vao, vbo) = create_vao();
-        call.vao = vao;
-        call.vbo = vbo;
+        call.attributes = create_attributes();
     }
 
     for call in draw_state.calls.iter_mut() {
@@ -116,6 +128,7 @@ pub fn initialize_renderer(ui_spritesheet_image: &[u8]) -> Result<(), Box<Error>
 #[inline]
 fn create_program(vert_source: &str, frag_source: &str) -> ShaderProgram {
     let program;
+    let projection_matrix_location;
     unsafe {
         program = gl::CreateProgram();
 
@@ -149,19 +162,20 @@ fn create_program(vert_source: &str, frag_source: &str) -> ShaderProgram {
                 String::from_utf8_lossy(&mem::transmute::<[i8; 1024], [u8; 1024]>(info)[..])
             );
         }
-        gl::UseProgram(program);
 
-        // FIXME: Convert projection matrix location to an array
-        // because there's more than one program now
-        PROJECTION_MATRIX_LOCATION =
+        gl::UseProgram(program);
+        projection_matrix_location =
             gl::GetUniformLocation(program, "projection_matrix\0".as_ptr() as *const _);
     }
 
-    program
+    ShaderProgram {
+        program,
+        projection_matrix_location,
+    }
 }
 
 #[inline]
-fn create_vao() -> (VertexArrayObject, VertexBufferObject) {
+fn create_attributes() -> Attributes {
     let mut vao = 0;
     unsafe {
         gl::GenVertexArrays(1, &mut vao);
@@ -200,7 +214,12 @@ fn create_vao() -> (VertexArrayObject, VertexBufferObject) {
         gl::EnableVertexAttribArray(1 /* Attribute location */);
     }
 
-    (vao, vbo)
+    Attributes {
+        vao,
+        vbo,
+        vbo_data: Vec::new(),
+        allocated_vbo_data_size: 0,
+    }
 }
 
 #[inline]
@@ -250,7 +269,7 @@ pub(crate) fn draw_quad(
         x0, y0, z, tx0, ty0, x1, y0, z, tx1, ty0, x1, y1, z, tx1, ty1, x0, y0, z, tx0, ty0, x1, y1,
         z, tx1, ty1, x0, y1, z, tx0, ty1,
     ];
-    call.vbo_data.push(quad);
+    call.attributes.vbo_data.push(quad);
 }
 
 pub(crate) fn render(width: f64, height: f64) {
@@ -264,36 +283,41 @@ pub(crate) fn render(width: f64, height: f64) {
 
     let mut draw_state = DRAW_STATE.lock().unwrap();
     for (i, call) in draw_state.calls.iter_mut().enumerate() {
-        if call.vbo_data.len() == 0 {
+        if call.attributes.vbo_data.len() == 0 {
             continue;
         }
 
         unsafe {
-            gl::UseProgram(call.program);
-            gl::UniformMatrix4fv(PROJECTION_MATRIX_LOCATION, 1, gl::FALSE, matrix.as_ptr());
-            gl::BindVertexArray(call.vao);
+            gl::UseProgram(call.program.program);
+            gl::UniformMatrix4fv(
+                call.program.projection_matrix_location,
+                1,
+                gl::FALSE,
+                matrix.as_ptr(),
+            );
+            gl::BindVertexArray(call.attributes.vao);
             gl::BindTexture(gl::TEXTURE_2D, call.texture);
-            gl::BindBuffer(gl::ARRAY_BUFFER, call.vbo);
+            gl::BindBuffer(gl::ARRAY_BUFFER, call.attributes.vbo);
         }
 
-        let buffer_length = (mem::size_of::<TexQuad>() * call.vbo_data.len()) as isize;
-        let buffer_ptr = call.vbo_data.as_ptr() as *const _;
+        let buffer_length = (mem::size_of::<TexQuad>() * call.attributes.vbo_data.len()) as isize;
+        let buffer_ptr = call.attributes.vbo_data.as_ptr() as *const _;
 
-        if buffer_length < call.allocated_vbo_data_size {
+        if buffer_length < call.attributes.allocated_vbo_data_size {
             unsafe {
                 gl::BufferSubData(gl::ARRAY_BUFFER, 0, buffer_length, buffer_ptr);
             }
         } else {
-            call.allocated_vbo_data_size = buffer_length;
+            call.attributes.allocated_vbo_data_size = buffer_length;
             unsafe {
                 gl::BufferData(gl::ARRAY_BUFFER, buffer_length, buffer_ptr, gl::STREAM_DRAW);
             }
         }
 
         unsafe {
-            gl::DrawArrays(gl::TRIANGLES, 0, call.vbo_data.len() as i32 * 6);
+            gl::DrawArrays(gl::TRIANGLES, 0, call.attributes.vbo_data.len() as i32 * 6);
         }
-        call.vbo_data.clear();
+        call.attributes.vbo_data.clear();
         print_gl_errors(&*format!("after render #{}", i));
     }
 }
