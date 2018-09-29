@@ -1,33 +1,53 @@
-// FIXME: Consider cleaning up some unnecessary unsafes
-
 use gl;
 use gl::types::*;
 use image::load_image;
 use std::error::Error;
 use std::mem;
 use std::ptr;
+use std::sync::Mutex;
 use text;
 
-const MAX_QUADS: usize = 16_000_000 / mem::size_of::<TexQuad>(); // 16 MB vertex buffers
 const TEXTURE_COUNT: usize = 2; // UI elements, glyph cache
 
+pub(crate) const DRAW_CALL_INDEX_UI: usize = 0;
+pub(crate) const DRAW_CALL_INDEX_TEXT: usize = 1;
+
 type TexQuad = [f32; 30];
-type VertexBufferData = [TexQuad; MAX_QUADS];
 type Texture = GLuint;
 type VertexBufferObject = GLuint;
 type VertexArrayObject = GLuint;
 type ShaderProgram = GLuint;
 
-static mut QUAD_COUNTS: [usize; TEXTURE_COUNT] = [0; TEXTURE_COUNT];
-/// The textures are always in the same order:
-/// [GUI elements spritesheet, Glyph Cache]
-static mut TEXTURES: [Texture; TEXTURE_COUNT] = [0; TEXTURE_COUNT];
-static mut VBOS: [VertexBufferObject; TEXTURE_COUNT] = [0; TEXTURE_COUNT];
-static mut VAOS: [VertexArrayObject; TEXTURE_COUNT] = [0; TEXTURE_COUNT];
-static mut SHADER_PROGRAMS: [ShaderProgram; TEXTURE_COUNT] = [0; TEXTURE_COUNT];
-static mut VERTEX_BUFFERS: [VertexBufferData; TEXTURE_COUNT] =
-    [[[0.0; 30]; MAX_QUADS]; TEXTURE_COUNT];
-static mut ALLOCATED_BUFFER_SIZES: [isize; TEXTURE_COUNT] = [-1; TEXTURE_COUNT];
+#[derive(Clone, Debug)]
+struct DrawCall {
+    texture: Texture,
+    vbo: VertexBufferObject,
+    vao: VertexArrayObject,
+    program: ShaderProgram,
+    vbo_data: Vec<TexQuad>,
+    allocated_vbo_data_size: isize,
+}
+
+#[derive(Debug)]
+struct DrawState {
+    calls: Vec<DrawCall>,
+}
+
+lazy_static! {
+    static ref DRAW_STATE: Mutex<DrawState> = Mutex::new(DrawState {
+        calls: vec![
+            DrawCall {
+                texture: 0,
+                vbo: 0,
+                vao: 0,
+                program: 0,
+                vbo_data: Vec::new(),
+                allocated_vbo_data_size: 0,
+            };
+            TEXTURE_COUNT
+        ]
+    });
+}
 
 static mut PROJECTION_MATRIX_LOCATION: GLint = -1;
 const VERTEX_SHADER_SOURCE: [&str; TEXTURE_COUNT] = [
@@ -50,60 +70,44 @@ const FRAGMENT_SHADER_SOURCE: [&str; TEXTURE_COUNT] = [
 /// fungui::initialize_renderer(include_bytes!("resources/gui.png"));
 /// ```
 pub fn initialize_renderer(ui_spritesheet_image: &[u8]) -> Result<(), Box<Error>> {
+    let mut draw_state = DRAW_STATE.lock().unwrap();
+
     unsafe {
         gl::Enable(gl::BLEND);
         gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
     }
 
-    unsafe {
-        for i in 0..TEXTURE_COUNT {
-            let program = create_program(VERTEX_SHADER_SOURCE[i], FRAGMENT_SHADER_SOURCE[i]);
-            SHADER_PROGRAMS[i] = program;
-        }
+    for (i, call) in draw_state.calls.iter_mut().enumerate() {
+        call.program = create_program(VERTEX_SHADER_SOURCE[i], FRAGMENT_SHADER_SOURCE[i]);
     }
 
-    unsafe {
-        for i in 0..TEXTURE_COUNT {
-            let (vao, vbo) = create_vao();
-            VAOS[i] = vao;
-            VBOS[i] = vbo;
-        }
+    for call in draw_state.calls.iter_mut() {
+        let (vao, vbo) = create_vao();
+        call.vao = vao;
+        call.vbo = vbo;
     }
 
-    unsafe {
-        for tex in TEXTURES.iter_mut() {
-            *tex = create_texture();
-        }
-
-        let image = load_image(ui_spritesheet_image).unwrap();
-        gl::BindTexture(gl::TEXTURE_2D, TEXTURES[0]);
-        gl::TexImage2D(
-            gl::TEXTURE_2D,
-            0,
-            gl::RGBA as GLint, /* Components in texture */
-            image.width,
-            image.height,
-            0,
-            gl::RGBA as GLuint, /* Format of the data */
-            gl::UNSIGNED_BYTE,  /* Type of the data*/
-            image.pixels.as_ptr() as *const _,
-        );
-
-        // This creates the glyph cache texture
-        gl::BindTexture(gl::TEXTURE_2D, TEXTURES[1]);
-        gl::TexImage2D(
-            gl::TEXTURE_2D,
-            0,
-            gl::RED as GLint, /* Components in texture */
-            text::GLYPH_CACHE_WIDTH as GLint,
-            text::GLYPH_CACHE_HEIGHT as GLint,
-            0,
-            gl::RED as GLuint, /* Format of the data */
-            gl::UNSIGNED_BYTE, /* Type of the data */
-            vec![0; (text::GLYPH_CACHE_WIDTH * text::GLYPH_CACHE_HEIGHT) as usize].as_ptr()
-                as *const _,
-        );
+    for call in draw_state.calls.iter_mut() {
+        call.texture = create_texture();
     }
+
+    let image = load_image(ui_spritesheet_image).unwrap();
+    insert_texture(
+        draw_state.calls[DRAW_CALL_INDEX_UI].texture,
+        gl::RGBA as GLint,
+        image.width,
+        image.height,
+        image.pixels,
+    );
+
+    // This creates the glyph cache texture
+    insert_texture(
+        draw_state.calls[DRAW_CALL_INDEX_TEXT].texture,
+        gl::RED as GLint,
+        text::GLYPH_CACHE_WIDTH as GLint,
+        text::GLYPH_CACHE_HEIGHT as GLint,
+        vec![0; (text::GLYPH_CACHE_WIDTH * text::GLYPH_CACHE_HEIGHT) as usize],
+    );
 
     print_gl_errors("after initialization");
     Ok(())
@@ -157,50 +161,78 @@ fn create_program(vert_source: &str, frag_source: &str) -> ShaderProgram {
 }
 
 #[inline]
-unsafe fn create_vao() -> (VertexArrayObject, VertexBufferObject) {
+fn create_vao() -> (VertexArrayObject, VertexBufferObject) {
     let mut vao = 0;
-    gl::GenVertexArrays(1, &mut vao);
-    gl::BindVertexArray(vao);
+    unsafe {
+        gl::GenVertexArrays(1, &mut vao);
+        gl::BindVertexArray(vao);
+    }
 
     let mut vbo = 0;
-    gl::GenBuffers(1, &mut vbo);
-    gl::BindBuffer(gl::ARRAY_BUFFER, vbo);
+    unsafe {
+        gl::GenBuffers(1, &mut vbo);
+        gl::BindBuffer(gl::ARRAY_BUFFER, vbo);
+    }
 
     /* Setup position attribute */
-    gl::VertexAttribPointer(
-        0,           /* Attrib location */
-        3,           /* Components */
-        gl::FLOAT,   /* Type */
-        gl::FALSE,   /* Normalize */
-        20,          /* Stride: sizeof(f32) * (Total component count)*/
-        ptr::null(), /* Offset */
-    );
-    gl::EnableVertexAttribArray(0 /* Attribute location */);
+    unsafe {
+        gl::VertexAttribPointer(
+            0,           /* Attrib location */
+            3,           /* Components */
+            gl::FLOAT,   /* Type */
+            gl::FALSE,   /* Normalize */
+            20,          /* Stride: sizeof(f32) * (Total component count)*/
+            ptr::null(), /* Offset */
+        );
+        gl::EnableVertexAttribArray(0 /* Attribute location */);
+    }
 
     /* Setup texture coordinate attribute */
-    gl::VertexAttribPointer(
-        1,              /* Attrib location */
-        2,              /* Components */
-        gl::FLOAT,      /* Type */
-        gl::FALSE,      /* Normalize */
-        20,             /* Stride: sizeof(f32) * (Total component count)*/
-        12 as *const _, /* Offset: sizeof(f32) * (Position's component count) */
-    );
-    gl::EnableVertexAttribArray(1 /* Attribute location */);
+    unsafe {
+        gl::VertexAttribPointer(
+            1,              /* Attrib location */
+            2,              /* Components */
+            gl::FLOAT,      /* Type */
+            gl::FALSE,      /* Normalize */
+            20,             /* Stride: sizeof(f32) * (Total component count)*/
+            12 as *const _, /* Offset: sizeof(f32) * (Position's component count) */
+        );
+        gl::EnableVertexAttribArray(1 /* Attribute location */);
+    }
 
     (vao, vbo)
 }
 
 #[inline]
-unsafe fn create_texture() -> GLuint {
+fn create_texture() -> GLuint {
     let mut tex = 0;
-    gl::GenTextures(1, &mut tex);
-    gl::BindTexture(gl::TEXTURE_2D, tex);
-    gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::REPEAT as GLint);
-    gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, gl::REPEAT as GLint);
-    gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as GLint);
-    gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::NEAREST as GLint);
+    unsafe {
+        gl::GenTextures(1, &mut tex);
+        gl::BindTexture(gl::TEXTURE_2D, tex);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::REPEAT as GLint);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, gl::REPEAT as GLint);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as GLint);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::NEAREST as GLint);
+    }
     tex
+}
+
+#[inline]
+fn insert_texture(tex: GLuint, components: GLint, w: GLint, h: GLint, pixels: Vec<u8>) {
+    unsafe {
+        gl::BindTexture(gl::TEXTURE_2D, tex);
+        gl::TexImage2D(
+            gl::TEXTURE_2D,
+            0,
+            components,
+            w,
+            h,
+            0,
+            components as GLuint,
+            gl::UNSIGNED_BYTE,
+            pixels.as_ptr() as *const _,
+        );
+    }
 }
 
 pub(crate) fn draw_quad(
@@ -211,22 +243,14 @@ pub(crate) fn draw_quad(
 ) {
     let (x0, y0, x1, y1) = coords;
     let (tx0, ty0, tx1, ty1) = texcoords;
-    if unsafe { QUAD_COUNTS[tex_index] } < MAX_QUADS {
-        let quad: TexQuad = [
-            x0, y0, z, tx0, ty0, x1, y0, z, tx1, ty0, x1, y1, z, tx1, ty1, x0, y0, z, tx0, ty0, x1,
-            y1, z, tx1, ty1, x0, y1, z, tx0, ty1,
-        ];
-        unsafe {
-            ptr::copy(
-                quad.as_ptr(),
-                VERTEX_BUFFERS[tex_index][QUAD_COUNTS[tex_index]].as_mut_ptr(),
-                mem::size_of::<TexQuad>(),
-            );
-            QUAD_COUNTS[tex_index] += 1;
-        }
-    } else {
-        println!("Too many quads!");
-    }
+    let mut draw_state = DRAW_STATE.lock().unwrap();
+    let call = &mut draw_state.calls[tex_index];
+
+    let quad: TexQuad = [
+        x0, y0, z, tx0, ty0, x1, y0, z, tx1, ty0, x1, y1, z, tx1, ty1, x0, y0, z, tx0, ty0, x1, y1,
+        z, tx1, ty1, x0, y1, z, tx0, ty1,
+    ];
+    call.vbo_data.push(quad);
 }
 
 pub(crate) fn render(width: f64, height: f64) {
@@ -238,37 +262,45 @@ pub(crate) fn render(width: f64, height: f64) {
 
     text::draw_text();
 
-    for tex_index in 0..TEXTURE_COUNT {
+    let mut draw_state = DRAW_STATE.lock().unwrap();
+    for (i, call) in draw_state.calls.iter_mut().enumerate() {
+        if call.vbo_data.len() == 0 {
+            continue;
+        }
+
         unsafe {
-            if QUAD_COUNTS[tex_index] == 0 {
-                continue;
-            }
-
-            gl::UseProgram(SHADER_PROGRAMS[tex_index]);
+            gl::UseProgram(call.program);
             gl::UniformMatrix4fv(PROJECTION_MATRIX_LOCATION, 1, gl::FALSE, matrix.as_ptr());
+            gl::BindVertexArray(call.vao);
+            gl::BindTexture(gl::TEXTURE_2D, call.texture);
+            gl::BindBuffer(gl::ARRAY_BUFFER, call.vbo);
+        }
 
-            gl::BindVertexArray(VAOS[tex_index]);
-            gl::BindTexture(gl::TEXTURE_2D, TEXTURES[tex_index]);
-            gl::BindBuffer(gl::ARRAY_BUFFER, VBOS[tex_index]);
+        let buffer_length = (mem::size_of::<TexQuad>() * call.vbo_data.len()) as isize;
+        let buffer_ptr = call.vbo_data.as_ptr() as *const _;
 
-            let buffer_length = (mem::size_of::<TexQuad>() * QUAD_COUNTS[tex_index]) as isize;
-            let buffer_ptr = VERTEX_BUFFERS[tex_index].as_ptr() as *const _;
-
-            if buffer_length < ALLOCATED_BUFFER_SIZES[tex_index] {
+        if buffer_length < call.allocated_vbo_data_size {
+            unsafe {
                 gl::BufferSubData(gl::ARRAY_BUFFER, 0, buffer_length, buffer_ptr);
-            } else {
-                ALLOCATED_BUFFER_SIZES[tex_index] = buffer_length;
+            }
+        } else {
+            call.allocated_vbo_data_size = buffer_length;
+            unsafe {
                 gl::BufferData(gl::ARRAY_BUFFER, buffer_length, buffer_ptr, gl::STREAM_DRAW);
             }
-
-            gl::DrawArrays(gl::TRIANGLES, 0, QUAD_COUNTS[tex_index] as i32 * 6);
-            QUAD_COUNTS[tex_index] = 0;
         }
+
+        unsafe {
+            gl::DrawArrays(gl::TRIANGLES, 0, call.vbo_data.len() as i32 * 6);
+        }
+        call.vbo_data.clear();
+        print_gl_errors(&*format!("after render #{}", i));
     }
 }
 
-pub(crate) unsafe fn get_texture(index: usize) -> GLuint {
-    TEXTURES[index]
+pub(crate) fn get_texture(index: usize) -> GLuint {
+    let draw_state = DRAW_STATE.lock().unwrap();
+    draw_state.calls[index].texture
 }
 
 fn print_gl_errors(context: &str) {

@@ -146,7 +146,7 @@ fn draw_element(element: &UIElement, text: &str) {
             let yi = i / 3;
             let coords = (left_[xi], top_[yi], right_[xi], bottom_[yi]);
             let texcoords = (tx[xi], ty[yi], tx[xi] + tw, ty[yi] + th);
-            renderer::draw_quad(coords, texcoords, z, 0);
+            renderer::draw_quad(coords, texcoords, z, renderer::DRAW_CALL_INDEX_UI);
         }
     }
 

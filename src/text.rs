@@ -259,8 +259,8 @@ pub(crate) fn draw_text() {
             }
         }
 
+        let tex = renderer::get_texture(renderer::DRAW_CALL_INDEX_TEXT);
         unsafe {
-            let tex = renderer::get_texture(1);
             gl::BindTexture(gl::TEXTURE_2D, tex);
             gl::PixelStorei(gl::UNPACK_ALIGNMENT, 1);
         }
