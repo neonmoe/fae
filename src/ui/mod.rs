@@ -85,22 +85,29 @@ pub fn update(width: f64, height: f64, dpi: f32, mouse: MouseStatus) -> UIStatus
 }
 
 fn new_element(identifier: String, kind: UIElementKind) -> UIElement {
+    let (rect, alignment) = create_next_element();
     let element = UIElement {
         identifier,
         kind,
-        layout: Layout::for_next_element(),
+        rect,
+        alignment,
     };
     element
 }
 
 fn draw_element(element: &UIElement, text: &str) {
-    let &UIElement { kind, layout, .. } = element;
+    let &UIElement {
+        kind,
+        rect,
+        alignment,
+        ..
+    } = element;
     let Rect {
         left,
         top,
         right,
         bottom,
-    } = layout.absolute();
+    } = rect;
 
     if kind != UIElementKind::NoBackground {
         let tx = kind as i32 as f32 / SHEET_LENGTH as f32; // The UV offset based on the element type
@@ -125,11 +132,5 @@ fn draw_element(element: &UIElement, text: &str) {
         }
     }
 
-    text::queue_text(
-        layout.absolute(),
-        NORMAL_UI_TEXT_DEPTH,
-        16.0,
-        text,
-        layout.alignment,
-    );
+    text::queue_text(rect, NORMAL_UI_TEXT_DEPTH, 16.0, text, alignment);
 }

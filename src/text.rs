@@ -80,11 +80,15 @@ pub(crate) fn queue_text(
     alignment: Alignment,
 ) {
     let mut cache = TEXT_CACHE.lock().unwrap();
+    let dpi = {
+        let lock = DPI_SCALE.lock().unwrap();
+        *lock
+    };
     let rows = collect_glyphs(
         &mut cache,
         area.left,
         area.top,
-        area.width(),
+        area.width() * dpi,
         font_size,
         text,
     );
@@ -100,10 +104,6 @@ pub(crate) fn queue_text(
         Alignment::Right => {
             for row in rows {
                 if let Some((width, _)) = measure_text(&row) {
-                    let dpi = {
-                        let lock = DPI_SCALE.lock().unwrap();
-                        *lock
-                    };
                     let offset = (area.width() - width) * dpi;
                     let row = offset_glyphs(row, offset, 0.0);
                     final_glyphs.extend_from_slice(&row);
@@ -116,10 +116,6 @@ pub(crate) fn queue_text(
         Alignment::Center => {
             for row in rows {
                 if let Some((width, _)) = measure_text(&row) {
-                    let dpi = {
-                        let lock = DPI_SCALE.lock().unwrap();
-                        *lock
-                    };
                     let offset = (area.width() - width) / 2.0 * dpi;
                     let row = offset_glyphs(row, offset, 0.0);
                     final_glyphs.extend_from_slice(&row);

@@ -17,7 +17,8 @@ pub(crate) enum UIElementKind {
 pub(crate) struct UIElement {
     pub(crate) identifier: String,
     pub(crate) kind: UIElementKind,
-    pub(crate) layout: Layout,
+    pub(crate) rect: Rect,
+    pub(crate) alignment: Alignment,
 }
 
 impl UIElement {
@@ -31,7 +32,7 @@ impl UIElement {
             top,
             right,
             bottom,
-        } = self.layout.absolute();
+        } = self.rect;
         !(x < left - PADDING - OUTER_TILE_WIDTH
             || x >= right + PADDING + OUTER_TILE_WIDTH
             || y < top - PADDING - OUTER_TILE_WIDTH
