@@ -19,7 +19,6 @@ const NORMAL_UI_TEXT_DEPTH: f32 = NORMAL_UI_ELEMENT_DEPTH - 0.1;
 
 lazy_static! {
     static ref UI_STATE: Mutex<UIState> = Mutex::new(UIState {
-        element_layouts: HashMap::new(),
         elements: HashMap::new(),
         last_element: None,
         mouse: MouseStatus {
@@ -35,7 +34,6 @@ lazy_static! {
 }
 
 struct UIState {
-    element_layouts: HashMap<u64, UIElementLayout>,
     elements: HashMap<u64, UIElement>,
     last_element: Option<UIElement>,
     mouse: MouseStatus,
@@ -62,20 +60,6 @@ pub struct MouseStatus {
     pub pressed: bool,
 }
 
-// TODO: Implement loading multiple elements' dimensions from a
-// configuration file
-/// Defines a specific layout for elements with the given
-/// identifier.
-///
-/// [See the `layout` documentation for an
-/// example](index.html#setting-layout-manually-from-code).
-pub fn define_element_layout(identifier: &str, dimensions: UIElementLayout) {
-    let mut state = UI_STATE.lock().unwrap();
-    state
-        .element_layouts
-        .insert(element_hash(identifier), dimensions);
-}
-
 /// Handled by the `window_bootstrap` feature, if in use.
 pub fn update(width: f64, height: f64, dpi: f32, mouse: MouseStatus) -> UIStatus {
     renderer::render(width, height);
@@ -100,21 +84,12 @@ pub fn update(width: f64, height: f64, dpi: f32, mouse: MouseStatus) -> UIStatus
     UIStatus { hovering_button }
 }
 
-// TODO: Improve automatic layouting
-fn new_element(state: &UIState, identifier: String, kind: UIElementKind) -> UIElement {
-    let y = if let Some(ref element) = state.last_element {
-        element.layout.relative.top + 16.0 + TILE_SIZE + OUTER_TILE_WIDTH * 3.0
-    } else {
-        30.0
-    };
-    let mut element = UIElement {
+fn new_element(identifier: String, kind: UIElementKind) -> UIElement {
+    let element = UIElement {
         identifier,
         kind,
-        layout: UIElementLayout::new().relative(30.0, y, 30.0 + 88.0, y + 16.0),
+        layout: Layout::for_next_element(),
     };
-    if let Some(loaded_layout) = state.element_layouts.get(&element.id()) {
-        element.layout = *loaded_layout;
-    }
     element
 }
 

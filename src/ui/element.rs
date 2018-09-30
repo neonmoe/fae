@@ -17,7 +17,7 @@ pub(crate) enum UIElementKind {
 pub(crate) struct UIElement {
     pub(crate) identifier: String,
     pub(crate) kind: UIElementKind,
-    pub(crate) layout: UIElementLayout,
+    pub(crate) layout: Layout,
 }
 
 impl UIElement {
@@ -49,7 +49,7 @@ pub(crate) fn element_hash(s: &str) -> u64 {
 pub fn label(identifier: &str, display_text: &str) {
     let mut state = UI_STATE.lock().unwrap();
 
-    let element = new_element(&state, identifier.to_owned(), UIElementKind::Panel);
+    let element = new_element(identifier.to_owned(), UIElementKind::Panel);
     draw_element(&element, display_text);
     state.insert_element(element);
 }
@@ -59,7 +59,7 @@ pub fn label(identifier: &str, display_text: &str) {
 pub fn button(identifier: &str, display_text: &str) -> bool {
     let mut state = UI_STATE.lock().unwrap();
 
-    let mut element = new_element(&state, identifier.to_owned(), UIElementKind::ButtonNormal);
+    let mut element = new_element(identifier.to_owned(), UIElementKind::ButtonNormal);
     let hovered = element.is_point_inside(state.mouse.x, state.mouse.y);
     let just_released = !state.mouse.pressed && state.mouse.last_pressed;
     let can_be_pressed =
