@@ -4,7 +4,28 @@
 //!
 //! ## Setting layout manually from code
 //! ```
-// TODO: Write this
+//! use fungui::{layout, element};
+//!
+//! layout::push_padding(20.0);
+//! layout::push_direction(layout::Direction::Right);
+//! layout::push_rect(
+//!     layout::screen_x(0.5) - 100.0,
+//!     20.0,
+//!     200.0,
+//!     16.0,
+//! );
+//!
+//! for i in 0..10 {
+//!     element::label(&format!("button-{}", i), &format!("Button #{}", i));
+//! }
+//!
+//! // Each push (eg. push_rect) has a corresponding pop
+//! // (eg. pop_rect). The pops are technically not needed, but the
+//! // intention is to build a sort of "style stack" and pop as your
+//! // environment changes.
+//! layout::pop_rect();
+//! layout::pop_direction();
+//! layout::pop_padding();
 //! ```
 use super::*;
 pub use text::Alignment;
@@ -100,14 +121,14 @@ pub fn pop_alignment() {
 }
 
 /// Returns `x` of window width, ie. `screen_x(0.5)` with a `640x480`
-/// screen will return `320.0` (`640 * 0.5`).
+/// screen will return `320.0` (= `640 * 0.5`).
 pub fn screen_x(x: f32) -> f32 {
     let lock = WINDOW_DIMENSIONS.lock().unwrap();
     x * lock.0
 }
 
 /// Returns `y` of window height, ie. `screen_y(0.5)` with a `640x480`
-/// screen will return `240.0` (`480 * 0.5`).
+/// screen will return `240.0` (= `480 * 0.5`).
 pub fn screen_y(y: f32) -> f32 {
     let lock = WINDOW_DIMENSIONS.lock().unwrap();
     y * lock.1
@@ -136,12 +157,8 @@ pub(crate) fn create_next_element() -> (Rect, Alignment) {
 }
 
 /// Defines a rectangle by defining each side's position on its
-/// axis. Ie. a 1x1 rectangle that was 2 units offset on the x-axis,
-/// would be defined as:
-/// ```
-/// # use fungui::layout::Rect;
-/// Rect { left: 3.0, top: 1.0, right: 4.0, bottom: 0.0 };
-/// ```
+/// axis.
+///
 /// The crate considers positive x as right, positive y as down.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Rect {
