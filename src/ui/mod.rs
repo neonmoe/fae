@@ -6,8 +6,8 @@ use std::collections::hash_map::HashMap;
 use std::sync::Mutex;
 use text;
 
-use self::element::*;
-use self::layout::*;
+use self::element::{UIElement, UIElementKind};
+use self::layout::Rect;
 
 const TILE_SIZE: f32 = 16.0;
 const OUTER_TILE_WIDTH: f32 = 4.0;
@@ -61,9 +61,10 @@ pub struct MouseStatus {
 }
 
 /// Handled by the `window_bootstrap` feature, if in use.
-pub fn update(width: f64, height: f64, dpi: f32, mouse: MouseStatus) -> UIStatus {
+pub fn update(width: f32, height: f32, dpi: f32, mouse: MouseStatus) -> UIStatus {
     renderer::render(width, height);
     text::update_dpi(dpi);
+    layout::reset_layout();
 
     {
         let mut dimensions = WINDOW_DIMENSIONS.lock().unwrap();
@@ -85,7 +86,7 @@ pub fn update(width: f64, height: f64, dpi: f32, mouse: MouseStatus) -> UIStatus
 }
 
 fn new_element(identifier: String, kind: UIElementKind) -> UIElement {
-    let (rect, alignment) = create_next_element();
+    let (rect, alignment) = layout::create_next_element();
     let element = UIElement {
         identifier,
         kind,
@@ -128,7 +129,8 @@ fn draw_element(element: &UIElement, text: &str) {
             let yi = i / 3;
             let coords = (left_[xi], top_[yi], right_[xi], bottom_[yi]);
             let texcoords = (tx[xi], ty[yi], tx[xi] + tw, ty[yi] + th);
-            renderer::draw_quad(coords, texcoords, z, renderer::DRAW_CALL_INDEX_UI);
+            let color = (0xFF, 0xFF, 0xFF, 0xFF);
+            renderer::draw_quad(coords, texcoords, color, z, renderer::DRAW_CALL_INDEX_UI);
         }
     }
 

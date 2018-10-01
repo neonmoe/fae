@@ -19,9 +19,9 @@ pub struct WindowSettings {
     /// Title of the window. Default value: Name of the executable file
     pub title: String,
     /// Width of the window in logical pixels. Default value: `320.0`
-    pub width: f64,
+    pub width: f32,
     /// Height of the window in logical pixels. Default value: `240.0`
-    pub height: f64,
+    pub height: f32,
     /// Whether or not the application is a dialog. Default value: `true`
     ///
     /// This only affects x11 environments, where it sets the window
@@ -109,9 +109,9 @@ fn get_default_font() -> Vec<u8> {
 
 /// Manages the window and propagates events to the UI system.
 pub struct Window {
-    width: f64,
-    height: f64,
-    dpi: f64,
+    width: f32,
+    height: f32,
+    dpi: f32,
     gl_window: GlWindow,
     events_loop: EventsLoop,
     mouse: MouseStatus,
@@ -134,7 +134,10 @@ impl Window {
         let events_loop = EventsLoop::new();
         let mut window = WindowBuilder::new()
             .with_title(settings.title)
-            .with_dimensions(LogicalSize::new(settings.width, settings.height));
+            .with_dimensions(LogicalSize::new(
+                settings.width as f64,
+                settings.height as f64,
+            ));
         if settings.is_dialog {
             window = Window::window_as_dialog(window);
         }
@@ -209,9 +212,9 @@ impl Window {
                 gl::Viewport(0, 0, width as i32, height as i32);
             }
             self.gl_window.resize(physical_size);
-            self.width = logical_size.width;
-            self.height = logical_size.height;
-            self.dpi = dpi_factor;
+            self.width = logical_size.width as f32;
+            self.height = logical_size.height as f32;
+            self.dpi = dpi_factor as f32;
         }
 
         /* Mouse move event handling */
@@ -226,7 +229,7 @@ impl Window {
             self.mouse.pressed = pressed;
         }
 
-        ui::update(self.width, self.height, self.dpi as f32, self.mouse);
+        ui::update(self.width, self.height, self.dpi, self.mouse);
 
         running
     }

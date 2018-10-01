@@ -5,11 +5,12 @@ use fungui::{element, Window, WindowSettings};
 
 fn main() {
     let mut window = Window::new(WindowSettings {
-        width: 150.0,
-        height: 170.0,
+        width: 160.0,
+        height: 152.0,
         is_dialog: true,
         ..Default::default()
-    }).unwrap();
+    })
+    .unwrap();
 
     let mut counter: i64 = 0;
     while window.refresh() {

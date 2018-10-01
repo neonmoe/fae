@@ -1,5 +1,5 @@
-//! This an identical program to the counter example, except for the
-//! UI element layout which is more controlled in this one.
+//! This an identical program to the `counter` example, except that
+//! the UI element layout is more controlled in this one.
 
 extern crate fungui;
 extern crate gl;

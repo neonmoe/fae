@@ -300,7 +300,7 @@ pub(crate) fn draw_text() {
                         screen_rect.max.y as f32 / dpi,
                     );
                     let texcoords = (uv_rect.min.x, uv_rect.min.y, uv_rect.max.x, uv_rect.max.y);
-                    renderer::draw_quad(coords, texcoords, z, 1);
+                    renderer::draw_quad(coords, texcoords, (0, 0, 0, 0xFF), z, 1);
                 }
             }
         }

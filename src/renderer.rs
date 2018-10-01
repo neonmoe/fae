@@ -12,7 +12,10 @@ const TEXTURE_COUNT: usize = 2; // UI elements, glyph cache
 pub(crate) const DRAW_CALL_INDEX_UI: usize = 0;
 pub(crate) const DRAW_CALL_INDEX_TEXT: usize = 1;
 
-type TexQuad = [f32; 30];
+type PositionAttribute = (f32, f32, f32);
+type TexCoordAttribute = (f32, f32);
+type ColorAttribute = (u8, u8, u8, u8);
+type TexQuad = [(PositionAttribute, TexCoordAttribute, ColorAttribute); 6];
 type Texture = GLuint;
 type VertexBufferObject = GLuint;
 type VertexArrayObject = GLuint;
@@ -93,13 +96,7 @@ pub fn initialize_renderer(ui_spritesheet_image: &[u8]) -> Result<(), Box<Error>
 
     for (i, call) in draw_state.calls.iter_mut().enumerate() {
         call.program = create_program(VERTEX_SHADER_SOURCE[i], FRAGMENT_SHADER_SOURCE[i]);
-    }
-
-    for call in draw_state.calls.iter_mut() {
         call.attributes = create_attributes();
-    }
-
-    for call in draw_state.calls.iter_mut() {
         call.texture = create_texture();
     }
 
@@ -188,30 +185,43 @@ fn create_attributes() -> Attributes {
         gl::BindBuffer(gl::ARRAY_BUFFER, vbo);
     }
 
-    /* Setup position attribute */
+    /* Setup the position attribute */
     unsafe {
         gl::VertexAttribPointer(
             0,           /* Attrib location */
             3,           /* Components */
             gl::FLOAT,   /* Type */
             gl::FALSE,   /* Normalize */
-            20,          /* Stride: sizeof(f32) * (Total component count)*/
+            24,          /* Stride: sizeof(f32) * (Total component count) */
             ptr::null(), /* Offset */
         );
         gl::EnableVertexAttribArray(0 /* Attribute location */);
     }
 
-    /* Setup texture coordinate attribute */
+    /* Setup the texture coordinate attribute */
     unsafe {
         gl::VertexAttribPointer(
             1,              /* Attrib location */
             2,              /* Components */
             gl::FLOAT,      /* Type */
             gl::FALSE,      /* Normalize */
-            20,             /* Stride: sizeof(f32) * (Total component count)*/
+            24,             /* Stride: sizeof(f32) * (Total component count) */
             12 as *const _, /* Offset: sizeof(f32) * (Position's component count) */
         );
         gl::EnableVertexAttribArray(1 /* Attribute location */);
+    }
+
+    /* Setup the color attribute */
+    unsafe {
+        gl::VertexAttribPointer(
+            2,                 /* Attrib location */
+            4,                 /* Components */
+            gl::UNSIGNED_BYTE, /* Type */
+            gl::TRUE,          /* Normalize */
+            24,                /* Stride: sizeof(f32) * (Total component count) */
+            20 as *const _,    /* Offset: sizeof(f32) * (Pos + tex component count) */
+        );
+        gl::EnableVertexAttribArray(2 /* Attribute location */);
     }
 
     Attributes {
@@ -254,27 +264,32 @@ fn insert_texture(tex: GLuint, components: GLint, w: GLint, h: GLint, pixels: Ve
     }
 }
 
+// TODO?: Start using instanced rendering
 pub(crate) fn draw_quad(
     coords: (f32, f32, f32, f32),
     texcoords: (f32, f32, f32, f32),
+    color: (u8, u8, u8, u8),
     z: f32,
     tex_index: usize,
 ) {
     let (x0, y0, x1, y1) = coords;
     let (tx0, ty0, tx1, ty1) = texcoords;
-    let mut draw_state = DRAW_STATE.lock().unwrap();
-    let call = &mut draw_state.calls[tex_index];
-
     let quad: TexQuad = [
-        x0, y0, z, tx0, ty0, x1, y0, z, tx1, ty0, x1, y1, z, tx1, ty1, x0, y0, z, tx0, ty0, x1, y1,
-        z, tx1, ty1, x0, y1, z, tx0, ty1,
+        ((x0, y0, z), (tx0, ty0), color),
+        ((x1, y0, z), (tx1, ty0), color),
+        ((x1, y1, z), (tx1, ty1), color),
+        ((x0, y0, z), (tx0, ty0), color),
+        ((x1, y1, z), (tx1, ty1), color),
+        ((x0, y1, z), (tx0, ty1), color),
     ];
-    call.attributes.vbo_data.push(quad);
+
+    let mut draw_state = DRAW_STATE.lock().unwrap();
+    draw_state.calls[tex_index].attributes.vbo_data.push(quad);
 }
 
-pub(crate) fn render(width: f64, height: f64) {
-    let m00 = 2.0 / width as f32;
-    let m11 = -2.0 / height as f32;
+pub(crate) fn render(width: f32, height: f32) {
+    let m00 = 2.0 / width;
+    let m11 = -2.0 / height;
     let matrix = [
         m00, 0.0, 0.0, -1.0, 0.0, m11, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
     ];

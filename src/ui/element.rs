@@ -1,8 +1,10 @@
 //! Contains the functions that create the UI elements.
 
-use super::*;
+use layout::Rect;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
+use text::Alignment;
+use ui::{self, OUTER_TILE_WIDTH, PADDING, UI_STATE};
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub(crate) enum UIElementKind {
@@ -50,8 +52,8 @@ pub(crate) fn element_hash(s: &str) -> u64 {
 pub fn label(identifier: &str, display_text: &str) {
     let mut state = UI_STATE.lock().unwrap();
 
-    let element = new_element(identifier.to_owned(), UIElementKind::Panel);
-    draw_element(&element, display_text);
+    let element = ui::new_element(identifier.to_owned(), UIElementKind::Panel);
+    ui::draw_element(&element, display_text);
     state.insert_element(element);
 }
 
@@ -60,7 +62,7 @@ pub fn label(identifier: &str, display_text: &str) {
 pub fn button(identifier: &str, display_text: &str) -> bool {
     let mut state = UI_STATE.lock().unwrap();
 
-    let mut element = new_element(identifier.to_owned(), UIElementKind::ButtonNormal);
+    let mut element = ui::new_element(identifier.to_owned(), UIElementKind::ButtonNormal);
     let hovered = element.is_point_inside(state.mouse.x, state.mouse.y);
     let just_released = !state.mouse.pressed && state.mouse.last_pressed;
     let can_be_pressed =
@@ -74,7 +76,7 @@ pub fn button(identifier: &str, display_text: &str) -> bool {
     }
 
     state.hovering |= hovered;
-    draw_element(&element, display_text);
+    ui::draw_element(&element, display_text);
     state.insert_element(element);
 
     hovered && just_released && can_be_pressed

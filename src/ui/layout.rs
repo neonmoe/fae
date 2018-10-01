@@ -31,16 +31,15 @@ use super::*;
 pub use text::Alignment;
 
 lazy_static! {
-    static ref LAYOUT_CONTROLLER: Mutex<LayoutController> = Mutex::new(LayoutController {
-        rect: vec![Rect {
-            left: 32.0,
-            top: 32.0,
-            right: 132.0,
-            bottom: 48.0
-        }],
-        padding: vec![32.0],
-        direction: vec![Direction::Down],
-        alignment: vec![Alignment::Center],
+    static ref LAYOUT_CONTROLLER: Mutex<LayoutController> = Mutex::new({
+        let mut layout_controller = LayoutController {
+            rect: Vec::new(),
+            padding: Vec::new(),
+            direction: Vec::new(),
+            alignment: Vec::new(),
+        };
+        layout_controller.reset();
+        layout_controller
     });
 }
 
@@ -49,6 +48,24 @@ struct LayoutController {
     padding: Vec<f32>,
     direction: Vec<Direction>,
     alignment: Vec<Alignment>,
+}
+
+impl LayoutController {
+    fn reset(&mut self) {
+        self.rect.clear();
+        self.rect.push(Rect {
+            left: 32.0,
+            top: 32.0,
+            right: 128.0,
+            bottom: 48.0,
+        });
+        self.padding.clear();
+        self.padding.push(20.0);
+        self.direction.clear();
+        self.direction.push(Direction::Down);
+        self.alignment.clear();
+        self.alignment.push(Alignment::Center);
+    }
 }
 
 /// Pushes a rectangle on the rectangle stack.
@@ -132,6 +149,11 @@ pub fn screen_x(x: f32) -> f32 {
 pub fn screen_y(y: f32) -> f32 {
     let lock = WINDOW_DIMENSIONS.lock().unwrap();
     y * lock.1
+}
+
+pub(crate) fn reset_layout() {
+    let mut lock = LAYOUT_CONTROLLER.lock().unwrap();
+    lock.reset();
 }
 
 pub(crate) fn create_next_element() -> (Rect, Alignment) {
