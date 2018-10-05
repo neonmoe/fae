@@ -1,5 +1,6 @@
 //! This an identical program to the `counter` example, except that
 //! the UI element layout is more controlled in this one.
+#![windows_subsystem = "windows"]
 
 extern crate fungui;
 extern crate gl;

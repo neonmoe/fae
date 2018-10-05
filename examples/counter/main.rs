@@ -1,3 +1,5 @@
+#![windows_subsystem = "windows"]
+
 extern crate fungui;
 extern crate gl;
 

@@ -10,3 +10,7 @@ lightweight GUIs. Main features / ideas of the crate:
 The crate is still very much in development and the API is changing
 all the time. Wouldn't recommend using this crate for anything
 currently. However, there is one working example, `counter`.
+
+## License
+I wouldn't recommend using this crate at this time, but you're free to
+do so under the terms of the [MIT license](LICENSE.md).

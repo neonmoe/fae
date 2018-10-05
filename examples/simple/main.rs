@@ -1,4 +1,5 @@
 //! This is a very simple crate, mostly for profiling frame times.
+#![windows_subsystem = "windows"]
 
 extern crate fungui;
 extern crate gl;
