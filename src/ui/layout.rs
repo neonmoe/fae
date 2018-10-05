@@ -210,7 +210,8 @@ impl Rect {
     }
 }
 
-impl std::ops::AddAssign<(f32, f32)> for Rect {
+use std::ops::AddAssign;
+impl AddAssign<(f32, f32)> for Rect {
     fn add_assign(&mut self, other: (f32, f32)) {
         self.left += other.0;
         self.top += other.1;
