@@ -1,3 +1,5 @@
+//! This module does the OpenGL stuff.
+
 use gl;
 use gl::types::*;
 use image::load_image;
@@ -120,6 +122,33 @@ pub fn initialize_renderer(ui_spritesheet_image: &[u8]) -> Result<(), Box<Error>
 
     print_gl_errors("after initialization");
     Ok(())
+}
+
+/// Creates a new draw call in the pipeline, and returns its
+/// index. Using the index, you can call `draw_quad` to draw sprites
+/// from your image. As a rule of thumb, try to minimize the amount of
+/// draw calls.
+pub fn create_draw_call(image: &[u8]) -> usize {
+    let mut draw_state = DRAW_STATE.lock().unwrap();
+    let vert = VERTEX_SHADER_SOURCE[DRAW_CALL_INDEX_UI];
+    let frag = FRAGMENT_SHADER_SOURCE[DRAW_CALL_INDEX_UI];
+    let index = draw_state.calls.len();
+    draw_state.calls.push(DrawCall {
+        texture: create_texture(),
+        program: create_program(vert, frag),
+        attributes: create_attributes(),
+    });
+
+    let image = load_image(image).unwrap();
+    insert_texture(
+        draw_state.calls[index].texture,
+        gl::RGBA as GLint,
+        image.width,
+        image.height,
+        image.pixels,
+    );
+
+    index
 }
 
 #[inline]
@@ -264,8 +293,24 @@ fn insert_texture(tex: GLuint, components: GLint, w: GLint, h: GLint, pixels: Ve
     }
 }
 
+/// Draws a textured rectangle on the screen.
+///
+/// - `coords`: The coordinates of the corners of the quad, in
+/// (logical) pixels. Arrangement: (left, top, right, bottom)
+///
+/// - `texcoords`: The texture coordinates (UVs) of the quad, in the
+/// range 0.0 - 1.0. Same arrangement as `coords`.
+///
+/// - `color`: The color tint of the quad, in the range
+/// 0-255. Arrangement: (red, green, blue, alpha)
+///
+/// - `z`: Used for ordering sprites on screen, in the range -1.0 -
+/// 1.0. Positive values are in front.
+///
+/// - `tex_index`: The index of the texture / draw call to draw the
+/// quad in. This is the returned value from `create_draw_call`.
 // TODO?: Start using instanced rendering
-pub(crate) fn draw_quad(
+pub fn draw_quad(
     coords: (f32, f32, f32, f32),
     texcoords: (f32, f32, f32, f32),
     color: (u8, u8, u8, u8),

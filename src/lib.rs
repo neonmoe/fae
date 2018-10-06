@@ -24,11 +24,10 @@ pub use window::*;
 pub mod resources;
 
 mod image;
-mod renderer;
+pub mod renderer;
 mod text;
 mod ui;
 
-pub use renderer::*;
 pub use text::initialize_font;
 pub use ui::element;
 pub use ui::layout;

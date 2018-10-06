@@ -12,7 +12,6 @@ use self::layout::Rect;
 const TILE_SIZE: f32 = 16.0;
 const OUTER_TILE_WIDTH: f32 = 4.0;
 const PADDING: f32 = 2.0;
-const SHEET_LENGTH: u32 = 4;
 
 const NORMAL_UI_ELEMENT_DEPTH: f32 = 0.0;
 const NORMAL_UI_TEXT_DEPTH: f32 = NORMAL_UI_ELEMENT_DEPTH - 0.1;
@@ -111,9 +110,10 @@ fn draw_element(element: &UIElement, text: &str) {
     } = rect;
 
     if kind != UIElementKind::NoBackground {
-        let tx = kind as i32 as f32 / SHEET_LENGTH as f32; // The UV offset based on the element type
+        let sheet_length = UIElementKind::KindCount as i32;
+        let tx = kind as i32 as f32 / sheet_length as f32; // The UV offset based on the element type
         let ty = 0.0;
-        let tw = 1.0 / (3.0 * SHEET_LENGTH as f32); // UV width of a spritesheet tile
+        let tw = 1.0 / (3.0 * sheet_length as f32); // UV width of a spritesheet tile
         let th = 1.0 / 3.0; // UV height of a spritesheet tile
         let tx = [tx, tx + tw, tx + tw * 2.0];
         let ty = [ty, ty + th, ty + th * 2.0];
@@ -134,5 +134,8 @@ fn draw_element(element: &UIElement, text: &str) {
         }
     }
 
+    // TODO: Resize text if it overflows the background
+    // Maybe change rect height to text height and then calculate the
+    // rect height based on that after measuring the text instead?
     text::queue_text(rect, NORMAL_UI_TEXT_DEPTH, 16.0, text, alignment);
 }

@@ -95,7 +95,7 @@ fn get_default_ui_spritesheet() -> Vec<u8> {
 }
 #[cfg(not(feature = "default_resources"))]
 fn get_default_ui_spritesheet() -> Vec<u8> {
-    panic!("default_resources feature is disabled, but no UI spritesheet was provided!");
+    Vec::new()
 }
 
 #[cfg(feature = "default_resources")]
@@ -104,7 +104,7 @@ fn get_default_font() -> Vec<u8> {
 }
 #[cfg(not(feature = "default_resources"))]
 fn get_default_font() -> Vec<u8> {
-    panic!("default_resources feature is disabled, but no font was provided!");
+    Vec::new()
 }
 
 /// Manages the window and propagates events to the UI system.

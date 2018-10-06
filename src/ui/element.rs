@@ -10,9 +10,9 @@ use ui::{self, OUTER_TILE_WIDTH, PADDING, UI_STATE};
 pub(crate) enum UIElementKind {
     NoBackground = -1,
     ButtonNormal = 0,
-    ButtonHovered = 1,
-    ButtonPressed = 2,
-    Panel = 3,
+    ButtonHovered,
+    ButtonPressed,
+    KindCount,
 }
 
 #[derive(Clone, Debug)]
@@ -52,7 +52,7 @@ pub(crate) fn element_hash(s: &str) -> u64 {
 pub fn label(identifier: &str, display_text: &str) {
     let mut state = UI_STATE.lock().unwrap();
 
-    let element = ui::new_element(identifier.to_owned(), UIElementKind::Panel);
+    let element = ui::new_element(identifier.to_owned(), UIElementKind::NoBackground);
     ui::draw_element(&element, display_text);
     state.insert_element(element);
 }
