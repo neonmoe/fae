@@ -333,6 +333,46 @@ pub fn draw_quad(
     draw_state.calls[tex_index].attributes.vbo_data.push(quad);
 }
 
+/// Draws a textured rectangle on the screen.
+///
+/// See docs for `draw_quad`. The only difference is `rotation`, which
+/// describes how much the quad is rotated, in radians.
+pub fn draw_rotated_quad(
+    coords: (f32, f32, f32, f32),
+    texcoords: (f32, f32, f32, f32),
+    c: (u8, u8, u8, u8),
+    z: f32,
+    tex_index: usize,
+    rotation: f32,
+) {
+    let cos = rotation.cos();
+    let sin = rotation.sin();
+    let rotx = |x, y| x * cos - y * sin;
+    let roty = |x, y| x * sin + y * cos;
+
+    let (x0, y0, x1, y1) = coords;
+    let (cx, cy) = ((x0 + x1) * 0.5, (y0 + y1) * 0.5);
+    let (rx0, ry0, rx1, ry1) = (x0 - cx, y0 - cy, x1 - cx, y1 - cy);
+
+    let (x00, y00) = (cx + rotx(rx0, ry0), cy + roty(rx0, ry0));
+    let (x10, y10) = (cx + rotx(rx1, ry0), cy + roty(rx1, ry0));
+    let (x11, y11) = (cx + rotx(rx1, ry1), cy + roty(rx1, ry1));
+    let (x01, y01) = (cx + rotx(rx0, ry1), cy + roty(rx0, ry1));
+
+    let (tx0, ty0, tx1, ty1) = texcoords;
+    let quad: TexQuad = [
+        ((x00, y00, z), (tx0, ty0), c),
+        ((x10, y10, z), (tx1, ty0), c),
+        ((x11, y11, z), (tx1, ty1), c),
+        ((x00, y00, z), (tx0, ty0), c),
+        ((x11, y11, z), (tx1, ty1), c),
+        ((x01, y01, z), (tx0, ty1), c),
+    ];
+
+    let mut draw_state = DRAW_STATE.lock().unwrap();
+    draw_state.calls[tex_index].attributes.vbo_data.push(quad);
+}
+
 pub(crate) fn render(width: f32, height: f32) {
     let m00 = 2.0 / width;
     let m11 = -2.0 / height;
