@@ -1,10 +1,11 @@
 pub mod element;
+pub mod keyboard;
 pub mod layout;
 
 pub use glutin::{ModifiersState, VirtualKeyCode};
 
 use renderer;
-use std::collections::hash_map::HashMap;
+use std::collections::HashMap;
 use std::sync::Mutex;
 use text;
 
@@ -30,6 +31,7 @@ lazy_static! {
         },
         pressed_element: None,
         hovering: false,
+        keys: HashMap::new(),
     });
     static ref WINDOW_DIMENSIONS: Mutex<(f32, f32)> = Mutex::new((0.0, 0.0));
 }
@@ -40,6 +42,7 @@ struct UIState {
     mouse: MouseStatus,
     pressed_element: Option<u64>,
     hovering: bool,
+    keys: HashMap<VirtualKeyCode, KeyStatus>,
 }
 
 impl UIState {
@@ -91,7 +94,13 @@ pub struct KeyStatus {
 /// Handled by the `window_bootstrap` feature, if in use.
 // TODO: Take a list of keystatuses as a parameter, and use those to
 // enable keyboard navigation of the UI.
-pub fn update(width: f32, height: f32, dpi: f32, mouse: MouseStatus) -> UIStatus {
+pub fn update(
+    width: f32,
+    height: f32,
+    dpi: f32,
+    mouse: MouseStatus,
+    key_inputs: Vec<KeyStatus>,
+) -> UIStatus {
     renderer::render(width, height);
     text::update_dpi(dpi);
     layout::reset_layout();
@@ -104,6 +113,18 @@ pub fn update(width: f32, height: f32, dpi: f32, mouse: MouseStatus) -> UIStatus
     let mut state = UI_STATE.lock().unwrap();
     if !state.mouse.pressed {
         state.pressed_element = None;
+    }
+
+    for mut key_input in key_inputs {
+        let keycode = key_input.keycode;
+        key_input.last_pressed = {
+            if !state.keys.contains_key(&keycode) {
+                false
+            } else {
+                state.keys[&keycode].pressed
+            }
+        };
+        state.keys.insert(keycode, key_input);
     }
 
     state.elements.clear();

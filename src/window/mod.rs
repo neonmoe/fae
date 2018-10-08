@@ -7,7 +7,6 @@ use glutin::*;
 use renderer;
 #[cfg(feature = "default_resources")]
 use resources;
-use std::collections::HashMap;
 use std::default::Default;
 use std::env;
 use std::error::Error;
@@ -117,7 +116,6 @@ pub struct Window {
     events_loop: EventsLoop,
     mouse: MouseStatus,
     frame_timer: FrameTimer,
-    keys: HashMap<VirtualKeyCode, KeyStatus>,
 }
 
 impl Window {
@@ -170,7 +168,6 @@ impl Window {
                 pressed: false,
             },
             frame_timer: FrameTimer::new(),
-            keys: HashMap::new(),
         })
     }
 
@@ -178,28 +175,6 @@ impl Window {
     /// `refresh`.
     pub fn get_mouse(&self) -> MouseStatus {
         self.mouse
-    }
-
-    /// Returns true if the given key was held, and the modifiers were
-    /// active when the key was initially pressed.
-    pub fn key_held(&self, keycode: VirtualKeyCode, modifiers: ModifiersState) -> bool {
-        if !self.keys.contains_key(&keycode) {
-            false
-        } else {
-            let state = self.keys[&keycode];
-            state.pressed && state.modifiers == modifiers
-        }
-    }
-
-    /// Returns true if the given key was just released, and the
-    /// modifiers were active when the key was initially pressed.
-    pub fn key_typed(&self, keycode: VirtualKeyCode, modifiers: ModifiersState) -> bool {
-        if !self.keys.contains_key(&keycode) {
-            false
-        } else {
-            let state = self.keys[&keycode];
-            !state.pressed && state.last_pressed && state.modifiers == modifiers
-        }
     }
 
     /// Re-renders the window, polls for new events and passes them on
@@ -278,20 +253,7 @@ impl Window {
             self.mouse.pressed = pressed;
         }
 
-        /* Keyboard event handling */
-        for mut key_input in key_inputs {
-            let keycode = key_input.keycode;
-            key_input.last_pressed = {
-                if !self.keys.contains_key(&keycode) {
-                    false
-                } else {
-                    self.keys[&keycode].pressed
-                }
-            };
-            self.keys.insert(keycode, key_input);
-        }
-
-        ui::update(self.width, self.height, self.dpi, self.mouse);
+        ui::update(self.width, self.height, self.dpi, self.mouse, key_inputs);
 
         running
     }
