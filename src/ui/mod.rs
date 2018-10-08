@@ -115,6 +115,9 @@ pub fn update(
         state.pressed_element = None;
     }
 
+    for key in state.keys.iter_mut().map(|(_, key_status)| key_status) {
+        key.last_pressed = key.pressed;
+    }
     for mut key_input in key_inputs {
         let keycode = key_input.keycode;
         key_input.last_pressed = {
