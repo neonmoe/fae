@@ -12,7 +12,7 @@ fn main() {
     })
     .unwrap();
 
-    while window.refresh() {
+    while window.refresh(0.8, 0.8, 0.8) {
         element::label("frame-time", &format!("{:?}", window.avg_frame_duration()));
     }
 }

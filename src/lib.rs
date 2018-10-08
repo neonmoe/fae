@@ -30,5 +30,4 @@ mod ui;
 
 pub use renderer::initialize_renderer;
 pub use text::initialize_font;
-pub use ui::element;
-pub use ui::layout;
+pub use ui::{element, layout, KeyStatus, ModifiersState, MouseStatus, VirtualKeyCode};

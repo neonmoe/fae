@@ -57,14 +57,12 @@ pub fn label(identifier: &str, display_text: &str) {
     state.insert_element(element);
 }
 
-/// Renders a button that can be pressed, and returns whether or not
-/// it was clicked.
-pub fn button(identifier: &str, display_text: &str) -> bool {
+fn button_meta<F: FnOnce(&UIElement)>(identifier: &str, render: F) -> bool {
     let mut state = UI_STATE.lock().unwrap();
 
     let mut element = ui::new_element(identifier.to_owned(), UIElementKind::ButtonNormal);
     let hovered = element.is_point_inside(state.mouse.x, state.mouse.y);
-    let just_released = !state.mouse.pressed && state.mouse.last_pressed;
+    let just_released = state.mouse.clicked();
     let can_be_pressed =
         state.pressed_element.is_none() || state.pressed_element.unwrap() == element.id();
 
@@ -76,8 +74,39 @@ pub fn button(identifier: &str, display_text: &str) -> bool {
     }
 
     state.hovering |= hovered;
-    ui::draw_element(&element, display_text);
+    render(&element);
     state.insert_element(element);
 
     hovered && just_released && can_be_pressed
+}
+
+/// Renders a button that can be pressed, and returns whether or not
+/// it was clicked.
+pub fn button(identifier: &str, display_text: &str) -> bool {
+    button_meta(identifier, |element| {
+        ui::draw_element(element, display_text);
+    })
+}
+
+/// Renders a button that can be pressed, and returns whether or not
+/// it was clicked. In contrast to `button`, this version lets you
+/// define the sprite used yourself. That said, the size and position
+/// of the button is still controlled by the layout system.
+pub fn button_image(
+    identifier: &str,
+    texcoords: (f32, f32, f32, f32),
+    color: (u8, u8, u8, u8),
+    z: f32,
+    tex_index: usize,
+) -> bool {
+    use renderer;
+    button_meta(identifier, |element| {
+        let Rect {
+            left,
+            top,
+            right,
+            bottom,
+        } = element.rect;
+        renderer::draw_quad((left, top, right, bottom), texcoords, color, z, tex_index);
+    })
 }

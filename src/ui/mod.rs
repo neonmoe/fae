@@ -1,6 +1,8 @@
 pub mod element;
 pub mod layout;
 
+pub use glutin::{ModifiersState, VirtualKeyCode};
+
 use renderer;
 use std::collections::hash_map::HashMap;
 use std::sync::Mutex;
@@ -51,15 +53,44 @@ pub struct UIStatus {
     pub hovering_button: bool,
 }
 
+/// Describes the current status of the mouse.
 #[derive(Clone, Copy)]
 pub struct MouseStatus {
+    /// The x-coordinate of the mouse in logical pixels.
     pub x: f32,
+    /// The y-coordinate of the mouse in logical pixels.
     pub y: f32,
+    /// Was the mouse pressed during the previous frame?
     pub last_pressed: bool,
+    /// Is the mouse pressed currently?
+    pub pressed: bool,
+}
+
+impl MouseStatus {
+    /// Returns true if the mouse was clicked, ie. was just
+    /// released. True for one frame per click.
+    #[inline]
+    pub fn clicked(&self) -> bool {
+        !self.pressed && self.last_pressed
+    }
+}
+
+/// Represents the status of a key on the keyboard.
+#[derive(Clone, Copy)]
+pub struct KeyStatus {
+    /// The key this status describes.
+    pub keycode: VirtualKeyCode,
+    /// The modifiers which were pressed with the key.
+    pub modifiers: ModifiersState,
+    /// Was the key pressed during the previous frame?
+    pub last_pressed: bool,
+    /// Is the key being pressed currently?
     pub pressed: bool,
 }
 
 /// Handled by the `window_bootstrap` feature, if in use.
+// TODO: Take a list of keystatuses as a parameter, and use those to
+// enable keyboard navigation of the UI.
 pub fn update(width: f32, height: f32, dpi: f32, mouse: MouseStatus) -> UIStatus {
     renderer::render(width, height);
     text::update_dpi(dpi);

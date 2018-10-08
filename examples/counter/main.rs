@@ -15,7 +15,7 @@ fn main() {
     .unwrap();
 
     let mut counter: i64 = 0;
-    while window.refresh() {
+    while window.refresh(0.8, 0.8, 0.8) {
         element::label("counter", &format!("Counter: {}", counter));
 
         if element::button("add", "Add") {

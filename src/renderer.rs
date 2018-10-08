@@ -92,6 +92,7 @@ pub fn initialize_renderer(ui_spritesheet_image: &[u8]) -> Result<(), Box<Error>
     let mut draw_state = DRAW_STATE.lock().unwrap();
 
     unsafe {
+        gl::Enable(gl::DEPTH_TEST);
         gl::Enable(gl::BLEND);
         gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
     }

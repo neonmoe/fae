@@ -7,12 +7,13 @@ use glutin::*;
 use renderer;
 #[cfg(feature = "default_resources")]
 use resources;
+use std::collections::HashMap;
 use std::default::Default;
 use std::env;
 use std::error::Error;
 use std::time::Duration;
 use text;
-use ui::{self, MouseStatus};
+use ui::{self, KeyStatus, MouseStatus};
 
 /// Defines a window.
 pub struct WindowSettings {
@@ -116,6 +117,7 @@ pub struct Window {
     events_loop: EventsLoop,
     mouse: MouseStatus,
     frame_timer: FrameTimer,
+    keys: HashMap<VirtualKeyCode, KeyStatus>,
 }
 
 impl Window {
@@ -150,7 +152,6 @@ impl Window {
         unsafe {
             gl_window.make_current()?;
             gl::load_with(|symbol| gl_window.get_proc_address(symbol) as *const _);
-            gl::ClearColor(0.85, 0.85, 0.85, 1.0);
         }
 
         renderer::initialize_renderer(&settings.ui_spritesheet)?;
@@ -169,25 +170,63 @@ impl Window {
                 pressed: false,
             },
             frame_timer: FrameTimer::new(),
+            keys: HashMap::new(),
         })
     }
 
-    /// Re-renders the window, polls for new events, and passes them
-    /// on to the UI system. **Note**: Because of vsync, this function
-    /// will hang for a while (usually 16ms at max).
-    pub fn refresh(&mut self) -> bool {
+    /// Returns the current status of the mouse. Updated every
+    /// `refresh`.
+    pub fn get_mouse(&self) -> MouseStatus {
+        self.mouse
+    }
+
+    /// Returns true if the given key was held, and the modifiers were
+    /// active when the key was initially pressed.
+    pub fn key_held(&self, keycode: VirtualKeyCode, modifiers: ModifiersState) -> bool {
+        if !self.keys.contains_key(&keycode) {
+            false
+        } else {
+            let state = self.keys[&keycode];
+            state.pressed && state.modifiers == modifiers
+        }
+    }
+
+    /// Returns true if the given key was just released, and the
+    /// modifiers were active when the key was initially pressed.
+    pub fn key_typed(&self, keycode: VirtualKeyCode, modifiers: ModifiersState) -> bool {
+        if !self.keys.contains_key(&keycode) {
+            false
+        } else {
+            let state = self.keys[&keycode];
+            !state.pressed && state.last_pressed && state.modifiers == modifiers
+        }
+    }
+
+    /// Re-renders the window, polls for new events and passes them on
+    /// to the UI system, and clears the screen with the
+    /// `background_*` colors, which consist of 0.0 - 1.0
+    /// values. **Note**: Because of vsync, this function will hang
+    /// for a while (usually 16ms at max).
+    pub fn refresh(
+        &mut self,
+        background_red: f32,
+        background_green: f32,
+        background_blue: f32,
+    ) -> bool {
         let mut running = true;
 
         self.frame_timer.end_frame();
         let _ = self.gl_window.swap_buffers();
         unsafe {
-            gl::Clear(gl::COLOR_BUFFER_BIT);
+            gl::ClearColor(background_red, background_green, background_blue, 1.0);
+            gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
         }
         self.frame_timer.begin_frame();
 
         let mut resized_logical_size = None;
         let mut mouse_position = None;
         let mut mouse_pressed = None;
+        let mut key_inputs = Vec::new();
         self.events_loop.poll_events(|event| {
             if let Event::WindowEvent { event, .. } = event {
                 match event {
@@ -196,6 +235,16 @@ impl Window {
                     WindowEvent::CursorMoved { position, .. } => mouse_position = Some(position),
                     WindowEvent::MouseInput { state, .. } => {
                         mouse_pressed = Some(state == ElementState::Pressed)
+                    }
+                    WindowEvent::KeyboardInput { input, .. } => {
+                        if let Some(keycode) = input.virtual_keycode {
+                            key_inputs.push(KeyStatus {
+                                keycode: keycode,
+                                modifiers: input.modifiers,
+                                last_pressed: false,
+                                pressed: input.state == ElementState::Pressed,
+                            });
+                        }
                     }
                     _ => (),
                 }
@@ -227,6 +276,19 @@ impl Window {
         self.mouse.last_pressed = self.mouse.pressed;
         if let Some(pressed) = mouse_pressed {
             self.mouse.pressed = pressed;
+        }
+
+        /* Keyboard event handling */
+        for mut key_input in key_inputs {
+            let keycode = key_input.keycode;
+            key_input.last_pressed = {
+                if !self.keys.contains_key(&keycode) {
+                    false
+                } else {
+                    self.keys[&keycode].pressed
+                }
+            };
+            self.keys.insert(keycode, key_input);
         }
 
         ui::update(self.width, self.height, self.dpi, self.mouse);

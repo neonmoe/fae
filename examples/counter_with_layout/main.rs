@@ -17,7 +17,7 @@ fn main() {
     .unwrap();
 
     let mut counter: i64 = 0;
-    while window.refresh() {
+    while window.refresh(0.8, 0.8, 0.8) {
         layout::push_padding(20.0);
         layout::push_direction(layout::Direction::Right);
 
