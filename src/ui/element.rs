@@ -12,6 +12,7 @@ pub(crate) enum UIElementKind {
     ButtonNormal = 0,
     ButtonHovered,
     ButtonPressed,
+    InputField,
     KindCount,
 }
 
@@ -143,18 +144,24 @@ pub fn input(identifier: &str, default_text: &str) -> String {
     let mut state = UI_STATE.lock().unwrap();
     let mut strings = INPUT_STRINGS.lock().unwrap();
 
-    let element = ui::new_element(identifier.to_owned(), UIElementKind::NoBackground);
+    let element = ui::new_element(identifier.to_owned(), UIElementKind::InputField);
     let id = element.id();
 
-    if state.mouse.clicked() && element.is_point_inside(state.mouse.x, state.mouse.y) {
+    let clicked = state.mouse.clicked();
+    let focused = if clicked && element.is_point_inside(state.mouse.x, state.mouse.y) {
         state.focused_element = Some(id);
-    }
+        true
+    } else if let Some(focused_id) = state.focused_element {
+        id == focused_id
+    } else {
+        false
+    };
 
     if !strings.contains_key(&id) {
         strings.insert(id, (default_text.to_string(), default_text.len()));
     }
     let (text, cursor_location) = strings.get(&id).unwrap();
-    let cursor = if (Instant::now() - state.start_time).subsec_millis() > 500 {
+    let cursor = if focused && (Instant::now() - state.start_time).subsec_millis() > 500 {
         Some(*cursor_location)
     } else {
         None
