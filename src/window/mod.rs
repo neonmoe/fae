@@ -202,6 +202,7 @@ impl Window {
         let mut mouse_position = None;
         let mut mouse_pressed = None;
         let mut key_inputs = Vec::new();
+        let mut characters = Vec::new();
         self.events_loop.poll_events(|event| {
             if let Event::WindowEvent { event, .. } = event {
                 match event {
@@ -220,6 +221,9 @@ impl Window {
                                 pressed: input.state == ElementState::Pressed,
                             });
                         }
+                    }
+                    WindowEvent::ReceivedCharacter(c) => {
+                        characters.push(c);
                     }
                     _ => (),
                 }
@@ -253,7 +257,14 @@ impl Window {
             self.mouse.pressed = pressed;
         }
 
-        ui::update(self.width, self.height, self.dpi, self.mouse, key_inputs);
+        ui::update(
+            self.width,
+            self.height,
+            self.dpi,
+            self.mouse,
+            key_inputs,
+            characters,
+        );
 
         running
     }

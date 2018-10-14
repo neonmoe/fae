@@ -53,7 +53,7 @@ pub fn label(identifier: &str, display_text: &str) {
     let mut state = UI_STATE.lock().unwrap();
 
     let element = ui::new_element(identifier.to_owned(), UIElementKind::NoBackground);
-    ui::draw_element(&element, display_text);
+    ui::draw_element(&element, display_text, true, None);
     state.insert_element(element);
 }
 
@@ -61,13 +61,15 @@ fn button_meta<F: FnOnce(&UIElement)>(identifier: &str, render: F) -> bool {
     let mut state = UI_STATE.lock().unwrap();
 
     let mut element = ui::new_element(identifier.to_owned(), UIElementKind::ButtonNormal);
+    let id = element.id();
     let hovered = element.is_point_inside(state.mouse.x, state.mouse.y);
     let just_released = state.mouse.clicked();
     let can_be_pressed =
         state.pressed_element.is_none() || state.pressed_element.unwrap() == element.id();
 
     if state.mouse.pressed && hovered && can_be_pressed {
-        state.pressed_element = Some(element.id());
+        state.pressed_element = Some(id);
+        state.focused_element = Some(id);
         element.kind = UIElementKind::ButtonPressed;
     } else if hovered {
         element.kind = UIElementKind::ButtonHovered;
@@ -84,7 +86,7 @@ fn button_meta<F: FnOnce(&UIElement)>(identifier: &str, render: F) -> bool {
 /// it was clicked.
 pub fn button(identifier: &str, display_text: &str) -> bool {
     button_meta(identifier, |element| {
-        ui::draw_element(element, display_text);
+        ui::draw_element(element, display_text, true, None);
     })
 }
 
@@ -109,4 +111,56 @@ pub fn button_image(
         } = element.rect;
         renderer::draw_quad((left, top, right, bottom), texcoords, color, z, tex_index);
     })
+}
+
+use std::collections::HashMap;
+use std::sync::Mutex;
+use std::time::Instant;
+
+type CursorPosition = usize;
+
+lazy_static! {
+    static ref INPUT_STRINGS: Mutex<HashMap<u64, (String, CursorPosition)>> =
+        Mutex::new(HashMap::new());
+}
+
+pub(crate) fn insert_input(focused_id: u64, input: char) {
+    let mut strings = INPUT_STRINGS.lock().unwrap();
+    if let Some(string) = strings.get_mut(&focused_id) {
+        if !input.is_control() {
+            string.0.push(input);
+            string.1 += 1;
+        } else if input == '\u{8}' && string.0.len() > 0 {
+            string.0.pop();
+            string.1 -= 1;
+        }
+    }
+}
+
+/// Creates an editable text field. Used for simple, label-like text
+/// which is editable.
+pub fn input(identifier: &str, default_text: &str) -> String {
+    let mut state = UI_STATE.lock().unwrap();
+    let mut strings = INPUT_STRINGS.lock().unwrap();
+
+    let element = ui::new_element(identifier.to_owned(), UIElementKind::NoBackground);
+    let id = element.id();
+
+    if state.mouse.clicked() && element.is_point_inside(state.mouse.x, state.mouse.y) {
+        state.focused_element = Some(id);
+    }
+
+    if !strings.contains_key(&id) {
+        strings.insert(id, (default_text.to_string(), default_text.len()));
+    }
+    let (text, cursor_location) = strings.get(&id).unwrap();
+    let cursor = if (Instant::now() - state.start_time).subsec_millis() > 500 {
+        Some(*cursor_location)
+    } else {
+        None
+    };
+    ui::draw_element(&element, text, false, cursor);
+    state.insert_element(element);
+
+    text.clone()
 }

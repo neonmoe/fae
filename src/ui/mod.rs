@@ -7,6 +7,7 @@ pub use glutin::{ModifiersState, VirtualKeyCode};
 use renderer;
 use std::collections::HashMap;
 use std::sync::Mutex;
+use std::time::Instant;
 use text;
 
 use self::element::{UIElement, UIElementKind};
@@ -21,6 +22,7 @@ const NORMAL_UI_TEXT_DEPTH: f32 = NORMAL_UI_ELEMENT_DEPTH - 0.1;
 
 lazy_static! {
     static ref UI_STATE: Mutex<UIState> = Mutex::new(UIState {
+        start_time: Instant::now(),
         elements: HashMap::new(),
         last_element: None,
         mouse: MouseStatus {
@@ -30,6 +32,7 @@ lazy_static! {
             pressed: false,
         },
         pressed_element: None,
+        focused_element: None,
         hovering: false,
         keys: HashMap::new(),
     });
@@ -37,10 +40,12 @@ lazy_static! {
 }
 
 struct UIState {
+    start_time: Instant,
     elements: HashMap<u64, UIElement>,
     last_element: Option<UIElement>,
     mouse: MouseStatus,
     pressed_element: Option<u64>,
+    focused_element: Option<u64>,
     hovering: bool,
     keys: HashMap<VirtualKeyCode, KeyStatus>,
 }
@@ -92,14 +97,14 @@ pub struct KeyStatus {
 }
 
 /// Handled by the `window_bootstrap` feature, if in use.
-// TODO: Take a list of keystatuses as a parameter, and use those to
-// enable keyboard navigation of the UI.
+// TODO: Keyboard navigation of the UI
 pub fn update(
     width: f32,
     height: f32,
     dpi: f32,
     mouse: MouseStatus,
     key_inputs: Vec<KeyStatus>,
+    characters: Vec<char>,
 ) -> UIStatus {
     renderer::render(width, height);
     text::update_dpi(dpi);
@@ -130,6 +135,12 @@ pub fn update(
         state.keys.insert(keycode, key_input);
     }
 
+    if let Some(id) = state.focused_element {
+        for character in characters {
+            element::insert_input(id, character);
+        }
+    }
+
     state.elements.clear();
     state.last_element = None;
     state.hovering = false;
@@ -150,7 +161,7 @@ fn new_element(identifier: String, kind: UIElementKind) -> UIElement {
     element
 }
 
-fn draw_element(element: &UIElement, text: &str) {
+fn draw_element(element: &UIElement, text: &str, multiline: bool, cursor: Option<usize>) {
     let &UIElement {
         kind,
         rect,
@@ -189,8 +200,14 @@ fn draw_element(element: &UIElement, text: &str) {
         }
     }
 
-    // TODO: Resize text if it overflows the background
-    // Maybe change rect height to text height and then calculate the
-    // rect height based on that after measuring the text instead?
-    text::queue_text(rect, NORMAL_UI_TEXT_DEPTH, 16.0, text, alignment);
+    text::queue_text(
+        rect.left,
+        rect.top,
+        if multiline { Some(rect.width()) } else { None },
+        NORMAL_UI_TEXT_DEPTH,
+        rect.height(),
+        text,
+        alignment,
+        cursor,
+    );
 }

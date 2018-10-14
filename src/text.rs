@@ -73,27 +73,29 @@ pub(crate) fn update_dpi(dpi: f32) {
 }
 
 pub(crate) fn queue_text(
-    area: layout::Rect,
+    x: f32,
+    y: f32,
+    width: Option<f32>,
     z: f32,
     font_size: f32,
     text: &str,
     alignment: Alignment,
+    cursor: Option<usize>,
 ) {
     let mut cache = TEXT_CACHE.lock().unwrap();
     let dpi = {
         let lock = DPI_SCALE.lock().unwrap();
         *lock
     };
-    let rows = collect_glyphs(
-        &mut cache,
-        area.left,
-        area.top,
-        area.width() * dpi,
-        font_size,
-        text,
-    );
+    let rows = collect_glyphs(&mut cache, x, y, width.map(|x| x * dpi), font_size, text);
 
     let mut final_glyphs = Vec::with_capacity(text.len());
+    let alignment = if width.is_some() {
+        alignment
+    } else {
+        Alignment::Left
+    };
+
     match alignment {
         Alignment::Left => {
             for row in rows {
@@ -103,8 +105,8 @@ pub(crate) fn queue_text(
 
         Alignment::Right => {
             for row in rows {
-                if let Some((width, _)) = measure_text(&row) {
-                    let offset = (area.width() - width) * dpi;
+                if let Some((row_width, _)) = measure_text(&row) {
+                    let offset = (width.unwrap() - row_width) * dpi;
                     let row = offset_glyphs(row, offset, 0.0);
                     final_glyphs.extend_from_slice(&row);
                 } else {
@@ -115,8 +117,8 @@ pub(crate) fn queue_text(
 
         Alignment::Center => {
             for row in rows {
-                if let Some((width, _)) = measure_text(&row) {
-                    let offset = (area.width() - width) / 2.0 * dpi;
+                if let Some((row_width, _)) = measure_text(&row) {
+                    let offset = (width.unwrap() - row_width) / 2.0 * dpi;
                     let row = offset_glyphs(row, offset, 0.0);
                     final_glyphs.extend_from_slice(&row);
                 } else {
@@ -126,10 +128,52 @@ pub(crate) fn queue_text(
         }
     }
 
+    if let Some(cursor_index) = cursor {
+        let cursor = if let Some(cursor_rect) = measure_text_at_index(&final_glyphs, cursor_index) {
+            collect_glyphs(
+                &mut cache,
+                cursor_rect.left + cursor_rect.width() * 0.5 + 1.0,
+                y,
+                None,
+                font_size,
+                "|",
+            )
+        } else {
+            collect_glyphs(&mut cache, x, y, width, font_size, "|")
+        };
+        final_glyphs.extend_from_slice(&cursor[0]);
+    }
+
     cache.cached_text.push(TextRender {
         glyphs: final_glyphs,
         z,
     });
+}
+
+fn measure_text_at_index<'a>(
+    glyphs: &[PositionedGlyph<'a>],
+    mut index: usize,
+) -> Option<layout::Rect> {
+    let dpi = {
+        let lock = DPI_SCALE.lock().unwrap();
+        *lock
+    };
+
+    let mut whitespace = 0.0;
+    while index > 0 {
+        index -= 1;
+        let glyph = &glyphs[index];
+        if let Some(rect) = glyph.pixel_bounding_box() {
+            return Some(layout::Rect {
+                left: rect.min.x as f32 / dpi + whitespace * rect.width() as f32,
+                top: rect.min.y as f32 / dpi,
+                right: rect.max.x as f32 / dpi,
+                bottom: rect.max.y as f32 / dpi,
+            });
+        }
+        whitespace += 1.0;
+    }
+    None
 }
 
 fn measure_text<'a>(glyphs: &[PositionedGlyph<'a>]) -> Option<(f32, f32)> {
@@ -176,7 +220,7 @@ fn collect_glyphs<'a>(
     cache: &mut TextCache<'a>,
     x: f32,
     y: f32,
-    width: f32,
+    width: Option<f32>,
     font_size: f32,
     text: &str,
 ) -> Vec<Vec<PositionedGlyph<'a>>> {
@@ -227,7 +271,8 @@ fn collect_glyphs<'a>(
             if let Some(id) = last_glyph_id.take() {
                 caret.x += font.pair_kerning(scale, id, glyph.id());
             }
-            if caret.x > x + width {
+
+            if width.is_some() && caret.x > x + width.unwrap() {
                 if let Some(ref mut last_row) = rows.last_mut() {
                     let len = last_row.len();
                     if current_word_length < len {
