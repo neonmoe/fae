@@ -54,7 +54,7 @@ pub fn label(identifier: &str, display_text: &str) {
     let mut state = UI_STATE.lock().unwrap();
 
     let element = ui::new_element(identifier.to_owned(), UIElementKind::NoBackground);
-    ui::draw_element(&element, display_text, true, None);
+    ui::draw_element(&element, display_text, None);
     state.insert_element(element);
 }
 
@@ -87,7 +87,7 @@ fn button_meta<F: FnOnce(&UIElement)>(identifier: &str, render: F) -> bool {
 /// it was clicked.
 pub fn button(identifier: &str, display_text: &str) -> bool {
     button_meta(identifier, |element| {
-        ui::draw_element(element, display_text, true, None);
+        ui::draw_element(element, display_text, None);
     })
 }
 
@@ -166,7 +166,7 @@ pub fn input(identifier: &str, default_text: &str) -> String {
     } else {
         None
     };
-    ui::draw_element(&element, text, false, cursor);
+    ui::draw_element(&element, text, cursor);
     state.insert_element(element);
 
     text.clone()

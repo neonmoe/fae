@@ -161,7 +161,7 @@ fn new_element(identifier: String, kind: UIElementKind) -> UIElement {
     element
 }
 
-fn draw_element(element: &UIElement, text: &str, multiline: bool, cursor: Option<usize>) {
+fn draw_element(element: &UIElement, text: &str, cursor: Option<usize>) {
     let &UIElement {
         kind,
         rect,
@@ -203,7 +203,7 @@ fn draw_element(element: &UIElement, text: &str, multiline: bool, cursor: Option
     text::queue_text(
         rect.left,
         rect.top,
-        if multiline { Some(rect.width()) } else { None },
+        rect.width(),
         NORMAL_UI_TEXT_DEPTH,
         rect.height(),
         text,

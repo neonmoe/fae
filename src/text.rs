@@ -75,7 +75,7 @@ pub(crate) fn update_dpi(dpi: f32) {
 pub(crate) fn queue_text(
     x: f32,
     y: f32,
-    width: Option<f32>,
+    width: f32,
     z: f32,
     font_size: f32,
     text: &str,
@@ -87,14 +87,9 @@ pub(crate) fn queue_text(
         let lock = DPI_SCALE.lock().unwrap();
         *lock
     };
-    let rows = collect_glyphs(&mut cache, x, y, width.map(|x| x * dpi), font_size, text);
+    let rows = collect_glyphs(&mut cache, x, y, width * dpi, font_size, text);
 
     let mut final_glyphs = Vec::with_capacity(text.len());
-    let alignment = if width.is_some() {
-        alignment
-    } else {
-        Alignment::Left
-    };
 
     match alignment {
         Alignment::Left => {
@@ -106,7 +101,7 @@ pub(crate) fn queue_text(
         Alignment::Right => {
             for row in rows {
                 if let Some((row_width, _)) = measure_text(&row) {
-                    let offset = (width.unwrap() - row_width) * dpi;
+                    let offset = (width - row_width) * dpi;
                     let row = offset_glyphs(row, offset, 0.0);
                     final_glyphs.extend_from_slice(&row);
                 } else {
@@ -118,7 +113,7 @@ pub(crate) fn queue_text(
         Alignment::Center => {
             for row in rows {
                 if let Some((row_width, _)) = measure_text(&row) {
-                    let offset = (width.unwrap() - row_width) / 2.0 * dpi;
+                    let offset = (width - row_width) / 2.0 * dpi;
                     let row = offset_glyphs(row, offset, 0.0);
                     final_glyphs.extend_from_slice(&row);
                 } else {
@@ -134,12 +129,18 @@ pub(crate) fn queue_text(
                 &mut cache,
                 cursor_rect.left + cursor_rect.width() * 0.5 + 1.0,
                 y,
-                None,
+                cursor_rect.width(),
                 font_size,
                 "|",
             )
         } else {
-            collect_glyphs(&mut cache, x, y, width, font_size, "|")
+            match alignment {
+                Alignment::Left => collect_glyphs(&mut cache, x, y, width, font_size, "|"),
+                Alignment::Right => collect_glyphs(&mut cache, x + width, y, width, font_size, "|"),
+                Alignment::Center => {
+                    collect_glyphs(&mut cache, x + width / 2.0, y, width, font_size, "|")
+                }
+            }
         };
         final_glyphs.extend_from_slice(&cursor[0]);
     }
@@ -167,7 +168,7 @@ fn measure_text_at_index<'a>(
             return Some(layout::Rect {
                 left: rect.min.x as f32 / dpi + whitespace * rect.width() as f32,
                 top: rect.min.y as f32 / dpi,
-                right: rect.max.x as f32 / dpi,
+                right: rect.max.x as f32 / dpi + whitespace * rect.width() as f32,
                 bottom: rect.max.y as f32 / dpi,
             });
         }
@@ -220,7 +221,7 @@ fn collect_glyphs<'a>(
     cache: &mut TextCache<'a>,
     x: f32,
     y: f32,
-    width: Option<f32>,
+    width: f32,
     font_size: f32,
     text: &str,
 ) -> Vec<Vec<PositionedGlyph<'a>>> {
@@ -272,7 +273,7 @@ fn collect_glyphs<'a>(
                 caret.x += font.pair_kerning(scale, id, glyph.id());
             }
 
-            if width.is_some() && caret.x > x + width.unwrap() {
+            if caret.x > x + width {
                 if let Some(ref mut last_row) = rows.last_mut() {
                     let len = last_row.len();
                     if current_word_length < len {
