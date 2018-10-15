@@ -135,8 +135,8 @@ impl Window {
         let mut window = WindowBuilder::new()
             .with_title(settings.title)
             .with_dimensions(LogicalSize::new(
-                settings.width as f64,
-                settings.height as f64,
+                f64::from(settings.width),
+                f64::from(settings.height),
             ));
         if settings.is_dialog {
             window = Window::window_as_dialog(window);
@@ -215,7 +215,7 @@ impl Window {
                     WindowEvent::KeyboardInput { input, .. } => {
                         if let Some(keycode) = input.virtual_keycode {
                             key_inputs.push(KeyStatus {
-                                keycode: keycode,
+                                keycode,
                                 modifiers: input.modifiers,
                                 last_pressed: false,
                                 pressed: input.state == ElementState::Pressed,

@@ -74,11 +74,9 @@ pub(crate) fn update_dpi(dpi: f32) {
 
 pub(crate) fn queue_text(
     text: &str,
-    x: f32,
-    y: f32,
+    (x, y, z): (f32, f32, f32),
     width: f32,
     font_size: f32,
-    z: f32,
     alignment: Alignment,
     multiline: bool,
     cursor: Option<usize>,

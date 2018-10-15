@@ -10,18 +10,18 @@ struct TextField {
 }
 
 lazy_static! {
-    static ref INPUT_STRINGS: Mutex<HashMap<u64, TextField>> = Mutex::new(HashMap::new());
+    static ref TEXT_FIELDS: Mutex<HashMap<u64, TextField>> = Mutex::new(HashMap::new());
 }
 
 pub(crate) fn insert_input(focused_id: u64, input: char) {
-    let mut strings = INPUT_STRINGS.lock().unwrap();
-    if let Some(string) = strings.get_mut(&focused_id) {
+    let mut text_fields = TEXT_FIELDS.lock().unwrap();
+    if let Some(text_field) = text_fields.get_mut(&focused_id) {
         if !input.is_control() {
-            string.text.push(input);
-            string.cursor_position += 1;
-        } else if input == '\u{8}' && string.text.len() > 0 {
-            string.text.pop();
-            string.cursor_position -= 1;
+            text_field.text.push(input);
+            text_field.cursor_position += 1;
+        } else if input == '\u{8}' && text_field.text.is_empty() {
+            text_field.text.pop();
+            text_field.cursor_position -= 1;
         }
     }
 }
@@ -30,12 +30,12 @@ pub(crate) fn insert_input(focused_id: u64, input: char) {
 /// which is editable.
 pub fn input(identifier: &str, default_text: &str) -> String {
     let mut state = UI_STATE.lock().unwrap();
-    let mut strings = INPUT_STRINGS.lock().unwrap();
+    let mut text_fields = TEXT_FIELDS.lock().unwrap();
 
     let element = ui::new_element(identifier.to_owned(), UIElementKind::InputField);
     let id = element.id();
-    if !strings.contains_key(&id) {
-        strings.insert(
+    if !text_fields.contains_key(&id) {
+        text_fields.insert(
             id,
             TextField {
                 selection_time: Instant::now(),
@@ -44,7 +44,7 @@ pub fn input(identifier: &str, default_text: &str) -> String {
             },
         );
     }
-    let field = strings.get_mut(&id).unwrap();
+    let field = text_fields.get_mut(&id).unwrap();
 
     let clicked = state.mouse.clicked();
     let focused = if clicked && element.is_point_inside(state.mouse.x, state.mouse.y) {

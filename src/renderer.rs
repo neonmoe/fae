@@ -109,7 +109,7 @@ pub fn initialize_renderer(ui_spritesheet_image: &[u8]) -> Result<(), Box<Error>
         gl::RGBA as GLint,
         image.width,
         image.height,
-        image.pixels,
+        &image.pixels,
     );
 
     // This creates the glyph cache texture
@@ -118,7 +118,7 @@ pub fn initialize_renderer(ui_spritesheet_image: &[u8]) -> Result<(), Box<Error>
         gl::RED as GLint,
         text::GLYPH_CACHE_WIDTH as GLint,
         text::GLYPH_CACHE_HEIGHT as GLint,
-        vec![0; (text::GLYPH_CACHE_WIDTH * text::GLYPH_CACHE_HEIGHT) as usize],
+        &[0; (text::GLYPH_CACHE_WIDTH * text::GLYPH_CACHE_HEIGHT) as usize],
     );
 
     print_gl_errors("after initialization");
@@ -146,7 +146,7 @@ pub fn create_draw_call(image: &[u8]) -> usize {
         gl::RGBA as GLint,
         image.width,
         image.height,
-        image.pixels,
+        &image.pixels,
     );
 
     index
@@ -277,7 +277,7 @@ fn create_texture() -> GLuint {
 }
 
 #[inline]
-fn insert_texture(tex: GLuint, components: GLint, w: GLint, h: GLint, pixels: Vec<u8>) {
+fn insert_texture(tex: GLuint, components: GLint, w: GLint, h: GLint, pixels: &[u8]) {
     unsafe {
         gl::BindTexture(gl::TEXTURE_2D, tex);
         gl::TexImage2D(
@@ -384,7 +384,7 @@ pub(crate) fn render(width: f32, height: f32) {
 
     let mut draw_state = DRAW_STATE.lock().unwrap();
     for (i, call) in draw_state.calls.iter_mut().enumerate() {
-        if call.attributes.vbo_data.len() == 0 {
+        if call.attributes.vbo_data.is_empty() {
             continue;
         }
 

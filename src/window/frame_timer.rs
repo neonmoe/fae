@@ -95,7 +95,7 @@ impl FrameTimer {
     }
 
     pub fn avg_frame_duration(&self) -> Duration {
-        if self.frame_durations.len() == 0 {
+        if self.frame_durations.is_empty() {
             Duration::from_millis(0)
         } else {
             let sum = self

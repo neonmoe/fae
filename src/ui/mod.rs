@@ -149,13 +149,12 @@ pub fn update(
 
 fn new_element(identifier: String, kind: UIElementKind) -> UIElement {
     let (rect, alignment) = layout::create_next_element();
-    let element = UIElement {
+    UIElement {
         identifier,
         kind,
         rect,
         alignment,
-    };
-    element
+    }
 }
 
 fn draw_element(element: &UIElement, text: &str, multiline: bool, cursor: Option<usize>) {
@@ -199,11 +198,9 @@ fn draw_element(element: &UIElement, text: &str, multiline: bool, cursor: Option
 
     text::queue_text(
         text,
-        rect.left,
-        rect.top,
+        (rect.left, rect.top, NORMAL_UI_TEXT_DEPTH),
         rect.width(),
         rect.height(),
-        NORMAL_UI_TEXT_DEPTH,
         alignment,
         multiline,
         cursor,
