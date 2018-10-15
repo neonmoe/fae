@@ -73,13 +73,14 @@ pub(crate) fn update_dpi(dpi: f32) {
 }
 
 pub(crate) fn queue_text(
+    text: &str,
     x: f32,
     y: f32,
     width: f32,
-    z: f32,
     font_size: f32,
-    text: &str,
+    z: f32,
     alignment: Alignment,
+    multiline: bool,
     cursor: Option<usize>,
 ) {
     let mut cache = TEXT_CACHE.lock().unwrap();
@@ -87,7 +88,7 @@ pub(crate) fn queue_text(
         let lock = DPI_SCALE.lock().unwrap();
         *lock
     };
-    let rows = collect_glyphs(&mut cache, x, y, width * dpi, font_size, text);
+    let rows = collect_glyphs(&mut cache, x, y, width * dpi, multiline, font_size, text);
 
     let mut final_glyphs = Vec::with_capacity(text.len());
 
@@ -130,15 +131,18 @@ pub(crate) fn queue_text(
                 cursor_rect.left + cursor_rect.width() * 0.5 + 1.0,
                 y,
                 cursor_rect.width(),
+                multiline,
                 font_size,
                 "|",
             )
         } else {
             match alignment {
-                Alignment::Left => collect_glyphs(&mut cache, x, y, width, font_size, "|"),
-                Alignment::Right => collect_glyphs(&mut cache, x + width, y, width, font_size, "|"),
+                Alignment::Left => collect_glyphs(&mut cache, x, y, width, false, font_size, "|"),
+                Alignment::Right => {
+                    collect_glyphs(&mut cache, x + width, y, width, false, font_size, "|")
+                }
                 Alignment::Center => {
-                    collect_glyphs(&mut cache, x + width / 2.0, y, width, font_size, "|")
+                    collect_glyphs(&mut cache, x + width / 2.0, y, width, false, font_size, "|")
                 }
             }
         };
@@ -222,6 +226,7 @@ fn collect_glyphs<'a>(
     x: f32,
     y: f32,
     width: f32,
+    multiline: bool,
     font_size: f32,
     text: &str,
 ) -> Vec<Vec<PositionedGlyph<'a>>> {
@@ -257,7 +262,7 @@ fn collect_glyphs<'a>(
             let c = chars[i];
             i += 1;
             if c.is_control() {
-                if c == '\n' {
+                if c == '\n' && multiline {
                     next_row(&mut caret, &mut rows);
                 }
                 continue;
@@ -273,7 +278,7 @@ fn collect_glyphs<'a>(
                 caret.x += font.pair_kerning(scale, id, glyph.id());
             }
 
-            if caret.x > x + width {
+            if caret.x > x + width && multiline {
                 if let Some(ref mut last_row) = rows.last_mut() {
                     let len = last_row.len();
                     if current_word_length < len {

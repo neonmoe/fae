@@ -7,7 +7,6 @@ pub use glutin::{ModifiersState, VirtualKeyCode};
 use renderer;
 use std::collections::HashMap;
 use std::sync::Mutex;
-use std::time::Instant;
 use text;
 
 use self::element::{UIElement, UIElementKind};
@@ -22,7 +21,6 @@ const NORMAL_UI_TEXT_DEPTH: f32 = NORMAL_UI_ELEMENT_DEPTH - 0.1;
 
 lazy_static! {
     static ref UI_STATE: Mutex<UIState> = Mutex::new(UIState {
-        start_time: Instant::now(),
         elements: HashMap::new(),
         last_element: None,
         mouse: MouseStatus {
@@ -40,7 +38,6 @@ lazy_static! {
 }
 
 struct UIState {
-    start_time: Instant,
     elements: HashMap<u64, UIElement>,
     last_element: Option<UIElement>,
     mouse: MouseStatus,
@@ -161,7 +158,7 @@ fn new_element(identifier: String, kind: UIElementKind) -> UIElement {
     element
 }
 
-fn draw_element(element: &UIElement, text: &str, cursor: Option<usize>) {
+fn draw_element(element: &UIElement, text: &str, multiline: bool, cursor: Option<usize>) {
     let &UIElement {
         kind,
         rect,
@@ -201,13 +198,14 @@ fn draw_element(element: &UIElement, text: &str, cursor: Option<usize>) {
     }
 
     text::queue_text(
+        text,
         rect.left,
         rect.top,
         rect.width(),
-        NORMAL_UI_TEXT_DEPTH,
         rect.height(),
-        text,
+        NORMAL_UI_TEXT_DEPTH,
         alignment,
+        multiline,
         cursor,
     );
 }
