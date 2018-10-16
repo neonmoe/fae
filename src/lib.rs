@@ -11,6 +11,8 @@ extern crate gl;
 extern crate glutin;
 #[macro_use]
 extern crate lazy_static;
+#[cfg(feature = "clipboard")]
+extern crate clipboard;
 extern crate png;
 extern crate rusttype;
 extern crate unicode_normalization;
@@ -23,6 +25,7 @@ pub use window::*;
 #[cfg(feature = "default_resources")]
 pub mod resources;
 
+mod clip;
 mod image;
 pub mod renderer;
 mod text;

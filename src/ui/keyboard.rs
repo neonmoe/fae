@@ -1,6 +1,19 @@
 //! Get your keypresses here.
 use super::{ModifiersState, VirtualKeyCode, UI_STATE};
 
+/// Represents the status of a key on the keyboard.
+#[derive(Clone, Copy, Debug)]
+pub struct KeyStatus {
+    /// The key this status describes.
+    pub keycode: VirtualKeyCode,
+    /// The modifiers which were pressed with the key.
+    pub modifiers: ModifiersState,
+    /// Was the key pressed during the previous frame?
+    pub last_pressed: bool,
+    /// Is the key being pressed currently?
+    pub pressed: bool,
+}
+
 /// Returns true if the given key is held, and the modifiers were
 /// active when the key was initially pressed. If you don't care
 /// about the modifiers, leave `modifiers` as None.

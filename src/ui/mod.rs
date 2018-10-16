@@ -10,7 +10,9 @@ use std::sync::Mutex;
 use text;
 
 use self::element::{UIElement, UIElementKind};
+pub use self::keyboard::KeyStatus;
 use self::layout::Rect;
+use clip;
 
 const TILE_SIZE: f32 = 16.0;
 const OUTER_TILE_WIDTH: f32 = 4.0;
@@ -80,19 +82,6 @@ impl MouseStatus {
     }
 }
 
-/// Represents the status of a key on the keyboard.
-#[derive(Clone, Copy)]
-pub struct KeyStatus {
-    /// The key this status describes.
-    pub keycode: VirtualKeyCode,
-    /// The modifiers which were pressed with the key.
-    pub modifiers: ModifiersState,
-    /// Was the key pressed during the previous frame?
-    pub last_pressed: bool,
-    /// Is the key being pressed currently?
-    pub pressed: bool,
-}
-
 /// Handled by the `window_bootstrap` feature, if in use.
 // TODO: Keyboard navigation of the UI
 pub fn update(
@@ -112,38 +101,57 @@ pub fn update(
         *dimensions = (width as f32, height as f32);
     }
 
-    let mut state = UI_STATE.lock().unwrap();
-    if !state.mouse.pressed {
-        state.pressed_element = None;
+    let hovering_button;
+    let focused_element;
+    {
+        let mut state = UI_STATE.lock().unwrap();
+        if !state.mouse.pressed {
+            state.pressed_element = None;
+        }
+        state.elements.clear();
+        state.last_element = None;
+        state.hovering = false;
+
+        state.mouse = mouse;
+        hovering_button = state.hovering;
+
+        for key in state.keys.iter_mut().map(|(_, key_status)| key_status) {
+            key.last_pressed = key.pressed;
+        }
+        for mut key_input in key_inputs {
+            let keycode = key_input.keycode;
+            key_input.last_pressed = {
+                if !state.keys.contains_key(&keycode) {
+                    false
+                } else {
+                    state.keys[&keycode].pressed
+                }
+            };
+            state.keys.insert(keycode, key_input);
+        }
+        focused_element = state.focused_element;
     }
 
-    for key in state.keys.iter_mut().map(|(_, key_status)| key_status) {
-        key.last_pressed = key.pressed;
-    }
-    for mut key_input in key_inputs {
-        let keycode = key_input.keycode;
-        key_input.last_pressed = {
-            if !state.keys.contains_key(&keycode) {
-                false
-            } else {
-                state.keys[&keycode].pressed
-            }
-        };
-        state.keys.insert(keycode, key_input);
-    }
-
-    if let Some(id) = state.focused_element {
+    if let Some(id) = focused_element {
         for character in characters {
             element::insert_input(id, character);
         }
+
+        if keyboard::key_typed(
+            VirtualKeyCode::V,
+            Some(ModifiersState {
+                ctrl: true,
+                shift: false,
+                alt: false,
+                logo: false,
+            }),
+        ) {
+            if let Some(paste) = clip::get() {
+                element::insert_input_str(id, &paste);
+            }
+        }
     }
 
-    state.elements.clear();
-    state.last_element = None;
-    state.hovering = false;
-
-    state.mouse = mouse;
-    let hovering_button = state.hovering;
     UIStatus { hovering_button }
 }
 

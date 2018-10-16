@@ -28,8 +28,14 @@ struct TextCache<'a> {
 }
 
 struct TextRender<'a> {
-    glyphs: Vec<PositionedGlyph<'a>>,
+    glyphs: Vec<SizedGlyph<'a>>,
     z: f32,
+}
+
+#[derive(Clone)]
+struct SizedGlyph<'a> {
+    glyph: PositionedGlyph<'a>,
+    width: Option<f32>,
 }
 
 /// Defines the alignment of text.
@@ -123,7 +129,8 @@ pub(crate) fn queue_text(
     }
 
     if let Some(cursor_index) = cursor {
-        let cursor = if let Some(cursor_rect) = measure_text_at_index(&final_glyphs, cursor_index) {
+        let cursor = if cursor_index > 0 {
+            let cursor_rect = measure_text_at_index(&final_glyphs, cursor_index - 1).unwrap();
             collect_glyphs(
                 &mut cache,
                 cursor_rect.left + cursor_rect.width() * 0.5 + 1.0,
@@ -153,50 +160,64 @@ pub(crate) fn queue_text(
     });
 }
 
-fn measure_text_at_index<'a>(
-    glyphs: &[PositionedGlyph<'a>],
-    mut index: usize,
-) -> Option<layout::Rect> {
+/// Will only return `None` when `index >= glyphs.len()`.
+fn measure_text_at_index<'a>(glyphs: &[SizedGlyph<'a>], index: usize) -> Option<layout::Rect> {
+    if index >= glyphs.len() {
+        return None;
+    }
+
     let dpi = {
         let lock = DPI_SCALE.lock().unwrap();
         *lock
     };
 
-    let mut whitespace = 0.0;
-    while index > 0 {
-        index -= 1;
-        let glyph = &glyphs[index];
-        if let Some(rect) = glyph.pixel_bounding_box() {
-            return Some(layout::Rect {
-                left: rect.min.x as f32 / dpi + whitespace * rect.width() as f32,
-                top: rect.min.y as f32 / dpi,
-                right: rect.max.x as f32 / dpi + whitespace * rect.width() as f32,
-                bottom: rect.max.y as f32 / dpi,
-            });
-        }
-        whitespace += 1.0;
+    let width = glyphs[index].width;
+    let glyph = &glyphs[index].glyph;
+    let position = glyph.position();
+    if let Some(rect) = glyph.pixel_bounding_box() {
+        return Some(layout::Rect {
+            left: rect.min.x as f32 / dpi,
+            top: rect.min.y as f32 / dpi,
+            right: rect.max.x as f32 / dpi,
+            bottom: rect.max.y as f32 / dpi,
+        });
+    } else {
+        let width = if let Some(width) = width {
+            width
+        } else if index > 0 {
+            if let Some(previous_width) = glyphs[index - 1].width {
+                previous_width
+            } else {
+                4.0
+            }
+        } else {
+            4.0
+        };
+        return Some(layout::Rect {
+            left: position.x,
+            top: position.y,
+            right: position.x + width,
+            bottom: position.y,
+        });
     }
-    None
 }
 
-fn measure_text<'a>(glyphs: &[PositionedGlyph<'a>]) -> Option<(f32, f32)> {
+fn measure_text<'a>(glyphs: &[SizedGlyph<'a>]) -> Option<(f32, f32)> {
     let mut result: Option<layout::Rect> = None;
-    let lock = DPI_SCALE.lock().unwrap();
-    let dpi = *lock;
 
-    for glyph in glyphs {
-        if let Some(glyph_rect) = glyph.pixel_bounding_box() {
+    for i in 0..glyphs.len() {
+        if let Some(glyph_rect) = measure_text_at_index(glyphs, i) {
             if let Some(ref mut rect) = result {
-                rect.left = rect.left.min(glyph_rect.min.x as f32 / dpi);
-                rect.top = rect.top.min(glyph_rect.min.y as f32 / dpi);
-                rect.right = rect.right.max(glyph_rect.max.x as f32 / dpi);
-                rect.bottom = rect.bottom.max(glyph_rect.max.y as f32 / dpi);
+                rect.left = rect.left.min(glyph_rect.left);
+                rect.top = rect.top.min(glyph_rect.top);
+                rect.right = rect.right.max(glyph_rect.right);
+                rect.bottom = rect.bottom.max(glyph_rect.bottom);
             } else {
                 result = Some(layout::Rect {
-                    left: glyph_rect.min.x as f32 / dpi,
-                    top: glyph_rect.min.y as f32 / dpi,
-                    right: glyph_rect.max.x as f32 / dpi,
-                    bottom: glyph_rect.max.y as f32 / dpi,
+                    left: glyph_rect.left,
+                    top: glyph_rect.top,
+                    right: glyph_rect.right,
+                    bottom: glyph_rect.bottom,
                 });
             }
         }
@@ -209,12 +230,17 @@ fn measure_text<'a>(glyphs: &[PositionedGlyph<'a>]) -> Option<(f32, f32)> {
     }
 }
 
-fn offset_glyphs<'a>(glyphs: Vec<PositionedGlyph<'a>>, x: f32, y: f32) -> Vec<PositionedGlyph<'a>> {
+fn offset_glyphs<'a>(glyphs: Vec<SizedGlyph<'a>>, x: f32, y: f32) -> Vec<SizedGlyph<'a>> {
     glyphs
         .into_iter()
         .map(|glyph| {
+            let width = glyph.width;
+            let glyph = glyph.glyph;
             let position = glyph.position() + vector(x, y);
-            glyph.into_unpositioned().positioned(position)
+            SizedGlyph {
+                width,
+                glyph: glyph.into_unpositioned().positioned(position),
+            }
         })
         .collect()
 }
@@ -227,7 +253,7 @@ fn collect_glyphs<'a>(
     multiline: bool,
     font_size: f32,
     text: &str,
-) -> Vec<Vec<PositionedGlyph<'a>>> {
+) -> Vec<Vec<SizedGlyph<'a>>> {
     let dpi;
     let scale;
     {
@@ -246,7 +272,7 @@ fn collect_glyphs<'a>(
         let mut caret = point(x, y + v_metrics.ascent);
         let mut last_glyph_id = None;
 
-        let next_row = |caret: &mut Point<f32>, rows: &mut Vec<Vec<_>>| {
+        let next_row = |caret: &mut Point<f32>, rows: &mut Vec<Vec<SizedGlyph<'a>>>| {
             *caret = point(x, caret.y + advance_height);
             // Pre-allocate based on the last row's length
             let len = rows.last().unwrap().len();
@@ -272,8 +298,12 @@ fn collect_glyphs<'a>(
             }
 
             let glyph = font.glyph(c);
+            let last_x = caret.x;
             if let Some(id) = last_glyph_id.take() {
                 caret.x += font.pair_kerning(scale, id, glyph.id());
+            }
+            if let Some(previous_glyph) = rows.last_mut().unwrap().last_mut() {
+                previous_glyph.width = Some(caret.x - last_x);
             }
 
             if caret.x > x + width && multiline {
@@ -296,7 +326,9 @@ fn collect_glyphs<'a>(
             let glyph = glyph.scaled(scale).positioned(caret);
             caret.x += glyph.unpositioned().h_metrics().advance_width;
 
-            rows.last_mut().unwrap().push(glyph);
+            rows.last_mut()
+                .unwrap()
+                .push(SizedGlyph { glyph, width: None });
         }
     }
     rows
@@ -310,7 +342,7 @@ pub(crate) fn draw_text() {
 
         for text in &text_cache.cached_text {
             for glyph in &text.glyphs {
-                cache.queue_glyph(0, glyph.clone());
+                cache.queue_glyph(0, glyph.glyph.clone());
             }
         }
 
@@ -341,7 +373,7 @@ pub(crate) fn draw_text() {
         for text in &text_cache.cached_text {
             let z = text.z;
             for glyph in &text.glyphs {
-                if let Ok(Some((uv_rect, screen_rect))) = cache.rect_for(0, &glyph) {
+                if let Ok(Some((uv_rect, screen_rect))) = cache.rect_for(0, &glyph.glyph) {
                     let coords = (
                         screen_rect.min.x as f32 / dpi,
                         screen_rect.min.y as f32 / dpi,
