@@ -1,7 +1,6 @@
 #![windows_subsystem = "windows"]
 
 extern crate fungui;
-extern crate gl;
 
 use fungui::{element, Window, WindowSettings};
 

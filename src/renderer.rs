@@ -88,6 +88,7 @@ pub fn initialize_renderer(
     unsafe {
         if draw_state.opengl21 {
             gl::Enable(gl::TEXTURE_2D);
+            gl::EnableClientState(gl::VERTEX_ARRAY);
         }
         gl::Enable(gl::DEPTH_TEST);
         gl::Enable(gl::BLEND);

@@ -9,7 +9,6 @@
 // TODO: Refactor away lazy statics and create a specific
 // static-feeling wrapper for the stateful stuff
 
-extern crate gl;
 #[cfg(feature = "window_bootstrap")]
 extern crate glutin;
 #[macro_use]
@@ -37,3 +36,7 @@ mod ui;
 pub use renderer::initialize_renderer;
 pub use text::initialize_font;
 pub use ui::{element, keyboard, layout, KeyStatus, ModifiersState, MouseStatus, VirtualKeyCode};
+
+mod gl {
+    include!(concat!(env!("OUT_DIR"), "/gl_bindings.rs"));
+}
