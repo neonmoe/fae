@@ -149,7 +149,8 @@ impl Window {
         }
         let context = ContextBuilder::new()
             .with_vsync(true)
-            .with_gl(GlRequest::Specific(Api::OpenGl, (2, 1)));
+            .with_gl(GlRequest::Specific(Api::OpenGl, (2, 1)))
+            .with_gl_profile(GlProfile::Compatibility);
         let gl_window = GlWindow::new(window, context, &events_loop)?;
 
         let opengl_major_version;

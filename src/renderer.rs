@@ -88,7 +88,6 @@ pub fn initialize_renderer(
     unsafe {
         if draw_state.opengl21 {
             gl::Enable(gl::TEXTURE_2D);
-            gl::EnableClientState(gl::VERTEX_ARRAY);
         }
         gl::Enable(gl::DEPTH_TEST);
         gl::Enable(gl::BLEND);
@@ -141,9 +140,9 @@ pub fn create_draw_call(image: &[u8]) -> usize {
     let index = draw_state.calls.len();
     let opengl21 = draw_state.opengl21;
 
-    let texture = create_texture();
     let program = create_program(vert, frag);
     let attributes = create_attributes(opengl21, program);
+    let texture = create_texture();
     draw_state.calls.push(DrawCall {
         texture,
         program,
@@ -243,8 +242,8 @@ fn create_program(vert_source: &str, frag_source: &str) -> ShaderProgram {
 #[inline]
 fn create_attributes(opengl21: bool, program: ShaderProgram) -> Attributes {
     let mut vao = 0;
-    unsafe {
-        if !opengl21 {
+    if !opengl21 {
+        unsafe {
             gl::GenVertexArrays(1, &mut vao);
             gl::BindVertexArray(vao);
         }
@@ -256,43 +255,10 @@ fn create_attributes(opengl21: bool, program: ShaderProgram) -> Attributes {
         gl::BindBuffer(gl::ARRAY_BUFFER, vbo);
     }
 
-    /* Setup the position attribute */
-    unsafe {
-        gl::VertexAttribPointer(
-            0,           /* Attrib location */
-            3,           /* Components */
-            gl::FLOAT,   /* Type */
-            gl::FALSE,   /* Normalize */
-            24,          /* Stride: sizeof(f32) * (Total component count) */
-            ptr::null(), /* Offset */
-        );
-        gl::EnableVertexAttribArray(program.position_attrib_location);
-    }
-
-    /* Setup the texture coordinate attribute */
-    unsafe {
-        gl::VertexAttribPointer(
-            1,              /* Attrib location */
-            2,              /* Components */
-            gl::FLOAT,      /* Type */
-            gl::FALSE,      /* Normalize */
-            24,             /* Stride: sizeof(f32) * (Total component count) */
-            12 as *const _, /* Offset: sizeof(f32) * (Position's component count) */
-        );
-        gl::EnableVertexAttribArray(program.texcoord_attrib_location);
-    }
-
-    /* Setup the color attribute */
-    unsafe {
-        gl::VertexAttribPointer(
-            2,                 /* Attrib location */
-            4,                 /* Components */
-            gl::UNSIGNED_BYTE, /* Type */
-            gl::TRUE,          /* Normalize */
-            24,                /* Stride: sizeof(f32) * (Total component count) */
-            20 as *const _,    /* Offset: sizeof(f32) * (Pos + tex component count) */
-        );
-        gl::EnableVertexAttribArray(program.color_attrib_location);
+    if !opengl21 {
+        unsafe {
+            enable_vertex_attribs(program);
+        }
     }
 
     Attributes {
@@ -301,6 +267,47 @@ fn create_attributes(opengl21: bool, program: ShaderProgram) -> Attributes {
         vbo_data: Vec::new(),
         allocated_vbo_data_size: 0,
     }
+}
+
+unsafe fn enable_vertex_attribs(program: ShaderProgram) {
+    /* Setup the position attribute */
+    gl::VertexAttribPointer(
+        0,           /* Attrib location */
+        3,           /* Components */
+        gl::FLOAT,   /* Type */
+        gl::FALSE,   /* Normalize */
+        24,          /* Stride: sizeof(f32) * (Total component count) */
+        ptr::null(), /* Offset */
+    );
+    gl::EnableVertexAttribArray(program.position_attrib_location);
+
+    /* Setup the texture coordinate attribute */
+    gl::VertexAttribPointer(
+        1,              /* Attrib location */
+        2,              /* Components */
+        gl::FLOAT,      /* Type */
+        gl::FALSE,      /* Normalize */
+        24,             /* Stride: sizeof(f32) * (Total component count) */
+        12 as *const _, /* Offset: sizeof(f32) * (Position's component count) */
+    );
+    gl::EnableVertexAttribArray(program.texcoord_attrib_location);
+
+    /* Setup the color attribute */
+    gl::VertexAttribPointer(
+        2,                 /* Attrib location */
+        4,                 /* Components */
+        gl::UNSIGNED_BYTE, /* Type */
+        gl::TRUE,          /* Normalize */
+        24,                /* Stride: sizeof(f32) * (Total component count) */
+        20 as *const _,    /* Offset: sizeof(f32) * (Pos + tex component count) */
+    );
+    gl::EnableVertexAttribArray(program.color_attrib_location);
+}
+
+unsafe fn disable_vertex_attribs(program: ShaderProgram) {
+    gl::DisableVertexAttribArray(program.position_attrib_location);
+    gl::DisableVertexAttribArray(program.texcoord_attrib_location);
+    gl::DisableVertexAttribArray(program.color_attrib_location);
 }
 
 #[inline]
@@ -456,9 +463,22 @@ pub(crate) fn render(width: f32, height: f32) {
             }
         }
 
+        if opengl21 {
+            unsafe {
+                enable_vertex_attribs(call.program);
+            }
+        }
+
         unsafe {
             gl::DrawArrays(gl::TRIANGLES, 0, call.attributes.vbo_data.len() as i32 * 6);
         }
+
+        if opengl21 {
+            unsafe {
+                disable_vertex_attribs(call.program);
+            }
+        }
+
         call.attributes.vbo_data.clear();
         print_gl_errors(&*format!("after render #{}", i));
     }
