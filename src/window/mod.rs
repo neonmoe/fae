@@ -138,22 +138,43 @@ impl Window {
         }
 
         let events_loop = EventsLoop::new();
-        let mut window = WindowBuilder::new()
-            .with_title(settings.title)
-            .with_dimensions(LogicalSize::new(
-                f64::from(settings.width),
-                f64::from(settings.height),
-            ));
-        if settings.is_dialog {
-            window = Window::window_as_dialog(window);
-        }
-        let context = ContextBuilder::new()
-            .with_vsync(true)
-            .with_gl(GlRequest::Specific(Api::OpenGl, (2, 1)))
-            .with_gl_profile(GlProfile::Compatibility);
-        let gl_window = GlWindow::new(window, context, &events_loop)?;
+        let opengl21;
+        let gl_window = {
+            let create_window = || {
+                let mut window = WindowBuilder::new()
+                    .with_title(settings.title.clone())
+                    .with_dimensions(LogicalSize::new(
+                        f64::from(settings.width),
+                        f64::from(settings.height),
+                    ));
+                if settings.is_dialog {
+                    window = Window::window_as_dialog(window);
+                }
+                window
+            };
 
-        let opengl_major_version;
+            let _window = create_window();
+            let _context = ContextBuilder::new()
+                .with_vsync(true)
+                .with_gl(GlRequest::Specific(Api::OpenGl, (3, 3)))
+                .with_gl_profile(GlProfile::Core);
+            // FIXME: This is a debugging thing for figuring out why ogl 2.1 isn't working
+            if false
+            /*let Ok(result) = GlWindow::new(window, context, &events_loop)*/
+            {
+                //opengl21 = false;
+                unreachable!() /*result*/
+            } else {
+                let window = create_window();
+                let context = ContextBuilder::new()
+                    .with_vsync(true)
+                    .with_gl(GlRequest::Specific(Api::OpenGl, (2, 1)))
+                    .with_gl_profile(GlProfile::Compatibility);
+                opengl21 = true;
+                GlWindow::new(window, context, &events_loop)?
+            }
+        };
+
         unsafe {
             gl_window.make_current()?;
             gl::load_with(|symbol| gl_window.get_proc_address(symbol) as *const _);
@@ -161,13 +182,12 @@ impl Window {
             let opengl_version_string = String::from_utf8_lossy(
                 CStr::from_ptr(gl::GetString(gl::VERSION) as *const _).to_bytes(),
             );
-            opengl_major_version = opengl_version_string[0..1].parse::<i32>().unwrap();
             if cfg!(debug_assertions) {
                 println!("OpenGL version: {}", opengl_version_string);
             }
         }
 
-        renderer::initialize_renderer(opengl_major_version, &settings.ui_spritesheet)?;
+        renderer::initialize_renderer(opengl21, &settings.ui_spritesheet)?;
         text::initialize_font(settings.font)?;
 
         Ok(Window {

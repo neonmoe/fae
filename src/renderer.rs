@@ -68,6 +68,15 @@ const FRAGMENT_SHADER_SOURCE: [&str; TEXTURE_COUNT] = [
     include_str!("shaders/text.frag"),
 ];
 
+const VERTEX_SHADER_SOURCE_210: [&str; TEXTURE_COUNT] = [
+    include_str!("shaders/legacy/texquad.vert"),
+    include_str!("shaders/legacy/text.vert"),
+];
+const FRAGMENT_SHADER_SOURCE_210: [&str; TEXTURE_COUNT] = [
+    include_str!("shaders/legacy/texquad.frag"),
+    include_str!("shaders/legacy/text.frag"),
+];
+
 /// Initialize the UI rendering system. Handled by
 /// `window_bootstrap`. This must be done after window and context
 /// creation, but before any drawing calls.
@@ -78,12 +87,9 @@ const FRAGMENT_SHADER_SOURCE: [&str; TEXTURE_COUNT] = [
 /// ```no_run
 /// fungui::initialize_renderer(include_bytes!("resources/gui.png"));
 /// ```
-pub fn initialize_renderer(
-    opengl_major_version: i32,
-    ui_spritesheet_image: &[u8],
-) -> Result<(), Box<Error>> {
+pub fn initialize_renderer(opengl21: bool, ui_spritesheet_image: &[u8]) -> Result<(), Box<Error>> {
     let mut draw_state = DRAW_STATE.lock().unwrap();
-    draw_state.opengl21 = opengl_major_version == 2;
+    draw_state.opengl21 = opengl21;
 
     unsafe {
         if draw_state.opengl21 {
@@ -96,7 +102,11 @@ pub fn initialize_renderer(
 
     // TODO: Use create_draw_call here and clean up
     for i in 0..TEXTURE_COUNT {
-        let program = create_program(VERTEX_SHADER_SOURCE[i], FRAGMENT_SHADER_SOURCE[i]);;
+        let program = if draw_state.opengl21 {
+            create_program(VERTEX_SHADER_SOURCE_210[i], FRAGMENT_SHADER_SOURCE_210[i])
+        } else {
+            create_program(VERTEX_SHADER_SOURCE[i], FRAGMENT_SHADER_SOURCE[i])
+        };
         let attributes = create_attributes(draw_state.opengl21, program);
         let texture = create_texture();
         let call = DrawCall {
@@ -135,8 +145,16 @@ pub fn initialize_renderer(
 /// draw calls.
 pub fn create_draw_call(image: &[u8]) -> usize {
     let mut draw_state = DRAW_STATE.lock().unwrap();
-    let vert = VERTEX_SHADER_SOURCE[DRAW_CALL_INDEX_UI];
-    let frag = FRAGMENT_SHADER_SOURCE[DRAW_CALL_INDEX_UI];
+    let vert = if draw_state.opengl21 {
+        VERTEX_SHADER_SOURCE_210[DRAW_CALL_INDEX_UI]
+    } else {
+        VERTEX_SHADER_SOURCE[DRAW_CALL_INDEX_UI]
+    };
+    let frag = if draw_state.opengl21 {
+        FRAGMENT_SHADER_SOURCE_210[DRAW_CALL_INDEX_UI]
+    } else {
+        FRAGMENT_SHADER_SOURCE[DRAW_CALL_INDEX_UI]
+    };
     let index = draw_state.calls.len();
     let opengl21 = draw_state.opengl21;
 

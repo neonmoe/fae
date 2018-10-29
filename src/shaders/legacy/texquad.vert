@@ -1,10 +1,10 @@
-#version 330
+#version 110
 
-in vec4 position;
-in vec2 texcoord;
-in vec4 color;
-out vec2 frag_texcoord;
-out vec4 frag_color;
+attribute vec4 position;
+attribute vec2 texcoord;
+attribute vec4 color;
+varying vec2 frag_texcoord;
+varying vec4 frag_color;
 uniform mat4 projection_matrix;
 
 void main(void) {
