@@ -46,6 +46,7 @@ struct DrawCall {
 #[derive(Debug)]
 struct DrawState {
     calls: Vec<DrawCall>,
+    opengl21: bool,
 }
 
 lazy_static! {
@@ -65,7 +66,8 @@ lazy_static! {
                 },
             };
             TEXTURE_COUNT
-        ]
+        ],
+        opengl21: true
     });
 }
 
@@ -92,15 +94,24 @@ pub fn initialize_renderer(ui_spritesheet_image: &[u8]) -> Result<(), Box<Error>
     let mut draw_state = DRAW_STATE.lock().unwrap();
 
     unsafe {
-        gl::Enable(gl::TEXTURE_2D);
+        let mut major_version = 0;
+        gl::GetIntegerv(gl::MAJOR_VERSION, &mut major_version);
+        draw_state.opengl21 = major_version == 2;
+    }
+
+    unsafe {
+        if draw_state.opengl21 {
+            gl::Enable(gl::TEXTURE_2D);
+        }
         gl::Enable(gl::DEPTH_TEST);
         gl::Enable(gl::BLEND);
         gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
     }
 
+    let opengl21 = draw_state.opengl21;
     for (i, call) in draw_state.calls.iter_mut().enumerate() {
         call.program = create_program(VERTEX_SHADER_SOURCE[i], FRAGMENT_SHADER_SOURCE[i]);
-        call.attributes = create_attributes();
+        call.attributes = create_attributes(opengl21);
         call.texture = create_texture();
     }
 
@@ -135,10 +146,11 @@ pub fn create_draw_call(image: &[u8]) -> usize {
     let vert = VERTEX_SHADER_SOURCE[DRAW_CALL_INDEX_UI];
     let frag = FRAGMENT_SHADER_SOURCE[DRAW_CALL_INDEX_UI];
     let index = draw_state.calls.len();
+    let opengl21 = draw_state.opengl21;
     draw_state.calls.push(DrawCall {
         texture: create_texture(),
         program: create_program(vert, frag),
-        attributes: create_attributes(),
+        attributes: create_attributes(opengl21),
     });
 
     let image = load_image(image).unwrap();
@@ -221,10 +233,10 @@ fn create_program(vert_source: &str, frag_source: &str) -> ShaderProgram {
 }
 
 #[inline]
-fn create_attributes() -> Attributes {
+fn create_attributes(opengl21: bool) -> Attributes {
     let mut vao = 0;
     unsafe {
-        if gl::GenVertexArrays::is_loaded() {
+        if !opengl21 {
             gl::GenVertexArrays(1, &mut vao);
             gl::BindVertexArray(vao);
         }
@@ -404,6 +416,7 @@ pub(crate) fn render(width: f32, height: f32) {
     text::draw_text();
 
     let mut draw_state = DRAW_STATE.lock().unwrap();
+    let opengl21 = draw_state.opengl21;
     for (i, call) in draw_state.calls.iter_mut().enumerate() {
         if call.attributes.vbo_data.is_empty() {
             continue;
@@ -417,7 +430,7 @@ pub(crate) fn render(width: f32, height: f32) {
                 gl::FALSE,
                 matrix.as_ptr(),
             );
-            if gl::BindVertexArray::is_loaded() {
+            if !opengl21 {
                 gl::BindVertexArray(call.attributes.vao);
             }
             gl::BindTexture(gl::TEXTURE_2D, call.texture);
