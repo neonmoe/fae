@@ -290,34 +290,34 @@ fn create_attributes(opengl21: bool, program: ShaderProgram) -> Attributes {
 unsafe fn enable_vertex_attribs(program: ShaderProgram) {
     /* Setup the position attribute */
     gl::VertexAttribPointer(
-        0,           /* Attrib location */
-        3,           /* Components */
-        gl::FLOAT,   /* Type */
-        gl::FALSE,   /* Normalize */
-        24,          /* Stride: sizeof(f32) * (Total component count) */
-        ptr::null(), /* Offset */
+        program.position_attrib_location, /* Attrib location */
+        3,                                /* Components */
+        gl::FLOAT,                        /* Type */
+        gl::FALSE,                        /* Normalize */
+        24,                               /* Stride: sizeof(f32) * (Total component count) */
+        ptr::null(),                      /* Offset */
     );
     gl::EnableVertexAttribArray(program.position_attrib_location);
 
     /* Setup the texture coordinate attribute */
     gl::VertexAttribPointer(
-        1,              /* Attrib location */
-        2,              /* Components */
-        gl::FLOAT,      /* Type */
-        gl::FALSE,      /* Normalize */
-        24,             /* Stride: sizeof(f32) * (Total component count) */
-        12 as *const _, /* Offset: sizeof(f32) * (Position's component count) */
+        program.texcoord_attrib_location, /* Attrib location */
+        2,                                /* Components */
+        gl::FLOAT,                        /* Type */
+        gl::FALSE,                        /* Normalize */
+        24,                               /* Stride: sizeof(f32) * (Total component count) */
+        12 as *const _,                   /* Offset: sizeof(f32) * (Position's component count) */
     );
     gl::EnableVertexAttribArray(program.texcoord_attrib_location);
 
     /* Setup the color attribute */
     gl::VertexAttribPointer(
-        2,                 /* Attrib location */
-        4,                 /* Components */
-        gl::UNSIGNED_BYTE, /* Type */
-        gl::TRUE,          /* Normalize */
-        24,                /* Stride: sizeof(f32) * (Total component count) */
-        20 as *const _,    /* Offset: sizeof(f32) * (Pos + tex component count) */
+        program.color_attrib_location, /* Attrib location */
+        4,                             /* Components */
+        gl::UNSIGNED_BYTE,             /* Type */
+        gl::TRUE,                      /* Normalize */
+        24,                            /* Stride: sizeof(f32) * (Total component count) */
+        20 as *const _,                /* Offset: sizeof(f32) * (Pos + tex component count) */
     );
     gl::EnableVertexAttribArray(program.color_attrib_location);
 }
