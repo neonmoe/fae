@@ -36,7 +36,9 @@ impl FrameTimer {
     pub fn end_frame(&mut self) {
         let end = Instant::now();
         if let Some(last_end) = self.end {
-            self.frame_duration = Some(end - last_end);
+            if end > last_end {
+                self.frame_duration = Some(end - last_end);
+            }
         }
         self.end = Some(end);
     }
@@ -64,7 +66,7 @@ impl FrameTimer {
             // duration is less than a millisecond, assume that we're
             // bound by vsync (which would result in little variance),
             // and set it.
-            if self
+            if avg > REFRESH_DURATION_ERROR_MARGIN && self
                 .refresh_durations
                 .iter()
                 .all(|&d| if d > avg { d - avg } else { avg - d } < REFRESH_DURATION_ERROR_MARGIN)
@@ -75,7 +77,11 @@ impl FrameTimer {
             self.refresh_durations.clear();
         }
 
-        let running_time = end - last_start;
+        let running_time = if end > last_start {
+            end - last_start
+        } else {
+            Duration::from_millis(0)
+        };
         self.frame_durations.insert(0, running_time);
         self.frame_durations.truncate(STORED_FRAME_TIMES);
 

@@ -22,10 +22,13 @@ type Texture = GLuint;
 type VertexBufferObject = GLuint;
 type VertexArrayObject = GLuint;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 struct ShaderProgram {
     program: GLuint,
     projection_matrix_location: GLint,
+    position_attrib_location: GLuint,
+    texcoord_attrib_location: GLuint,
+    color_attrib_location: GLuint,
 }
 
 #[derive(Clone, Debug)]
@@ -51,22 +54,7 @@ struct DrawState {
 
 lazy_static! {
     static ref DRAW_STATE: Mutex<DrawState> = Mutex::new(DrawState {
-        calls: vec![
-            DrawCall {
-                texture: 0,
-                program: ShaderProgram {
-                    program: 0,
-                    projection_matrix_location: 0,
-                },
-                attributes: Attributes {
-                    vbo: 0,
-                    vao: 0,
-                    vbo_data: Vec::new(),
-                    allocated_vbo_data_size: 0,
-                },
-            };
-            TEXTURE_COUNT
-        ],
+        calls: Vec::with_capacity(TEXTURE_COUNT),
         opengl21: true
     });
 }
@@ -95,9 +83,7 @@ pub fn initialize_renderer(
     ui_spritesheet_image: &[u8],
 ) -> Result<(), Box<Error>> {
     let mut draw_state = DRAW_STATE.lock().unwrap();
-
-    let opengl21 = opengl_major_version == 2;
-    draw_state.opengl21 = opengl21;
+    draw_state.opengl21 = opengl_major_version == 2;
 
     unsafe {
         if draw_state.opengl21 {
@@ -108,10 +94,17 @@ pub fn initialize_renderer(
         gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
     }
 
-    for (i, call) in draw_state.calls.iter_mut().enumerate() {
-        call.program = create_program(VERTEX_SHADER_SOURCE[i], FRAGMENT_SHADER_SOURCE[i]);
-        call.attributes = create_attributes(opengl21);
-        call.texture = create_texture();
+    // TODO: Use create_draw_call here and clean up
+    for i in 0..TEXTURE_COUNT {
+        let program = create_program(VERTEX_SHADER_SOURCE[i], FRAGMENT_SHADER_SOURCE[i]);;
+        let attributes = create_attributes(draw_state.opengl21, program);
+        let texture = create_texture();
+        let call = DrawCall {
+            texture,
+            program,
+            attributes,
+        };
+        draw_state.calls.push(call);
     }
 
     let image = load_image(ui_spritesheet_image).unwrap();
@@ -146,10 +139,14 @@ pub fn create_draw_call(image: &[u8]) -> usize {
     let frag = FRAGMENT_SHADER_SOURCE[DRAW_CALL_INDEX_UI];
     let index = draw_state.calls.len();
     let opengl21 = draw_state.opengl21;
+
+    let texture = create_texture();
+    let program = create_program(vert, frag);
+    let attributes = create_attributes(opengl21, program);
     draw_state.calls.push(DrawCall {
-        texture: create_texture(),
-        program: create_program(vert, frag),
-        attributes: create_attributes(opengl21),
+        texture,
+        program,
+        attributes,
     });
 
     let image = load_image(image).unwrap();
@@ -182,6 +179,9 @@ fn create_program(vert_source: &str, frag_source: &str) -> ShaderProgram {
 
     let program;
     let projection_matrix_location;
+    let position_attrib_location;
+    let texcoord_attrib_location;
+    let color_attrib_location;
     unsafe {
         program = gl::CreateProgram();
 
@@ -222,17 +222,25 @@ fn create_program(vert_source: &str, frag_source: &str) -> ShaderProgram {
         gl::UseProgram(program);
         projection_matrix_location =
             gl::GetUniformLocation(program, "projection_matrix\0".as_ptr() as *const _);
-        // TODO: Get attribute locations and store them in the shaderprogram
+        position_attrib_location =
+            gl::GetAttribLocation(program, "position\0".as_ptr() as *const _) as GLuint;
+        texcoord_attrib_location =
+            gl::GetAttribLocation(program, "texcoord\0".as_ptr() as *const _) as GLuint;
+        color_attrib_location =
+            gl::GetAttribLocation(program, "color\0".as_ptr() as *const _) as GLuint;
     }
 
     ShaderProgram {
         program,
         projection_matrix_location,
+        position_attrib_location,
+        texcoord_attrib_location,
+        color_attrib_location,
     }
 }
 
 #[inline]
-fn create_attributes(opengl21: bool) -> Attributes {
+fn create_attributes(opengl21: bool, program: ShaderProgram) -> Attributes {
     let mut vao = 0;
     unsafe {
         if !opengl21 {
@@ -257,7 +265,7 @@ fn create_attributes(opengl21: bool) -> Attributes {
             24,          /* Stride: sizeof(f32) * (Total component count) */
             ptr::null(), /* Offset */
         );
-        gl::EnableVertexAttribArray(0 /* Attribute location */);
+        gl::EnableVertexAttribArray(program.position_attrib_location);
     }
 
     /* Setup the texture coordinate attribute */
@@ -270,7 +278,7 @@ fn create_attributes(opengl21: bool) -> Attributes {
             24,             /* Stride: sizeof(f32) * (Total component count) */
             12 as *const _, /* Offset: sizeof(f32) * (Position's component count) */
         );
-        gl::EnableVertexAttribArray(1 /* Attribute location */);
+        gl::EnableVertexAttribArray(program.texcoord_attrib_location);
     }
 
     /* Setup the color attribute */
@@ -283,7 +291,7 @@ fn create_attributes(opengl21: bool) -> Attributes {
             24,                /* Stride: sizeof(f32) * (Total component count) */
             20 as *const _,    /* Offset: sizeof(f32) * (Pos + tex component count) */
         );
-        gl::EnableVertexAttribArray(2 /* Attribute location */);
+        gl::EnableVertexAttribArray(program.color_attrib_location);
     }
 
     Attributes {
@@ -342,7 +350,6 @@ fn insert_texture(tex: GLuint, components: GLint, w: GLint, h: GLint, pixels: &[
 ///
 /// - `tex_index`: The index of the texture / draw call to draw the
 /// quad in. This is the returned value from `create_draw_call`.
-// TODO?: Start using instanced rendering
 pub fn draw_quad(
     coords: (f32, f32, f32, f32),
     texcoords: (f32, f32, f32, f32),
@@ -352,17 +359,16 @@ pub fn draw_quad(
 ) {
     let (x0, y0, x1, y1) = coords;
     let (tx0, ty0, tx1, ty1) = texcoords;
-    let quad: TexQuad = [
+
+    let mut draw_state = DRAW_STATE.lock().unwrap();
+    draw_state.calls[tex_index].attributes.vbo_data.push([
         ((x0, y0, z), (tx0, ty0), color),
         ((x1, y0, z), (tx1, ty0), color),
         ((x1, y1, z), (tx1, ty1), color),
         ((x0, y0, z), (tx0, ty0), color),
         ((x1, y1, z), (tx1, ty1), color),
         ((x0, y1, z), (tx0, ty1), color),
-    ];
-
-    let mut draw_state = DRAW_STATE.lock().unwrap();
-    draw_state.calls[tex_index].attributes.vbo_data.push(quad);
+    ]);
 }
 
 /// Draws a textured rectangle on the screen.
@@ -392,17 +398,16 @@ pub fn draw_rotated_quad(
     let (x01, y01) = (cx + rotx(rx0, ry1), cy + roty(rx0, ry1));
 
     let (tx0, ty0, tx1, ty1) = texcoords;
-    let quad: TexQuad = [
+
+    let mut draw_state = DRAW_STATE.lock().unwrap();
+    draw_state.calls[tex_index].attributes.vbo_data.push([
         ((x00, y00, z), (tx0, ty0), c),
         ((x10, y10, z), (tx1, ty0), c),
         ((x11, y11, z), (tx1, ty1), c),
         ((x00, y00, z), (tx0, ty0), c),
         ((x11, y11, z), (tx1, ty1), c),
         ((x01, y01, z), (tx0, ty1), c),
-    ];
-
-    let mut draw_state = DRAW_STATE.lock().unwrap();
-    draw_state.calls[tex_index].attributes.vbo_data.push(quad);
+    ]);
 }
 
 pub(crate) fn render(width: f32, height: f32) {
