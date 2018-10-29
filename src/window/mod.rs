@@ -125,11 +125,17 @@ impl Window {
     /// context creation fails, or resources defined in the `settings`
     /// can't be loaded.
     pub fn new(settings: WindowSettings) -> Result<Window, Box<Error>> {
-        // FIXME: Enable wayland support by not setting the backend to
-        // x11 automatically. Note: At the time of writing, wayland
-        // support in winit seems to be buggy. At the very least, it
-        // doesn't seem to work with the sway the
-        env::set_var("WINIT_UNIX_BACKEND", "x11");
+        // Note: At the time of writing, wayland support in winit
+        // seems to be buggy. Default to x11, since xwayland at least
+        // works.
+        if cfg!(any(
+            target_os = "linux",
+            target_os = "dragonfly",
+            target_os = "freebsd",
+            target_os = "openbsd",
+        )) {
+            env::set_var("WINIT_UNIX_BACKEND", "x11");
+        }
 
         let events_loop = EventsLoop::new();
         let mut window = WindowBuilder::new()
@@ -143,13 +149,19 @@ impl Window {
         }
         let context = ContextBuilder::new()
             .with_vsync(true)
-            .with_gl(GlRequest::Specific(Api::OpenGl, (3, 3)))
-            .with_gl_profile(GlProfile::Core);
+            .with_gl(GlRequest::Specific(Api::OpenGl, (2, 1)));
         let gl_window = GlWindow::new(window, context, &events_loop)?;
 
         unsafe {
             gl_window.make_current()?;
             gl::load_with(|symbol| gl_window.get_proc_address(symbol) as *const _);
+            use std::ffi::CStr;
+            let c_str = String::from_utf8_lossy(
+                CStr::from_ptr(gl::GetString(gl::VERSION) as *const _).to_bytes(),
+            );
+            if cfg!(debug_assertions) {
+                println!("OpenGL version: {}", c_str);
+            }
         }
 
         renderer::initialize_renderer(&settings.ui_spritesheet)?;

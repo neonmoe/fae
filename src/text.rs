@@ -35,7 +35,7 @@ struct TextRender<'a> {
 #[derive(Clone)]
 struct SizedGlyph<'a> {
     glyph: PositionedGlyph<'a>,
-    width: Option<f32>,
+    width: f32,
 }
 
 /// Defines the alignment of text.
@@ -88,11 +88,7 @@ pub(crate) fn queue_text(
     cursor: Option<usize>,
 ) {
     let mut cache = TEXT_CACHE.lock().unwrap();
-    let dpi = {
-        let lock = DPI_SCALE.lock().unwrap();
-        *lock
-    };
-    let rows = collect_glyphs(&mut cache, x, y, width * dpi, multiline, font_size, text);
+    let rows = collect_glyphs(&mut cache, x, y, width, multiline, font_size, text);
 
     let mut final_glyphs = Vec::with_capacity(text.len());
 
@@ -106,7 +102,7 @@ pub(crate) fn queue_text(
         Alignment::Right => {
             for row in rows {
                 if let Some((row_width, _)) = measure_text(&row) {
-                    let offset = (width - row_width) * dpi;
+                    let offset = width - row_width;
                     let row = offset_glyphs(row, offset, 0.0);
                     final_glyphs.extend_from_slice(&row);
                 } else {
@@ -118,7 +114,7 @@ pub(crate) fn queue_text(
         Alignment::Center => {
             for row in rows {
                 if let Some((row_width, _)) = measure_text(&row) {
-                    let offset = (width - row_width) / 2.0 * dpi;
+                    let offset = (width - row_width) / 2.0;
                     let row = offset_glyphs(row, offset, 0.0);
                     final_glyphs.extend_from_slice(&row);
                 } else {
@@ -128,6 +124,7 @@ pub(crate) fn queue_text(
         }
     }
 
+    // Add cursor character
     if let Some(cursor_index) = cursor {
         let cursor = if cursor_index > 0 {
             let cursor_rect = measure_text_at_index(&final_glyphs, cursor_index - 1).unwrap();
@@ -182,22 +179,11 @@ fn measure_text_at_index<'a>(glyphs: &[SizedGlyph<'a>], index: usize) -> Option<
             bottom: rect.max.y as f32 / dpi,
         });
     } else {
-        let width = if let Some(width) = width {
-            width
-        } else if index > 0 {
-            if let Some(previous_width) = glyphs[index - 1].width {
-                previous_width
-            } else {
-                4.0
-            }
-        } else {
-            4.0
-        };
         return Some(layout::Rect {
-            left: position.x,
-            top: position.y,
-            right: position.x + width,
-            bottom: position.y,
+            left: position.x / dpi,
+            top: position.y / dpi,
+            right: (position.x + width) / dpi,
+            bottom: position.y / dpi,
         });
     }
 }
@@ -231,12 +217,17 @@ fn measure_text<'a>(glyphs: &[SizedGlyph<'a>]) -> Option<(f32, f32)> {
 }
 
 fn offset_glyphs<'a>(glyphs: Vec<SizedGlyph<'a>>, x: f32, y: f32) -> Vec<SizedGlyph<'a>> {
+    let dpi = {
+        let lock = DPI_SCALE.lock().unwrap();
+        *lock
+    };
+
     glyphs
         .into_iter()
         .map(|glyph| {
             let width = glyph.width;
             let glyph = glyph.glyph;
-            let position = glyph.position() + vector(x, y);
+            let position = glyph.position() + vector(x, y) * dpi;
             SizedGlyph {
                 width,
                 glyph: glyph.into_unpositioned().positioned(position),
@@ -298,12 +289,8 @@ fn collect_glyphs<'a>(
             }
 
             let glyph = font.glyph(c);
-            let last_x = caret.x;
             if let Some(id) = last_glyph_id.take() {
                 caret.x += font.pair_kerning(scale, id, glyph.id());
-            }
-            if let Some(previous_glyph) = rows.last_mut().unwrap().last_mut() {
-                previous_glyph.width = Some(caret.x - last_x);
             }
 
             if caret.x > x + width && multiline {
@@ -324,11 +311,13 @@ fn collect_glyphs<'a>(
             }
 
             let glyph = glyph.scaled(scale).positioned(caret);
-            caret.x += glyph.unpositioned().h_metrics().advance_width;
+            let advance_width = glyph.unpositioned().h_metrics().advance_width;
+            caret.x += advance_width;
 
-            rows.last_mut()
-                .unwrap()
-                .push(SizedGlyph { glyph, width: None });
+            rows.last_mut().unwrap().push(SizedGlyph {
+                glyph,
+                width: advance_width,
+            });
         }
     }
     rows

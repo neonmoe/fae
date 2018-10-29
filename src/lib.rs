@@ -6,6 +6,9 @@
 //! aside from the examples.
 #![warn(missing_docs)]
 
+// TODO: Refactor away lazy statics and create a specific
+// static-feeling wrapper for the stateful stuff
+
 extern crate gl;
 #[cfg(feature = "window_bootstrap")]
 extern crate glutin;

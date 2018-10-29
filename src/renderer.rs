@@ -92,6 +92,7 @@ pub fn initialize_renderer(ui_spritesheet_image: &[u8]) -> Result<(), Box<Error>
     let mut draw_state = DRAW_STATE.lock().unwrap();
 
     unsafe {
+        gl::Enable(gl::TEXTURE_2D);
         gl::Enable(gl::DEPTH_TEST);
         gl::Enable(gl::BLEND);
         gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
@@ -154,6 +155,20 @@ pub fn create_draw_call(image: &[u8]) -> usize {
 
 #[inline]
 fn create_program(vert_source: &str, frag_source: &str) -> ShaderProgram {
+    let print_shader_error = |shader, shader_type| unsafe {
+        let mut compilation_status = 0;
+        gl::GetShaderiv(shader, gl::COMPILE_STATUS, &mut compilation_status);
+        if compilation_status as u8 != gl::TRUE {
+            let mut info = [0; 1024];
+            gl::GetShaderInfoLog(shader, 1024, ptr::null_mut(), info.as_mut_ptr());
+            println!(
+                "Shader ({}) compilation failed:\n{}",
+                shader_type,
+                String::from_utf8_lossy(&mem::transmute::<[i8; 1024], [u8; 1024]>(info)[..])
+            );
+        }
+    };
+
     let program;
     let projection_matrix_location;
     unsafe {
@@ -167,6 +182,8 @@ fn create_program(vert_source: &str, frag_source: &str) -> ShaderProgram {
             [vert_source.len() as GLint].as_ptr(),
         );
         gl::CompileShader(vert_shader);
+        print_shader_error(vert_shader, "vertex");
+
         let frag_shader = gl::CreateShader(gl::FRAGMENT_SHADER);
         gl::ShaderSource(
             frag_shader,
@@ -175,6 +192,7 @@ fn create_program(vert_source: &str, frag_source: &str) -> ShaderProgram {
             [frag_source.len() as GLint].as_ptr(),
         );
         gl::CompileShader(frag_shader);
+        print_shader_error(frag_shader, "fragment");
 
         gl::AttachShader(program, vert_shader);
         gl::AttachShader(program, frag_shader);
@@ -193,6 +211,7 @@ fn create_program(vert_source: &str, frag_source: &str) -> ShaderProgram {
         gl::UseProgram(program);
         projection_matrix_location =
             gl::GetUniformLocation(program, "projection_matrix\0".as_ptr() as *const _);
+        // TODO: Get attribute locations and store them in the shaderprogram
     }
 
     ShaderProgram {
@@ -205,8 +224,10 @@ fn create_program(vert_source: &str, frag_source: &str) -> ShaderProgram {
 fn create_attributes() -> Attributes {
     let mut vao = 0;
     unsafe {
-        gl::GenVertexArrays(1, &mut vao);
-        gl::BindVertexArray(vao);
+        if gl::GenVertexArrays::is_loaded() {
+            gl::GenVertexArrays(1, &mut vao);
+            gl::BindVertexArray(vao);
+        }
     }
 
     let mut vbo = 0;
@@ -396,7 +417,9 @@ pub(crate) fn render(width: f32, height: f32) {
                 gl::FALSE,
                 matrix.as_ptr(),
             );
-            gl::BindVertexArray(call.attributes.vao);
+            if gl::BindVertexArray::is_loaded() {
+                gl::BindVertexArray(call.attributes.vao);
+            }
             gl::BindTexture(gl::TEXTURE_2D, call.texture);
             gl::BindBuffer(gl::ARRAY_BUFFER, call.attributes.vbo);
         }
