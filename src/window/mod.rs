@@ -153,17 +153,14 @@ impl Window {
                 window
             };
 
-            let _window = create_window();
-            let _context = ContextBuilder::new()
+            let window = create_window();
+            let context = ContextBuilder::new()
                 .with_vsync(true)
                 .with_gl(GlRequest::Specific(Api::OpenGl, (3, 3)))
                 .with_gl_profile(GlProfile::Core);
-            // FIXME: This is a debugging thing for figuring out why ogl 2.1 isn't working
-            if false
-            /*let Ok(result) = GlWindow::new(window, context, &events_loop)*/
-            {
-                //opengl21 = false;
-                unreachable!() /*result*/
+            if let Ok(result) = GlWindow::new(window, context, &events_loop) {
+                opengl21 = false;
+                result
             } else {
                 let window = create_window();
                 let context = ContextBuilder::new()
@@ -178,13 +175,16 @@ impl Window {
         unsafe {
             gl_window.make_current()?;
             gl::load_with(|symbol| gl_window.get_proc_address(symbol) as *const _);
-            use std::ffi::CStr;
+            /* use std::ffi::CStr;
+
+            Uncomment in case of opengl shenanigans
+
             let opengl_version_string = String::from_utf8_lossy(
                 CStr::from_ptr(gl::GetString(gl::VERSION) as *const _).to_bytes(),
             );
             if cfg!(debug_assertions) {
                 println!("OpenGL version: {}", opengl_version_string);
-            }
+            }*/
         }
 
         renderer::initialize_renderer(opengl21, &settings.ui_spritesheet)?;
