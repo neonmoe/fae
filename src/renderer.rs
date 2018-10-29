@@ -90,14 +90,14 @@ const FRAGMENT_SHADER_SOURCE: [&str; TEXTURE_COUNT] = [
 /// ```no_run
 /// fungui::initialize_renderer(include_bytes!("resources/gui.png"));
 /// ```
-pub fn initialize_renderer(ui_spritesheet_image: &[u8]) -> Result<(), Box<Error>> {
+pub fn initialize_renderer(
+    opengl_major_version: i32,
+    ui_spritesheet_image: &[u8],
+) -> Result<(), Box<Error>> {
     let mut draw_state = DRAW_STATE.lock().unwrap();
 
-    unsafe {
-        let mut major_version = 0;
-        gl::GetIntegerv(gl::MAJOR_VERSION, &mut major_version);
-        draw_state.opengl21 = major_version == 2;
-    }
+    let opengl21 = opengl_major_version == 2;
+    draw_state.opengl21 = opengl21;
 
     unsafe {
         if draw_state.opengl21 {
@@ -108,7 +108,6 @@ pub fn initialize_renderer(ui_spritesheet_image: &[u8]) -> Result<(), Box<Error>
         gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
     }
 
-    let opengl21 = draw_state.opengl21;
     for (i, call) in draw_state.calls.iter_mut().enumerate() {
         call.program = create_program(VERTEX_SHADER_SOURCE[i], FRAGMENT_SHADER_SOURCE[i]);
         call.attributes = create_attributes(opengl21);

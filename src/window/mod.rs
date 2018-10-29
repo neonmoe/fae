@@ -152,19 +152,21 @@ impl Window {
             .with_gl(GlRequest::Specific(Api::OpenGl, (2, 1)));
         let gl_window = GlWindow::new(window, context, &events_loop)?;
 
+        let opengl_major_version;
         unsafe {
             gl_window.make_current()?;
             gl::load_with(|symbol| gl_window.get_proc_address(symbol) as *const _);
             use std::ffi::CStr;
-            let c_str = String::from_utf8_lossy(
+            let opengl_version_string = String::from_utf8_lossy(
                 CStr::from_ptr(gl::GetString(gl::VERSION) as *const _).to_bytes(),
             );
+            opengl_major_version = opengl_version_string[0..1].parse::<i32>().unwrap();
             if cfg!(debug_assertions) {
-                println!("OpenGL version: {}", c_str);
+                println!("OpenGL version: {}", opengl_version_string);
             }
         }
 
-        renderer::initialize_renderer(&settings.ui_spritesheet)?;
+        renderer::initialize_renderer(opengl_major_version, &settings.ui_spritesheet)?;
         text::initialize_font(settings.font)?;
 
         Ok(Window {
