@@ -360,6 +360,38 @@ fn insert_texture(tex: GLuint, components: GLint, w: GLint, h: GLint, pixels: &[
     }
 }
 
+/// Draws a rectangle on the screen.
+///
+/// - `coords`: The coordinates of the corners of the quad, in
+/// (logical) pixels. Arrangement: (left, top, right, bottom)
+///
+/// - `color`: The color of the quad, in the range 0-255. Arrangement:
+/// (red, green, blue, alpha)
+///
+/// - `z`: Used for ordering sprites on screen, in the range -1.0 -
+/// 1.0. Positive values are in front.
+///
+/// - `tex_index`: The index of the texture / draw call to draw the
+/// quad in. This is the returned value from `create_draw_call`.
+pub fn draw_colored_quad(
+    coords: (f32, f32, f32, f32),
+    color: (u8, u8, u8, u8),
+    z: f32,
+    tex_index: usize,
+) {
+    let (x0, y0, x1, y1) = coords;
+
+    let mut draw_state = DRAW_STATE.lock().unwrap();
+    draw_state.calls[tex_index].attributes.vbo_data.push([
+        ((x0, y0, z), (-1.0, -1.0), color),
+        ((x1, y0, z), (-1.0, -1.0), color),
+        ((x1, y1, z), (-1.0, -1.0), color),
+        ((x0, y0, z), (-1.0, -1.0), color),
+        ((x1, y1, z), (-1.0, -1.0), color),
+        ((x0, y1, z), (-1.0, -1.0), color),
+    ]);
+}
+
 /// Draws a textured rectangle on the screen.
 ///
 /// - `coords`: The coordinates of the corners of the quad, in

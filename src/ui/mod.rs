@@ -7,7 +7,8 @@ pub use glutin::{ModifiersState, VirtualKeyCode};
 use renderer;
 use std::collections::HashMap;
 use std::sync::Mutex;
-use text;
+use std::time::{Duration, Instant};
+use text::{self, TextCursor};
 
 use self::element::{UIElement, UIElementKind};
 pub use self::keyboard::KeyStatus;
@@ -35,6 +36,7 @@ lazy_static! {
         focused_element: None,
         hovering: false,
         keys: HashMap::new(),
+        last_key_input_time: None,
     });
     static ref WINDOW_DIMENSIONS: Mutex<(f32, f32)> = Mutex::new((0.0, 0.0));
 }
@@ -47,6 +49,7 @@ struct UIState {
     focused_element: Option<u64>,
     hovering: bool,
     keys: HashMap<VirtualKeyCode, KeyStatus>,
+    last_key_input_time: Option<Instant>,
 }
 
 impl UIState {
@@ -150,6 +153,36 @@ pub fn update(
                 element::insert_input_str(id, &paste);
             }
         }
+
+        let mut last_key_input_time = {
+            let mut state = UI_STATE.lock().unwrap();
+            state.last_key_input_time
+        };
+        let right_held = keyboard::key_held(VirtualKeyCode::Right, None);
+        let left_held = keyboard::key_held(VirtualKeyCode::Left, None);
+        let now = Instant::now();
+        if !right_held && !left_held {
+            last_key_input_time = None;
+        } else {
+            let amount = if right_held && left_held {
+                0
+            } else if right_held {
+                1
+            } else {
+                -1
+            };
+            if let Some(time) = last_key_input_time {
+                if now > time && now - time > Duration::from_millis(500) {
+                    element::move_cursor(amount);
+                    last_key_input_time = Some(now - Duration::from_millis(470));
+                }
+            } else {
+                last_key_input_time = Some(now);
+                element::move_cursor(amount);
+            }
+        }
+        let mut state = UI_STATE.lock().unwrap();
+        state.last_key_input_time = last_key_input_time;
     }
 
     UIStatus { hovering_button }
@@ -165,7 +198,7 @@ fn new_element(identifier: String, kind: UIElementKind) -> UIElement {
     }
 }
 
-fn draw_element(element: &UIElement, text: &str, multiline: bool, cursor: Option<usize>) {
+fn draw_element(element: &UIElement, text: &str, multiline: bool, cursor: Option<TextCursor>) {
     let &UIElement {
         kind,
         rect,

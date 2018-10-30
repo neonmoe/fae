@@ -257,9 +257,7 @@ impl Window {
                             });
                         }
                     }
-                    WindowEvent::ReceivedCharacter(c) => {
-                        characters.push(c);
-                    }
+                    WindowEvent::ReceivedCharacter(c) => characters.push(c),
                     _ => (),
                 }
             }
