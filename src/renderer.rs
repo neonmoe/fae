@@ -1,5 +1,9 @@
 //! This module does the OpenGL stuff.
 
+// TODO: Make the pub functions self-contained
+// ie. assume that the user is doing something with the OpenGL
+// context, and try to keep everything running.
+
 use gl;
 use gl::types::*;
 use image::load_image;
