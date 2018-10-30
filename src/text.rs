@@ -38,6 +38,7 @@ struct SizedGlyph<'a> {
     width: f32,
 }
 
+#[derive(Clone, Copy)]
 pub(crate) struct TextCursor {
     pub index: usize,
     pub blink_visibility: bool,
@@ -148,15 +149,13 @@ pub(crate) fn queue_text(
         } else if index > 0 {
             let cursor_rect = measure_text_at_index(&final_glyphs, index - 1).unwrap();
             cursor_rect.right
+        } else if let Some(rect) = measure_text_at_index(&final_glyphs, 0) {
+            rect.left
         } else {
-            if let Some(rect) = measure_text_at_index(&final_glyphs, 0) {
-                rect.left
-            } else {
-                match alignment {
-                    Alignment::Left => x,
-                    Alignment::Right => x + width - 4.0 * get_dpi(),
-                    Alignment::Center => x + width / 2.0,
-                }
+            match alignment {
+                Alignment::Left => x,
+                Alignment::Right => x + width - 4.0 * get_dpi(),
+                Alignment::Center => x + width / 2.0,
             }
         };
 
@@ -251,7 +250,7 @@ fn measure_text<'a>(glyphs: &[SizedGlyph<'a>]) -> Option<(f32, f32)> {
     }
 }
 
-fn offset_glyphs<'a>(glyphs: Vec<SizedGlyph<'a>>, x: f32, y: f32) -> Vec<SizedGlyph<'a>> {
+fn offset_glyphs(glyphs: Vec<SizedGlyph>, x: f32, y: f32) -> Vec<SizedGlyph> {
     let dpi = get_dpi();
     glyphs
         .into_iter()
@@ -259,7 +258,7 @@ fn offset_glyphs<'a>(glyphs: Vec<SizedGlyph<'a>>, x: f32, y: f32) -> Vec<SizedGl
         .collect()
 }
 
-fn offset_glyph<'a>(glyph: SizedGlyph<'a>, x: f32, y: f32, dpi: f32) -> SizedGlyph<'a> {
+fn offset_glyph(glyph: SizedGlyph, x: f32, y: f32, dpi: f32) -> SizedGlyph {
     let width = glyph.width;
     let glyph = glyph.glyph;
     let position = glyph.position() + vector(x, y) * dpi;

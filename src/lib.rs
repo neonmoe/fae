@@ -38,5 +38,7 @@ pub use text::initialize_font;
 pub use ui::{element, keyboard, layout, KeyStatus, ModifiersState, MouseStatus, VirtualKeyCode};
 
 mod gl {
+    #![allow(unknown_lints)]
+    #![allow(clippy::all)]
     include!(concat!(env!("OUT_DIR"), "/gl_bindings.rs"));
 }

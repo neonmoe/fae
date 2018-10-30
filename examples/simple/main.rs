@@ -6,7 +6,7 @@ extern crate fungui;
 use fungui::{element, Window, WindowSettings};
 
 fn main() {
-    let mut window = Window::new(WindowSettings {
+    let mut window = Window::create(WindowSettings {
         ..Default::default()
     })
     .unwrap();

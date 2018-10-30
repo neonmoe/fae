@@ -7,7 +7,7 @@ extern crate fungui;
 use fungui::{element, layout, Window, WindowSettings};
 
 fn main() {
-    let mut window = Window::new(WindowSettings {
+    let mut window = Window::create(WindowSettings {
         width: 320.0,
         height: 92.0,
         is_dialog: true,

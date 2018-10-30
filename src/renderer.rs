@@ -81,11 +81,16 @@ const FRAGMENT_SHADER_SOURCE_210: [&str; TEXTURE_COUNT] = [
 /// `window_bootstrap`. This must be done after window and context
 /// creation, but before any drawing calls.
 ///
+/// `opengl21` disables some post-OpenGL 2.1 functionality, like
+/// VAOs. Ideally this should be `false` in all cases where the OpenGL
+/// version is >=3.0 (or OpenGL ES >=3) to allow for more optimized
+/// rendering.
+///
 /// `ui_spritesheet_image` should a Vec of the bytes of a .png file
 /// with an alpha channel. To load the image at compile-time, you
 /// could run the following (of course, with your own path):
 /// ```no_run
-/// fungui::initialize_renderer(include_bytes!("resources/gui.png"));
+/// fungui::initialize_renderer(false, include_bytes!("resources/gui.png"));
 /// ```
 pub fn initialize_renderer(opengl21: bool, ui_spritesheet_image: &[u8]) -> Result<(), Box<Error>> {
     let mut draw_state = DRAW_STATE.lock().unwrap();

@@ -124,7 +124,7 @@ impl Window {
     /// Can result in an error if window creation fails, OpenGL
     /// context creation fails, or resources defined in the `settings`
     /// can't be loaded.
-    pub fn new(settings: WindowSettings) -> Result<Window, Box<Error>> {
+    pub fn create(settings: WindowSettings) -> Result<Window, Box<Error>> {
         // Note: At the time of writing, wayland support in winit
         // seems to be buggy. Default to x11, since xwayland at least
         // works.
