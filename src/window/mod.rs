@@ -140,7 +140,7 @@ impl Window {
         let events_loop = EventsLoop::new();
         let opengl21;
         let gl_window = {
-            let create_window = || {
+            let create_window = |gl_request, gl_profile| {
                 let mut window = WindowBuilder::new()
                     .with_title(settings.title.clone())
                     .with_dimensions(LogicalSize::new(
@@ -150,25 +150,32 @@ impl Window {
                 if settings.is_dialog {
                     window = Window::window_as_dialog(window);
                 }
-                window
+                let context = ContextBuilder::new()
+                    .with_vsync(true)
+                    .with_srgb(true)
+                    .with_gl(gl_request)
+                    .with_gl_profile(gl_profile);
+                GlWindow::new(window, context, &events_loop)
             };
 
-            let window = create_window();
-            let context = ContextBuilder::new()
-                .with_vsync(true)
-                .with_gl(GlRequest::Specific(Api::OpenGl, (3, 3)))
-                .with_gl_profile(GlProfile::Core);
-            if let Ok(result) = GlWindow::new(window, context, &events_loop) {
+            if let Ok(result) = create_window(
+                GlRequest::GlThenGles {
+                    opengl_version: (3, 3),
+                    opengles_version: (3, 0),
+                },
+                GlProfile::Core,
+            ) {
                 opengl21 = false;
                 result
             } else {
-                let window = create_window();
-                let context = ContextBuilder::new()
-                    .with_vsync(true)
-                    .with_gl(GlRequest::Specific(Api::OpenGl, (2, 1)))
-                    .with_gl_profile(GlProfile::Compatibility);
                 opengl21 = true;
-                GlWindow::new(window, context, &events_loop)?
+                create_window(
+                    GlRequest::GlThenGles {
+                        opengl_version: (2, 1),
+                        opengles_version: (2, 0),
+                    },
+                    GlProfile::Compatibility,
+                )?
             }
         };
 
