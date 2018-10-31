@@ -42,6 +42,19 @@ struct SizedGlyph<'a> {
 pub(crate) struct TextCursor {
     pub index: usize,
     pub blink_visibility: bool,
+    offset_min: Option<f32>,
+    offset_max: Option<f32>,
+}
+
+impl TextCursor {
+    pub fn new(index: usize, blink_visibility: bool) -> TextCursor {
+        TextCursor {
+            index,
+            blink_visibility,
+            offset_min: None,
+            offset_max: None,
+        }
+    }
 }
 
 /// Defines the alignment of text.
@@ -97,7 +110,7 @@ pub(crate) fn queue_text(
     font_size: f32,
     alignment: Alignment,
     multiline: bool,
-    cursor: Option<TextCursor>,
+    cursor: Option<&mut TextCursor>,
 ) {
     let mut cache = TEXT_CACHE.lock().unwrap();
     let rows = collect_glyphs(&mut cache, x, y, width, multiline, font_size, text);
@@ -138,12 +151,14 @@ pub(crate) fn queue_text(
     }
 
     // Add cursor character
-    if let Some(TextCursor {
+    if let Some(&mut TextCursor {
         index,
         blink_visibility,
+        offset_min,
+        offset_max,
     }) = cursor
     {
-        let cursor_x = if index > 0 && index < final_glyphs.len() {
+        let mut cursor_x = if index > 0 && index < final_glyphs.len() {
             let cursor_rect = measure_text_at_index(&final_glyphs, index).unwrap();
             cursor_rect.left
         } else if index > 0 {
@@ -159,34 +174,73 @@ pub(crate) fn queue_text(
             }
         };
 
-        let offset_x = if cursor_x > x + width {
-            x + width - cursor_x
-        } else if cursor_x < x {
-            x - cursor_x
-        } else {
-            0.0
-        };
+        // TODO: Clean up offsets caused by cursors
+        // Because this code is a *mess*.
+
+        let cursor = cursor.unwrap();
+        let mut current_offset_x = None;
+
+        if let Some(offset_min) = offset_min {
+            let new_x = cursor_x + offset_min;
+            if new_x >= x && new_x < x + width {
+                current_offset_x = Some(offset_min);
+            } else {
+                cursor.offset_min = None;
+                if new_x >= x + width {
+                    current_offset_x = Some(x + width - cursor_x);
+                    cursor.offset_max = current_offset_x;
+                } else {
+                    current_offset_x = Some(x - cursor_x);
+                    cursor.offset_min = current_offset_x;
+                }
+            }
+        } else if let Some(offset_max) = offset_max {
+            let new_x = cursor_x + offset_max;
+            if new_x >= x && new_x < x + width {
+                current_offset_x = Some(offset_max);
+            } else {
+                cursor.offset_max = None;
+                if new_x < x {
+                    current_offset_x = Some(x - cursor_x);
+                    cursor.offset_min = current_offset_x;
+                } else {
+                    current_offset_x = Some(x + width - cursor_x);
+                    cursor.offset_max = current_offset_x;
+                }
+            }
+        }
+
+        if current_offset_x.is_none() {
+            if cursor_x >= x + width {
+                let offset = x + width - cursor_x;
+                cursor.offset_min = None;
+                cursor.offset_max = Some(offset);
+                current_offset_x = Some(offset);
+            } else if cursor_x < x {
+                let offset = x - cursor_x;
+                cursor.offset_min = Some(offset);
+                cursor.offset_max = None;
+                current_offset_x = Some(offset);
+            } else {
+                cursor.offset_min = None;
+                cursor.offset_max = None;
+            }
+        }
 
         if blink_visibility {
-            let x = offset_x + cursor_x;
+            let x = current_offset_x.unwrap_or(0.0) + cursor_x;
             renderer::draw_colored_quad(
-                (x - 0.5, y + 1.0, x + 0.5, y + font_size - 2.0),
+                (x - 0.5, y + 1.0, x + 0.5, y + font_size - 1.0),
                 (0, 0, 0, 0xFF),
                 z,
                 renderer::DRAW_CALL_INDEX_UI,
             );
         }
 
-        if offset_x != 0.0 {
-            let dpi = get_dpi();
-            final_glyphs = final_glyphs
-                .into_iter()
-                .map(|glyph| offset_glyph(glyph, offset_x, 0.0, dpi))
-                .collect();
+        if let Some(offset_x) = current_offset_x {
+            final_glyphs = offset_glyphs(final_glyphs, offset_x, 0.0);
         }
     }
-
-    // Make sure the cursor is in the visible portion
 
     cache.cached_text.push(TextRender {
         glyphs: final_glyphs,

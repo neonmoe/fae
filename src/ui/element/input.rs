@@ -8,7 +8,7 @@ struct TextField {
     selection_time: Instant,
     pre_cursor_text: String,
     post_cursor_text: String,
-    cursor_position: usize,
+    cursor: TextCursor,
 }
 
 impl TextField {
@@ -35,7 +35,7 @@ pub(crate) fn move_cursor(modifier: i32) {
                     let mut chars = new_text.chars();
                     if let Some(c) = chars.next() {
                         field.pre_cursor_text += &c.to_string();
-                        field.cursor_position += 1;
+                        field.cursor.index += 1;
                     } else {
                         break;
                     }
@@ -47,7 +47,7 @@ pub(crate) fn move_cursor(modifier: i32) {
                     let mut chars = new_text.chars();
                     if let Some(c) = chars.next_back() {
                         field.post_cursor_text = c.to_string() + &field.post_cursor_text;
-                        field.cursor_position -= 1;
+                        field.cursor.index -= 1;
                     } else {
                         break;
                     }
@@ -62,11 +62,11 @@ pub(crate) fn move_cursor(modifier: i32) {
 fn insert_char(text_field: &mut TextField, input: char) {
     if !input.is_control() {
         text_field.pre_cursor_text.push(input);
-        let cursor = text_field.cursor_position + 1;
-        text_field.cursor_position = cursor.min(text_field.pre_cursor_text.len());
+        let cursor = text_field.cursor.index + 1;
+        text_field.cursor.index = cursor.min(text_field.pre_cursor_text.len());
     } else if input == '\u{8}' && !text_field.pre_cursor_text.is_empty() {
         text_field.pre_cursor_text.pop();
-        text_field.cursor_position -= 1;
+        text_field.cursor.index -= 1;
     }
 }
 
@@ -101,7 +101,7 @@ pub fn input(identifier: &str, default_text: &str) -> String {
                 selection_time: Instant::now(),
                 pre_cursor_text: default_text.to_string(),
                 post_cursor_text: String::new(),
-                cursor_position: default_text.len(),
+                cursor: TextCursor::new(default_text.len(), false),
             },
         );
     }
@@ -118,13 +118,11 @@ pub fn input(identifier: &str, default_text: &str) -> String {
         false
     };
 
-    let cursor = TextCursor {
-        index: field.cursor_position,
-        blink_visibility: focused && (Instant::now() - field.selection_time).subsec_millis() < 500,
-    };
+    field.cursor.blink_visibility =
+        focused && (Instant::now() - field.selection_time).subsec_millis() < 500;
 
     let text = field.text();
-    ui::draw_element(&element, &text, false, Some(cursor));
+    ui::draw_element(&element, &text, false, Some(&mut field.cursor));
     state.insert_element(element);
 
     text

@@ -198,7 +198,7 @@ fn new_element(identifier: String, kind: UIElementKind) -> UIElement {
     }
 }
 
-fn draw_element(element: &UIElement, text: &str, multiline: bool, cursor: Option<TextCursor>) {
+fn draw_element(element: &UIElement, text: &str, multiline: bool, cursor: Option<&mut TextCursor>) {
     let &UIElement {
         kind,
         rect,
