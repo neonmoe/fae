@@ -477,6 +477,65 @@ pub fn draw_rotated_quad(
     ]);
 }
 
+/// Draws a textured rectangle on the screen, but only the parts
+/// inside `clip_area`.
+///
+/// - `coords`: The coordinates of the corners of the quad, in
+/// (logical) pixels. Arrangement: (left, top, right, bottom)
+///
+/// - `texcoords`: The texture coordinates (UVs) of the quad, in the
+/// range 0.0 - 1.0. Same arrangement as `coords`.
+///
+/// - `color`: The color tint of the quad, in the range
+/// 0-255. Arrangement: (red, green, blue, alpha)
+///
+/// - `clip_area`: The coordinates of the corners of the clipping
+/// area, in (logical) pixels. Arrangement: (left, top, right, bottom)
+///
+/// - `z`: Used for ordering sprites on screen, in the range -1.0 -
+/// 1.0. Positive values are in front.
+///
+/// - `tex_index`: The index of the texture / draw call to draw the
+/// quad in. This is the returned value from `create_draw_call`.
+pub fn draw_quad_clipped(
+    coords: (f32, f32, f32, f32),
+    texcoords: (f32, f32, f32, f32),
+    color: (u8, u8, u8, u8),
+    clip_area: (f32, f32, f32, f32),
+    z: f32,
+    tex_index: usize,
+) {
+    let (cx0, cy0, cx1, cy1) = clip_area; // Clip coords
+    let (ox0, oy0, ox1, oy1) = coords; // Original coords
+    if ox0 > cx1 || ox1 < cx0 || oy0 > cy1 || oy1 < cy0 {
+        return;
+    }
+    let (x0, y0, x1, y1) = (
+        // Real coords
+        ox0.max(cx0).min(cx1),
+        oy0.max(cy0).min(cy1),
+        ox1.max(cx0).min(cx1),
+        oy1.max(cx0).min(cy1),
+    );
+    let (tx0, ty0, tx1, ty1) = texcoords; // Texture coords
+    let (tx0, ty0, tx1, ty1) = (
+        tx0.max(tx0 + (tx1 - tx0) * (x0 - ox0) / (ox1 - ox0)),
+        ty0.max(ty0 + (ty1 - ty0) * (y0 - oy0) / (oy1 - oy0)),
+        tx1.min(tx1 - (tx1 - tx0) * (ox1 - x1) / (ox1 - ox0)),
+        ty1.min(ty1 - (ty1 - ty0) * (oy1 - y1) / (oy1 - oy0)),
+    );
+
+    let mut draw_state = DRAW_STATE.lock().unwrap();
+    draw_state.calls[tex_index].attributes.vbo_data.push([
+        ((x0, y0, z), (tx0, ty0), color),
+        ((x1, y0, z), (tx1, ty0), color),
+        ((x1, y1, z), (tx1, ty1), color),
+        ((x0, y0, z), (tx0, ty0), color),
+        ((x1, y1, z), (tx1, ty1), color),
+        ((x0, y1, z), (tx0, ty1), color),
+    ]);
+}
+
 pub(crate) fn render(width: f32, height: f32) {
     let m00 = 2.0 / width;
     let m11 = -2.0 / height;

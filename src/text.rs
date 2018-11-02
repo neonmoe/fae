@@ -29,6 +29,7 @@ struct TextCache<'a> {
 
 struct TextRender<'a> {
     glyphs: Vec<SizedGlyph<'a>>,
+    clip_area: layout::Rect,
     z: f32,
 }
 
@@ -244,6 +245,12 @@ pub(crate) fn queue_text(
 
     cache.cached_text.push(TextRender {
         glyphs: final_glyphs,
+        clip_area: layout::Rect {
+            left: x,
+            top: y,
+            right: x + width,
+            bottom: y + font_size,
+        },
         z,
     });
 }
@@ -441,6 +448,7 @@ pub(crate) fn draw_text() {
 
         for text in &text_cache.cached_text {
             let z = text.z;
+            let clip_area = text.clip_area.to_tuple();
             for glyph in &text.glyphs {
                 if let Ok(Some((uv_rect, screen_rect))) = cache.rect_for(0, &glyph.glyph) {
                     let coords = (
@@ -450,10 +458,11 @@ pub(crate) fn draw_text() {
                         screen_rect.max.y as f32 / dpi,
                     );
                     let texcoords = (uv_rect.min.x, uv_rect.min.y, uv_rect.max.x, uv_rect.max.y);
-                    renderer::draw_quad(
+                    renderer::draw_quad_clipped(
                         coords,
                         texcoords,
                         (0, 0, 0, 0xFF),
+                        clip_area,
                         z,
                         renderer::DRAW_CALL_INDEX_TEXT,
                     );

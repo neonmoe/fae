@@ -208,6 +208,10 @@ impl Rect {
     pub fn height(&self) -> f32 {
         self.bottom - self.top
     }
+
+    pub fn to_tuple(&self) -> (f32, f32, f32, f32) {
+        (self.left, self.top, self.right, self.bottom)
+    }
 }
 
 use std::ops::AddAssign;
