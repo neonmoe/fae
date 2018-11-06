@@ -2,7 +2,7 @@
 mod input;
 pub use self::input::*;
 
-use layout::Rect;
+use rect::Rect;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use text::Alignment;
@@ -20,10 +20,10 @@ pub(crate) enum UIElementKind {
 
 #[derive(Clone, Debug)]
 pub(crate) struct UIElement {
-    pub(crate) identifier: String,
-    pub(crate) kind: UIElementKind,
-    pub(crate) rect: Rect,
-    pub(crate) alignment: Alignment,
+    pub identifier: String,
+    pub kind: UIElementKind,
+    pub rect: Rect,
+    pub alignment: Alignment,
 }
 
 impl UIElement {
@@ -32,16 +32,11 @@ impl UIElement {
     }
 
     pub(crate) fn is_point_inside(&self, x: f32, y: f32) -> bool {
-        let Rect {
-            left,
-            top,
-            right,
-            bottom,
-        } = self.rect;
-        !(x < left - PADDING - OUTER_TILE_WIDTH
-            || x >= right + PADDING + OUTER_TILE_WIDTH
-            || y < top - PADDING - OUTER_TILE_WIDTH
-            || y >= bottom + PADDING + OUTER_TILE_WIDTH)
+        let (x0, y0, x1, y1) = self.rect.coords();
+        !(x < x0 - PADDING - OUTER_TILE_WIDTH
+            || x >= x1 + PADDING + OUTER_TILE_WIDTH
+            || y < y0 - PADDING - OUTER_TILE_WIDTH
+            || y >= y1 + PADDING + OUTER_TILE_WIDTH)
     }
 }
 
@@ -107,12 +102,6 @@ pub fn button_image(
 ) -> bool {
     use renderer;
     button_meta(identifier, |element| {
-        let Rect {
-            left,
-            top,
-            right,
-            bottom,
-        } = element.rect;
-        renderer::draw_quad((left, top, right, bottom), texcoords, color, z, tex_index);
+        renderer::draw_quad(element.rect.coords(), texcoords, color, z, tex_index);
     })
 }

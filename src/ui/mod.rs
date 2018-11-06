@@ -1,18 +1,17 @@
 pub mod element;
 pub mod keyboard;
-pub mod layout;
 
 pub use glutin::{ModifiersState, VirtualKeyCode};
 
+use rect::Rect;
 use renderer;
 use std::collections::HashMap;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
-use text::{self, TextCursor};
+use text::{self, Alignment, TextCursor};
 
 use self::element::{UIElement, UIElementKind};
 pub use self::keyboard::KeyStatus;
-use self::layout::Rect;
 use clip;
 
 const TILE_SIZE: f32 = 16.0;
@@ -97,7 +96,6 @@ pub fn update(
 ) -> UIStatus {
     renderer::render(width, height);
     text::update_dpi(dpi);
-    layout::reset_layout();
 
     {
         let mut dimensions = WINDOW_DIMENSIONS.lock().unwrap();
@@ -189,12 +187,11 @@ pub fn update(
 }
 
 fn new_element(identifier: String, kind: UIElementKind) -> UIElement {
-    let (rect, alignment) = layout::create_next_element();
     UIElement {
         identifier,
         kind,
-        rect,
-        alignment,
+        rect: Rect::Dims(10.0, 10.0, 150.0, 16.0),
+        alignment: Alignment::Left,
     }
 }
 
@@ -205,12 +202,7 @@ fn draw_element(element: &UIElement, text: &str, multiline: bool, cursor: Option
         alignment,
         ..
     } = element;
-    let Rect {
-        left,
-        top,
-        right,
-        bottom,
-    } = rect;
+    let (left, top, right, bottom) = rect.coords();
 
     if kind != UIElementKind::NoBackground {
         let sheet_length = UIElementKind::KindCount as i32;
@@ -239,7 +231,7 @@ fn draw_element(element: &UIElement, text: &str, multiline: bool, cursor: Option
 
     text::queue_text(
         text,
-        (rect.left, rect.top, NORMAL_UI_TEXT_DEPTH),
+        (rect.left(), rect.top(), NORMAL_UI_TEXT_DEPTH),
         rect.width(),
         rect.height(),
         alignment,

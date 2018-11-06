@@ -1,12 +1,12 @@
 use gl;
 use gl::types::*;
+use rect;
 use renderer;
 use rusttype::gpu_cache::Cache;
 use rusttype::*;
 use std::cell::RefCell;
 use std::error::Error;
 use std::sync::Mutex;
-use ui::layout;
 use unicode_normalization::UnicodeNormalization;
 
 lazy_static! {
@@ -29,7 +29,7 @@ struct TextCache<'a> {
 
 struct TextRender<'a> {
     glyphs: Vec<SizedGlyph<'a>>,
-    clip_area: layout::Rect,
+    clip_area: rect::Rect,
     z: f32,
 }
 
@@ -161,12 +161,12 @@ pub(crate) fn queue_text(
     {
         let mut cursor_x = if index > 0 && index < final_glyphs.len() {
             let cursor_rect = measure_text_at_index(&final_glyphs, index).unwrap();
-            cursor_rect.left
+            cursor_rect.left()
         } else if index > 0 {
             let cursor_rect = measure_text_at_index(&final_glyphs, index - 1).unwrap();
-            cursor_rect.right
+            cursor_rect.right()
         } else if let Some(rect) = measure_text_at_index(&final_glyphs, 0) {
-            rect.left
+            rect.left()
         } else {
             match alignment {
                 Alignment::Left => x,
@@ -245,18 +245,13 @@ pub(crate) fn queue_text(
 
     cache.cached_text.push(TextRender {
         glyphs: final_glyphs,
-        clip_area: layout::Rect {
-            left: x,
-            top: y,
-            right: x + width,
-            bottom: y + font_size,
-        },
+        clip_area: rect::Rect::Dims(x, y, width, font_size),
         z,
     });
 }
 
 /// Will only return `None` when `index >= glyphs.len()`.
-fn measure_text_at_index<'a>(glyphs: &[SizedGlyph<'a>], index: usize) -> Option<layout::Rect> {
+fn measure_text_at_index<'a>(glyphs: &[SizedGlyph<'a>], index: usize) -> Option<rect::Rect> {
     if index >= glyphs.len() {
         return None;
     }
@@ -267,45 +262,43 @@ fn measure_text_at_index<'a>(glyphs: &[SizedGlyph<'a>], index: usize) -> Option<
     let glyph = &glyphs[index].glyph;
     let position = glyph.position();
     if let Some(rect) = glyph.pixel_bounding_box() {
-        return Some(layout::Rect {
-            left: rect.min.x as f32 / dpi,
-            top: rect.min.y as f32 / dpi,
-            right: rect.max.x as f32 / dpi,
-            bottom: rect.max.y as f32 / dpi,
-        });
+        return Some(rect::Rect::Coords(
+            rect.min.x as f32 / dpi,
+            rect.min.y as f32 / dpi,
+            rect.max.x as f32 / dpi,
+            rect.max.y as f32 / dpi,
+        ));
     } else {
-        return Some(layout::Rect {
-            left: position.x / dpi,
-            top: position.y / dpi,
-            right: (position.x + width) / dpi,
-            bottom: position.y / dpi,
-        });
+        return Some(rect::Rect::Dims(
+            position.x / dpi,
+            position.y / dpi,
+            width / dpi,
+            1.0,
+        ));
     }
 }
 
 fn measure_text<'a>(glyphs: &[SizedGlyph<'a>]) -> Option<(f32, f32)> {
-    let mut result: Option<layout::Rect> = None;
+    let mut result: Option<rect::Rect> = None;
 
     for i in 0..glyphs.len() {
         if let Some(glyph_rect) = measure_text_at_index(glyphs, i) {
             if let Some(ref mut rect) = result {
-                rect.left = rect.left.min(glyph_rect.left);
-                rect.top = rect.top.min(glyph_rect.top);
-                rect.right = rect.right.max(glyph_rect.right);
-                rect.bottom = rect.bottom.max(glyph_rect.bottom);
+                let (x0, y0, x1, y1) = (
+                    rect.left().min(glyph_rect.left()),
+                    rect.top().min(glyph_rect.top()),
+                    rect.bottom().max(glyph_rect.right()),
+                    rect.bottom().max(glyph_rect.bottom()),
+                );
+                rect.set_coords(x0, y0, x1, y1);
             } else {
-                result = Some(layout::Rect {
-                    left: glyph_rect.left,
-                    top: glyph_rect.top,
-                    right: glyph_rect.right,
-                    bottom: glyph_rect.bottom,
-                });
+                result = Some(glyph_rect);
             }
         }
     }
 
     if let Some(rect) = result {
-        Some((rect.right - rect.left, rect.bottom - rect.top))
+        Some((rect.width(), rect.height()))
     } else {
         None
     }
@@ -448,7 +441,7 @@ pub(crate) fn draw_text() {
 
         for text in &text_cache.cached_text {
             let z = text.z;
-            let clip_area = text.clip_area.to_tuple();
+            let clip_area = text.clip_area.coords();
             for glyph in &text.glyphs {
                 if let Ok(Some((uv_rect, screen_rect))) = cache.rect_for(0, &glyph.glyph) {
                     let coords = (

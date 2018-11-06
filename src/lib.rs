@@ -29,13 +29,14 @@ pub mod resources;
 
 mod clip;
 mod image;
+pub mod rect;
 pub mod renderer;
 mod text;
 mod ui;
 
 pub use renderer::initialize_renderer;
 pub use text::initialize_font;
-pub use ui::{element, keyboard, layout, KeyStatus, ModifiersState, MouseStatus, VirtualKeyCode};
+pub use ui::{element, keyboard, KeyStatus, ModifiersState, MouseStatus, VirtualKeyCode};
 
 mod gl {
     #![allow(unknown_lints)]
