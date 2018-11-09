@@ -3,16 +3,15 @@ pub mod keyboard;
 
 pub use glutin::{ModifiersState, VirtualKeyCode};
 
-use rect::Rect;
+use clip;
 use renderer;
 use std::collections::HashMap;
-use std::sync::Mutex;
 use std::time::{Duration, Instant};
-use text::{self, Alignment, TextCursor};
+use text::{self, TextCursor};
 
 use self::element::{UIElement, UIElementKind};
-pub use self::keyboard::KeyStatus;
-use clip;
+use self::keyboard::KeyStatus;
+use self::keyboard::Keyboard;
 
 const TILE_SIZE: f32 = 16.0;
 const OUTER_TILE_WIDTH: f32 = 4.0;
@@ -21,40 +20,119 @@ const PADDING: f32 = 2.0;
 const NORMAL_UI_ELEMENT_DEPTH: f32 = 0.0;
 const NORMAL_UI_TEXT_DEPTH: f32 = NORMAL_UI_ELEMENT_DEPTH - 0.1;
 
-lazy_static! {
-    static ref UI_STATE: Mutex<UIState> = Mutex::new(UIState {
-        elements: HashMap::new(),
-        last_element: None,
-        mouse: MouseStatus {
-            x: 0.0,
-            y: 0.0,
-            last_pressed: false,
-            pressed: false,
-        },
-        pressed_element: None,
-        focused_element: None,
-        hovering: false,
-        keys: HashMap::new(),
-        last_key_input_time: None,
-    });
-    static ref WINDOW_DIMENSIONS: Mutex<(f32, f32)> = Mutex::new((0.0, 0.0));
-}
-
-struct UIState {
+/// The state of the UI.
+pub struct UIState {
     elements: HashMap<u64, UIElement>,
     last_element: Option<UIElement>,
     mouse: MouseStatus,
     pressed_element: Option<u64>,
     focused_element: Option<u64>,
     hovering: bool,
-    keys: HashMap<VirtualKeyCode, KeyStatus>,
     last_key_input_time: Option<Instant>,
+    window_dimensions: (f32, f32),
+    keyboard: Keyboard,
 }
 
 impl UIState {
+    /// Creates a new instance of the UI.
+    pub fn new() -> UIState {
+        UIState {
+            elements: HashMap::new(),
+            last_element: None,
+            mouse: MouseStatus {
+                x: 0.0,
+                y: 0.0,
+                last_pressed: false,
+                pressed: false,
+            },
+            pressed_element: None,
+            focused_element: None,
+            hovering: false,
+            keyboard: Keyboard::new(),
+            last_key_input_time: None,
+            window_dimensions: (0.0, 0.0),
+        }
+    }
+
     fn insert_element(&mut self, element: UIElement) {
         self.last_element = Some(element.clone());
         self.elements.insert(element.id(), element);
+    }
+
+    /// Handled by the `window_bootstrap` feature, if in use.
+    // TODO: Keyboard navigation of the UI
+    pub fn update(
+        &mut self,
+        width: f32,
+        height: f32,
+        dpi: f32,
+        mouse: MouseStatus,
+        key_inputs: Vec<KeyStatus>,
+        characters: Vec<char>,
+    ) -> UIStatus {
+        renderer::render(width, height);
+        text::update_dpi(dpi);
+        self.window_dimensions = (width as f32, height as f32);
+
+        let hovering_button;
+        let focused_element;
+        if !self.mouse.pressed {
+            self.pressed_element = None;
+        }
+        self.elements.clear();
+        self.last_element = None;
+        self.hovering = false;
+
+        self.mouse = mouse;
+        hovering_button = self.hovering;
+        self.keyboard.update(key_inputs);
+        focused_element = self.focused_element;
+
+        if let Some(id) = focused_element {
+            for character in characters {
+                element::insert_input(id, character);
+            }
+
+            if self.keyboard.key_typed(
+                VirtualKeyCode::V,
+                Some(ModifiersState {
+                    ctrl: true,
+                    shift: false,
+                    alt: false,
+                    logo: false,
+                }),
+            ) {
+                if let Some(paste) = clip::get() {
+                    element::insert_input_str(id, &paste);
+                }
+            }
+
+            let right_held = self.keyboard.key_held(VirtualKeyCode::Right, None);
+            let left_held = self.keyboard.key_held(VirtualKeyCode::Left, None);
+            let now = Instant::now();
+            if !right_held && !left_held {
+                self.last_key_input_time = None;
+            } else {
+                let amount = if right_held && left_held {
+                    0
+                } else if right_held {
+                    1
+                } else {
+                    -1
+                };
+                if let Some(time) = self.last_key_input_time {
+                    if now > time && now - time > Duration::from_millis(500) {
+                        element::move_cursor(self, amount);
+                        self.last_key_input_time = Some(now - Duration::from_millis(470));
+                    }
+                } else {
+                    self.last_key_input_time = Some(now);
+                    element::move_cursor(self, amount);
+                }
+            }
+        }
+
+        UIStatus { hovering_button }
     }
 }
 
@@ -81,117 +159,6 @@ impl MouseStatus {
     #[inline]
     pub fn clicked(&self) -> bool {
         !self.pressed && self.last_pressed
-    }
-}
-
-/// Handled by the `window_bootstrap` feature, if in use.
-// TODO: Keyboard navigation of the UI
-pub fn update(
-    width: f32,
-    height: f32,
-    dpi: f32,
-    mouse: MouseStatus,
-    key_inputs: Vec<KeyStatus>,
-    characters: Vec<char>,
-) -> UIStatus {
-    renderer::render(width, height);
-    text::update_dpi(dpi);
-
-    {
-        let mut dimensions = WINDOW_DIMENSIONS.lock().unwrap();
-        *dimensions = (width as f32, height as f32);
-    }
-
-    let hovering_button;
-    let focused_element;
-    {
-        let mut state = UI_STATE.lock().unwrap();
-        if !state.mouse.pressed {
-            state.pressed_element = None;
-        }
-        state.elements.clear();
-        state.last_element = None;
-        state.hovering = false;
-
-        state.mouse = mouse;
-        hovering_button = state.hovering;
-
-        for key in state.keys.iter_mut().map(|(_, key_status)| key_status) {
-            key.last_pressed = key.pressed;
-        }
-        for mut key_input in key_inputs {
-            let keycode = key_input.keycode;
-            key_input.last_pressed = {
-                if !state.keys.contains_key(&keycode) {
-                    false
-                } else {
-                    state.keys[&keycode].pressed
-                }
-            };
-            state.keys.insert(keycode, key_input);
-        }
-        focused_element = state.focused_element;
-    }
-
-    if let Some(id) = focused_element {
-        for character in characters {
-            element::insert_input(id, character);
-        }
-
-        if keyboard::key_typed(
-            VirtualKeyCode::V,
-            Some(ModifiersState {
-                ctrl: true,
-                shift: false,
-                alt: false,
-                logo: false,
-            }),
-        ) {
-            if let Some(paste) = clip::get() {
-                element::insert_input_str(id, &paste);
-            }
-        }
-
-        let mut last_key_input_time = {
-            let mut state = UI_STATE.lock().unwrap();
-            state.last_key_input_time
-        };
-        let right_held = keyboard::key_held(VirtualKeyCode::Right, None);
-        let left_held = keyboard::key_held(VirtualKeyCode::Left, None);
-        let now = Instant::now();
-        if !right_held && !left_held {
-            last_key_input_time = None;
-        } else {
-            let amount = if right_held && left_held {
-                0
-            } else if right_held {
-                1
-            } else {
-                -1
-            };
-            if let Some(time) = last_key_input_time {
-                if now > time && now - time > Duration::from_millis(500) {
-                    element::move_cursor(amount);
-                    last_key_input_time = Some(now - Duration::from_millis(470));
-                }
-            } else {
-                last_key_input_time = Some(now);
-                element::move_cursor(amount);
-            }
-        }
-        let mut state = UI_STATE.lock().unwrap();
-        state.last_key_input_time = last_key_input_time;
-    }
-
-    UIStatus { hovering_button }
-}
-
-fn new_element(identifier: String, kind: UIElementKind) -> UIElement {
-    UIElement {
-        identifier,
-        kind,
-        rect: Rect::Dims(10.0, 10.0, 150.0, 16.0),
-        alignment: Alignment::Left,
     }
 }
 

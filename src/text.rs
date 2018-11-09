@@ -59,6 +59,7 @@ impl TextCursor {
 }
 
 /// Defines the alignment of text.
+#[allow(dead_code)]
 #[derive(Clone, Copy, Debug)]
 pub enum Alignment {
     /// Text is aligned to the left.
@@ -287,7 +288,7 @@ fn measure_text<'a>(glyphs: &[SizedGlyph<'a>]) -> Option<(f32, f32)> {
                 let (x0, y0, x1, y1) = (
                     rect.left().min(glyph_rect.left()),
                     rect.top().min(glyph_rect.top()),
-                    rect.bottom().max(glyph_rect.right()),
+                    rect.right().max(glyph_rect.right()),
                     rect.bottom().max(glyph_rect.bottom()),
                 );
                 rect.set_coords(x0, y0, x1, y1);

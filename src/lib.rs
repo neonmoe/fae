@@ -36,7 +36,8 @@ mod ui;
 
 pub use renderer::initialize_renderer;
 pub use text::initialize_font;
-pub use ui::{element, keyboard, KeyStatus, ModifiersState, MouseStatus, VirtualKeyCode};
+pub use ui::keyboard::{KeyStatus, Keyboard};
+pub use ui::{ModifiersState, MouseStatus, UIState, VirtualKeyCode};
 
 mod gl {
     #![allow(unknown_lints)]

@@ -3,16 +3,15 @@
 
 extern crate fungui;
 
-use fungui::{element, Window, WindowSettings};
+use fungui::{UIState, Window, WindowSettings};
 
 fn main() {
-    let mut window = Window::create(WindowSettings {
-        ..Default::default()
-    })
-    .unwrap();
+    let mut ui = UIState::new();
+    let mut window = Window::create(WindowSettings::default()).unwrap();
 
-    while window.refresh(0.8, 0.8, 0.8) {
-        let _text = element::input("text", "default text!");
-        // TODO: Implement a way of manipulating the input text (maybe by returning a &mut?) and then add a reset button
+    while window.refresh(&mut ui, 0.8, 0.8, 0.8) {
+        let _text = ui.input("text", "default text!");
+        // TODO: Implement a way of manipulating the input text (maybe
+        // by returning a &mut?) and then add a reset button
     }
 }

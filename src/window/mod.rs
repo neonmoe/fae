@@ -12,7 +12,8 @@ use std::env;
 use std::error::Error;
 use std::time::Duration;
 use text;
-use ui::{self, KeyStatus, MouseStatus};
+use ui::keyboard::KeyStatus;
+use ui::{MouseStatus, UIState};
 
 /// Defines a window.
 pub struct WindowSettings {
@@ -226,6 +227,7 @@ impl Window {
     /// for a while (usually 16ms at max).
     pub fn refresh(
         &mut self,
+        ui: &mut UIState,
         background_red: f32,
         background_green: f32,
         background_blue: f32,
@@ -297,7 +299,7 @@ impl Window {
             self.mouse.pressed = pressed;
         }
 
-        ui::update(
+        ui.update(
             self.width,
             self.height,
             self.dpi,

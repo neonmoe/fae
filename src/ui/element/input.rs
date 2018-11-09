@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 use std::time::Instant;
 use text::TextCursor;
-use ui::{self, UIElementKind, UI_STATE};
+use ui::{self, UIElement, UIElementKind, UIState};
 
 struct TextField {
     selection_time: Instant,
@@ -21,12 +21,11 @@ lazy_static! {
     static ref TEXT_FIELDS: Mutex<HashMap<u64, TextField>> = Mutex::new(HashMap::new());
 }
 
-pub(crate) fn move_cursor(modifier: i32) {
+pub(crate) fn move_cursor(ui: &UIState, modifier: i32) {
     if modifier == 0 {
         return;
     }
-    let state = UI_STATE.lock().unwrap();
-    if let Some(id) = state.focused_element {
+    if let Some(id) = ui.focused_element {
         let mut text_fields = TEXT_FIELDS.lock().unwrap();
         if let Some(field) = text_fields.get_mut(&id) {
             if modifier > 0 {
@@ -86,44 +85,45 @@ pub(crate) fn insert_input_str(focused_id: u64, input: &str) {
     }
 }
 
-/// Creates an editable text field. Used for simple, label-like text
-/// which is editable.
-pub fn input(identifier: &str, default_text: &str) -> String {
-    let mut state = UI_STATE.lock().unwrap();
-    let mut text_fields = TEXT_FIELDS.lock().unwrap();
+impl UIState {
+    /// Creates an editable text field. Used for simple, label-like text
+    /// which is editable.
+    pub fn input(&mut self, identifier: &str, default_text: &str) -> String {
+        let mut text_fields = TEXT_FIELDS.lock().unwrap();
 
-    let element = ui::new_element(identifier.to_owned(), UIElementKind::InputField);
-    let id = element.id();
-    if !text_fields.contains_key(&id) {
-        text_fields.insert(
-            id,
-            TextField {
-                selection_time: Instant::now(),
-                pre_cursor_text: default_text.to_string(),
-                post_cursor_text: String::new(),
-                cursor: TextCursor::new(default_text.len(), false),
-            },
-        );
+        let element = UIElement::create(identifier.to_owned(), UIElementKind::InputField);
+        let id = element.id();
+        if !text_fields.contains_key(&id) {
+            text_fields.insert(
+                id,
+                TextField {
+                    selection_time: Instant::now(),
+                    pre_cursor_text: default_text.to_string(),
+                    post_cursor_text: String::new(),
+                    cursor: TextCursor::new(default_text.len(), false),
+                },
+            );
+        }
+        let field = text_fields.get_mut(&id).unwrap();
+
+        let clicked = self.mouse.clicked();
+        let focused = if clicked && element.is_point_inside(self.mouse.x, self.mouse.y) {
+            field.selection_time = Instant::now();
+            self.focused_element = Some(id);
+            true
+        } else if let Some(focused_id) = self.focused_element {
+            id == focused_id
+        } else {
+            false
+        };
+
+        field.cursor.blink_visibility =
+            focused && (Instant::now() - field.selection_time).subsec_millis() < 500;
+
+        let text = field.text();
+        ui::draw_element(&element, &text, false, Some(&mut field.cursor));
+        self.insert_element(element);
+
+        text
     }
-    let field = text_fields.get_mut(&id).unwrap();
-
-    let clicked = state.mouse.clicked();
-    let focused = if clicked && element.is_point_inside(state.mouse.x, state.mouse.y) {
-        field.selection_time = Instant::now();
-        state.focused_element = Some(id);
-        true
-    } else if let Some(focused_id) = state.focused_element {
-        id == focused_id
-    } else {
-        false
-    };
-
-    field.cursor.blink_visibility =
-        focused && (Instant::now() - field.selection_time).subsec_millis() < 500;
-
-    let text = field.text();
-    ui::draw_element(&element, &text, false, Some(&mut field.cursor));
-    state.insert_element(element);
-
-    text
 }

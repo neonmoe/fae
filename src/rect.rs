@@ -47,7 +47,7 @@ impl Rect {
     pub fn right(&self) -> f32 {
         match self {
             &Rect::Dims(x, _, w, _) => x + w,
-            &Rect::Coords(_, x1, ..) => x1,
+            &Rect::Coords(.., x1, _) => x1,
         }
     }
 
