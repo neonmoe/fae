@@ -23,11 +23,6 @@ pub enum UIElementKind {
     /// Editable text field.
     InputField,
     /// How many different UI element kinds there are.
-    ///
-    /// Usage:
-    /// ```
-    /// UIElementKind::KindCount as usize
-    /// ```
     KindCount,
 }
 

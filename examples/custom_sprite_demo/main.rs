@@ -4,17 +4,15 @@
 
 extern crate fungui;
 
-use fungui::{renderer, Window, WindowSettings};
+use fungui::{renderer, UIState, Window, WindowSettings};
 
 fn main() {
-    let mut window = Window::create(WindowSettings {
-        ..Default::default()
-    })
-    .unwrap();
+    let mut ui = UIState::new();
+    let mut window = Window::create(WindowSettings::default()).unwrap();
 
     let spritesheet_tex_index = renderer::create_draw_call(include_bytes!("test.png"));
 
-    while window.refresh(0.8, 0.8, 0.8) {
+    while window.refresh(&mut ui, 0.8, 0.8, 0.8) {
         renderer::draw_quad(
             (70.0, 70.0, 170.0, 170.0), // Left, top, right and bottom coordinates
             (0.0, 0.0, 1.0, 1.0),       // Same as before but for the texture

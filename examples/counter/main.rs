@@ -2,9 +2,10 @@
 
 extern crate fungui;
 
-use fungui::{element, Window, WindowSettings};
+use fungui::{UIState, Window, WindowSettings};
 
 fn main() {
+    let mut ui = UIState::new();
     let mut window = Window::create(WindowSettings {
         width: 160.0,
         height: 152.0,
@@ -14,14 +15,14 @@ fn main() {
     .unwrap();
 
     let mut counter: i64 = 0;
-    while window.refresh(0.8, 0.8, 0.8) {
-        element::label("counter", &format!("Counter: {}", counter));
+    while window.refresh(&mut ui, 0.8, 0.8, 0.8) {
+        ui.label("counter", &format!("Counter: {}", counter));
 
-        if element::button("add", "Add") {
+        if ui.button("add", "Add") {
             counter += 1;
         }
 
-        if element::button("sub", "Subtract") {
+        if ui.button("sub", "Subtract") {
             counter -= 1;
         }
     }
