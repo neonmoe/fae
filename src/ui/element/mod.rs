@@ -6,7 +6,7 @@ use rect::Rect;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use text::Alignment;
-use ui::{self, UIState, OUTER_TILE_WIDTH, PADDING};
+use ui::{UIState, OUTER_TILE_WIDTH, PADDING};
 
 /// Represents what kind of element this is, used for deciding which
 /// sprite to use for rendering, and which state the element is in.
@@ -75,16 +75,17 @@ impl UIState {
     /// Creates a text label. Used for displaying plain uneditable text.
     pub fn label(&mut self, identifier: &str, display_text: &str) {
         let element = UIElement::create(identifier.to_owned(), UIElementKind::NoBackground);
-        ui::draw_element(&element, display_text, true, None);
+        self.draw_element(&element, display_text, true, None);
         self.insert_element(element);
     }
 
     /// Renders a button that can be pressed, and returns whether or not
     /// it was clicked.
     pub fn button(&mut self, identifier: &str, display_text: &str) -> bool {
-        button_meta(self, identifier, |element| {
-            ui::draw_element(element, display_text, false, None);
-        })
+        let (clicked, element) = button_meta(self, identifier);
+        self.draw_element(&element, display_text, false, None);
+        self.insert_element(element);
+        clicked
     }
 
     /// Renders a button that can be pressed, and returns whether or not
@@ -100,14 +101,15 @@ impl UIState {
         tex_index: usize,
     ) -> bool {
         use renderer;
-        button_meta(self, identifier, |element| {
-            renderer::draw_quad(element.rect.coords(), texcoords, color, z, tex_index);
-        })
+        let (clicked, element) = button_meta(self, identifier);
+        renderer::draw_quad(element.rect.coords(), texcoords, color, z, tex_index);
+        self.insert_element(element);
+        clicked
     }
 }
 
 // TODO: Implement button ordering and only activate one button per press
-fn button_meta<F: FnOnce(&UIElement)>(ui: &mut UIState, identifier: &str, render: F) -> bool {
+fn button_meta(ui: &mut UIState, identifier: &str) -> (bool, UIElement) {
     let mut element = UIElement::create(identifier.to_owned(), UIElementKind::ButtonNormal);
     let id = element.id();
     let hovered = element.is_point_inside(ui.mouse.x, ui.mouse.y);
@@ -124,8 +126,6 @@ fn button_meta<F: FnOnce(&UIElement)>(ui: &mut UIState, identifier: &str, render
     }
 
     ui.hovering |= hovered;
-    render(&element);
-    ui.insert_element(element);
 
-    hovered && just_released && can_be_pressed
+    (hovered && just_released && can_be_pressed, element)
 }

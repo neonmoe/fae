@@ -10,8 +10,6 @@ use resources;
 use std::default::Default;
 use std::env;
 use std::error::Error;
-use std::time::Duration;
-use text;
 use ui::keyboard::KeyStatus;
 use ui::{MouseStatus, UIState};
 
@@ -115,8 +113,12 @@ pub struct Window {
     dpi: f32,
     gl_window: GlWindow,
     events_loop: EventsLoop,
-    mouse: MouseStatus,
-    frame_timer: FrameTimer,
+    /// The mouse state.
+    pub mouse: MouseStatus,
+    /// Information about the frame timings.
+    pub frame_timer: FrameTimer,
+    /// The UI state.
+    pub ui: UIState,
 }
 
 impl Window {
@@ -195,8 +197,8 @@ impl Window {
             }*/
         }
 
+        let ui = UIState::create(settings.font)?;
         renderer::initialize_renderer(opengl21, &settings.ui_spritesheet)?;
-        text::initialize_font(settings.font)?;
 
         Ok(Window {
             width: settings.width,
@@ -211,13 +213,8 @@ impl Window {
                 pressed: false,
             },
             frame_timer: FrameTimer::new(),
+            ui,
         })
-    }
-
-    /// Returns the current status of the mouse. Updated every
-    /// `refresh`.
-    pub fn get_mouse(&self) -> MouseStatus {
-        self.mouse
     }
 
     /// Re-renders the window, polls for new events and passes them on
@@ -227,7 +224,6 @@ impl Window {
     /// for a while (usually 16ms at max).
     pub fn refresh(
         &mut self,
-        ui: &mut UIState,
         background_red: f32,
         background_green: f32,
         background_blue: f32,
@@ -299,7 +295,7 @@ impl Window {
             self.mouse.pressed = pressed;
         }
 
-        ui.update(
+        self.ui.update(
             self.width,
             self.height,
             self.dpi,
@@ -309,13 +305,6 @@ impl Window {
         );
 
         running
-    }
-
-    /// Returns the average duration of the last 60 frames. A "frame"
-    /// includes operations between the latest refresh() and the one
-    /// before that, except waiting for vsync.
-    pub fn avg_frame_duration(&self) -> Duration {
-        self.frame_timer.avg_frame_duration()
     }
 
     #[cfg(any(

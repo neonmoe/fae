@@ -3,13 +3,17 @@
 
 extern crate fungui;
 
-use fungui::{UIState, Window, WindowSettings};
+use fungui::{Window, WindowSettings};
 
 fn main() {
-    let mut ui = UIState::new();
     let mut window = Window::create(WindowSettings::default()).unwrap();
 
-    while window.refresh(&mut ui, 0.8, 0.8, 0.8) {
-        ui.label("frame-time", &format!("{:?}", window.avg_frame_duration()));
+    while window.refresh(0.8, 0.8, 0.8) {
+        let ui = &mut window.ui;
+        let frame_timer = &window.frame_timer;
+        ui.label(
+            "frame-time",
+            &format!("{:?}", frame_timer.avg_frame_duration()),
+        );
     }
 }

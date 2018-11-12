@@ -6,36 +6,20 @@ use rusttype::gpu_cache::Cache;
 use rusttype::*;
 use std::cell::RefCell;
 use std::error::Error;
-use std::sync::Mutex;
 use unicode_normalization::UnicodeNormalization;
-
-lazy_static! {
-    static ref TEXT_CACHE: Mutex<TextCache<'static>> = Mutex::new(TextCache {
-        font: None,
-        cache: None,
-        cached_text: Vec::new(),
-    });
-    static ref DPI_SCALE: Mutex<f32> = Mutex::new(1.0);
-}
 
 pub(crate) const GLYPH_CACHE_WIDTH: u32 = 1024;
 pub(crate) const GLYPH_CACHE_HEIGHT: u32 = 1024;
 
-struct TextCache<'a> {
-    font: Option<Font<'a>>,
-    cache: Option<RefCell<Cache<'a>>>,
-    cached_text: Vec<TextRender<'a>>,
-}
-
-struct TextRender<'a> {
-    glyphs: Vec<SizedGlyph<'a>>,
+struct TextRender {
+    glyphs: Vec<SizedGlyph>,
     clip_area: rect::Rect,
     z: f32,
 }
 
 #[derive(Clone)]
-struct SizedGlyph<'a> {
-    glyph: PositionedGlyph<'a>,
+struct SizedGlyph {
+    glyph: PositionedGlyph<'static>,
     width: f32,
 }
 
@@ -70,194 +54,11 @@ pub enum Alignment {
     Center,
 }
 
-/// Initialize fonts. Handled by `window_bootstrap`. This must be done
-/// before any drawing calls.
-///
-/// `font_data` should a Vec of the bytes of a .ttf file. To load the
-/// image at compile-time, you could run the following (of course,
-/// with your own path):
-/// ```
-/// fungui::initialize_font(include_bytes!("resources/FiraSans.ttf").to_vec());
-/// ```
-pub fn initialize_font(font_data: Vec<u8>) -> Result<(), Box<Error>> {
-    let cache = TextCache {
-        font: Some(Font::from_bytes(font_data)?),
-        cache: Some(RefCell::new(
-            Cache::builder()
-                .dimensions(GLYPH_CACHE_WIDTH, GLYPH_CACHE_HEIGHT)
-                .build(),
-        )),
-        cached_text: Vec::new(),
-    };
-    let mut lock = TEXT_CACHE.lock()?;
-    *lock = cache;
-    Ok(())
-}
-
-pub(crate) fn update_dpi(dpi: f32) {
-    let mut lock = DPI_SCALE.lock().unwrap();
-    *lock = dpi;
-}
-
-#[inline]
-fn get_dpi() -> f32 {
-    let lock = DPI_SCALE.lock().unwrap();
-    *lock
-}
-
-pub(crate) fn queue_text(
-    text: &str,
-    (x, y, z): (f32, f32, f32),
-    width: f32,
-    font_size: f32,
-    alignment: Alignment,
-    multiline: bool,
-    cursor: Option<&mut TextCursor>,
-) {
-    let mut cache = TEXT_CACHE.lock().unwrap();
-    let rows = collect_glyphs(&mut cache, x, y, width, multiline, font_size, text);
-
-    let mut final_glyphs = Vec::with_capacity(text.len());
-
-    // Collect the rows and offset them according to the alignment
-    match alignment {
-        Alignment::Left => {
-            for row in rows {
-                final_glyphs.extend_from_slice(&row);
-            }
-        }
-
-        Alignment::Right => {
-            for row in rows {
-                let row = if let Some((row_width, _)) = measure_text(&row) {
-                    let offset = width - row_width;
-                    offset_glyphs(row, offset, 0.0)
-                } else {
-                    row
-                };
-                final_glyphs.extend_from_slice(&row);
-            }
-        }
-
-        Alignment::Center => {
-            for row in rows {
-                let row = if let Some((row_width, _)) = measure_text(&row) {
-                    let offset = (width - row_width) / 2.0;
-                    offset_glyphs(row, offset, 0.0)
-                } else {
-                    row
-                };
-                final_glyphs.extend_from_slice(&row);
-            }
-        }
-    }
-
-    // Add cursor character
-    if let Some(&mut TextCursor {
-        index,
-        blink_visibility,
-        offset_min,
-        offset_max,
-    }) = cursor
-    {
-        let mut cursor_x = if index > 0 && index < final_glyphs.len() {
-            let cursor_rect = measure_text_at_index(&final_glyphs, index).unwrap();
-            cursor_rect.left()
-        } else if index > 0 {
-            let cursor_rect = measure_text_at_index(&final_glyphs, index - 1).unwrap();
-            cursor_rect.right()
-        } else if let Some(rect) = measure_text_at_index(&final_glyphs, 0) {
-            rect.left()
-        } else {
-            match alignment {
-                Alignment::Left => x,
-                Alignment::Right => x + width - 4.0 * get_dpi(),
-                Alignment::Center => x + width / 2.0,
-            }
-        };
-
-        // TODO: Clean up offsets caused by cursors
-        // Because this code is a *mess*.
-
-        let cursor = cursor.unwrap();
-        let mut current_offset_x = None;
-
-        if let Some(offset_min) = offset_min {
-            let new_x = cursor_x + offset_min;
-            if new_x >= x && new_x < x + width {
-                current_offset_x = Some(offset_min);
-            } else {
-                cursor.offset_min = None;
-                if new_x >= x + width {
-                    current_offset_x = Some(x + width - cursor_x);
-                    cursor.offset_max = current_offset_x;
-                } else {
-                    current_offset_x = Some(x - cursor_x);
-                    cursor.offset_min = current_offset_x;
-                }
-            }
-        } else if let Some(offset_max) = offset_max {
-            let new_x = cursor_x + offset_max;
-            if new_x >= x && new_x < x + width {
-                current_offset_x = Some(offset_max);
-            } else {
-                cursor.offset_max = None;
-                if new_x < x {
-                    current_offset_x = Some(x - cursor_x);
-                    cursor.offset_min = current_offset_x;
-                } else {
-                    current_offset_x = Some(x + width - cursor_x);
-                    cursor.offset_max = current_offset_x;
-                }
-            }
-        }
-
-        if current_offset_x.is_none() {
-            if cursor_x >= x + width {
-                let offset = x + width - cursor_x;
-                cursor.offset_min = None;
-                cursor.offset_max = Some(offset);
-                current_offset_x = Some(offset);
-            } else if cursor_x < x {
-                let offset = x - cursor_x;
-                cursor.offset_min = Some(offset);
-                cursor.offset_max = None;
-                current_offset_x = Some(offset);
-            } else {
-                cursor.offset_min = None;
-                cursor.offset_max = None;
-            }
-        }
-
-        if blink_visibility {
-            let x = current_offset_x.unwrap_or(0.0) + cursor_x;
-            renderer::draw_colored_quad(
-                (x - 0.5, y + 1.0, x + 0.5, y + font_size - 1.0),
-                (0, 0, 0, 0xFF),
-                z,
-                renderer::DRAW_CALL_INDEX_UI,
-            );
-        }
-
-        if let Some(offset_x) = current_offset_x {
-            final_glyphs = offset_glyphs(final_glyphs, offset_x, 0.0);
-        }
-    }
-
-    cache.cached_text.push(TextRender {
-        glyphs: final_glyphs,
-        clip_area: rect::Rect::Dims(x, y, width, font_size),
-        z,
-    });
-}
-
 /// Will only return `None` when `index >= glyphs.len()`.
-fn measure_text_at_index<'a>(glyphs: &[SizedGlyph<'a>], index: usize) -> Option<rect::Rect> {
+fn measure_text_at_index(glyphs: &[SizedGlyph], index: usize, dpi: f32) -> Option<rect::Rect> {
     if index >= glyphs.len() {
         return None;
     }
-
-    let dpi = get_dpi();
 
     let width = glyphs[index].width;
     let glyph = &glyphs[index].glyph;
@@ -279,11 +80,11 @@ fn measure_text_at_index<'a>(glyphs: &[SizedGlyph<'a>], index: usize) -> Option<
     }
 }
 
-fn measure_text<'a>(glyphs: &[SizedGlyph<'a>]) -> Option<(f32, f32)> {
+fn measure_text(glyphs: &[SizedGlyph], dpi: f32) -> Option<(f32, f32)> {
     let mut result: Option<rect::Rect> = None;
 
     for i in 0..glyphs.len() {
-        if let Some(glyph_rect) = measure_text_at_index(glyphs, i) {
+        if let Some(glyph_rect) = measure_text_at_index(glyphs, i, dpi) {
             if let Some(ref mut rect) = result {
                 let (x0, y0, x1, y1) = (
                     rect.left().min(glyph_rect.left()),
@@ -305,8 +106,7 @@ fn measure_text<'a>(glyphs: &[SizedGlyph<'a>]) -> Option<(f32, f32)> {
     }
 }
 
-fn offset_glyphs(glyphs: Vec<SizedGlyph>, x: f32, y: f32) -> Vec<SizedGlyph> {
-    let dpi = get_dpi();
+fn offset_glyphs(glyphs: Vec<SizedGlyph>, x: f32, y: f32, dpi: f32) -> Vec<SizedGlyph> {
     glyphs
         .into_iter()
         .map(|glyph| offset_glyph(glyph, x, y, dpi))
@@ -323,29 +123,200 @@ fn offset_glyph(glyph: SizedGlyph, x: f32, y: f32, dpi: f32) -> SizedGlyph {
     }
 }
 
-fn collect_glyphs<'a>(
-    cache: &mut TextCache<'a>,
-    x: f32,
-    y: f32,
-    width: f32,
-    multiline: bool,
-    font_size: f32,
-    text: &str,
-) -> Vec<Vec<SizedGlyph<'a>>> {
-    let dpi = get_dpi();
-    let scale = Scale::uniform(font_size * dpi);
-    let x = x * dpi;
-    let y = y * dpi;
+pub struct TextRenderer {
+    font: Font<'static>,
+    cache: RefCell<Cache<'static>>,
+    cached_text: Vec<TextRender>,
+    dpi: f32,
+}
 
-    let mut rows = Vec::new();
-    rows.push(Vec::with_capacity(text.len()));
-    if let Some(ref font) = &cache.font {
-        let v_metrics = font.v_metrics(scale);
+impl TextRenderer {
+    pub(crate) fn create(font_data: Vec<u8>) -> Result<TextRenderer, Box<Error>> {
+        Ok(TextRenderer {
+            font: Font::from_bytes(font_data)?,
+            cache: RefCell::new(
+                Cache::builder()
+                    .dimensions(GLYPH_CACHE_WIDTH, GLYPH_CACHE_HEIGHT)
+                    .build(),
+            ),
+            cached_text: Vec::new(),
+            dpi: 1.0,
+        })
+    }
+
+    pub(crate) fn update_dpi(&mut self, dpi: f32) {
+        self.dpi = dpi;
+    }
+
+    pub(crate) fn queue_text(
+        &mut self,
+        text: &str,
+        (x, y, z): (f32, f32, f32),
+        width: f32,
+        font_size: f32,
+        alignment: Alignment,
+        multiline: bool,
+        cursor: Option<&mut TextCursor>,
+    ) {
+        let rows = self.collect_glyphs(x, y, width, multiline, font_size, text);
+        let dpi = self.dpi;
+
+        let mut final_glyphs = Vec::with_capacity(text.len());
+
+        // Collect the rows and offset them according to the alignment
+        match alignment {
+            Alignment::Left => {
+                for row in rows {
+                    final_glyphs.extend_from_slice(&row);
+                }
+            }
+
+            Alignment::Right => {
+                for row in rows {
+                    let row = if let Some((row_width, _)) = measure_text(&row, dpi) {
+                        let offset = width - row_width;
+                        offset_glyphs(row, offset, 0.0, dpi)
+                    } else {
+                        row
+                    };
+                    final_glyphs.extend_from_slice(&row);
+                }
+            }
+
+            Alignment::Center => {
+                for row in rows {
+                    let row = if let Some((row_width, _)) = measure_text(&row, dpi) {
+                        let offset = (width - row_width) / 2.0;
+                        offset_glyphs(row, offset, 0.0, dpi)
+                    } else {
+                        row
+                    };
+                    final_glyphs.extend_from_slice(&row);
+                }
+            }
+        }
+
+        // Add cursor character
+        if let Some(&mut TextCursor {
+            index,
+            blink_visibility,
+            offset_min,
+            offset_max,
+        }) = cursor
+        {
+            let mut cursor_x = if index > 0 && index < final_glyphs.len() {
+                let cursor_rect = measure_text_at_index(&final_glyphs, index, dpi).unwrap();
+                cursor_rect.left()
+            } else if index > 0 {
+                let cursor_rect = measure_text_at_index(&final_glyphs, index - 1, dpi).unwrap();
+                cursor_rect.right()
+            } else if let Some(rect) = measure_text_at_index(&final_glyphs, 0, dpi) {
+                rect.left()
+            } else {
+                match alignment {
+                    Alignment::Left => x,
+                    Alignment::Right => x + width - 4.0 * dpi,
+                    Alignment::Center => x + width / 2.0,
+                }
+            };
+
+            // TODO: Clean up offsets caused by cursors
+            // Because this code is a *mess*.
+
+            let cursor = cursor.unwrap();
+            let mut current_offset_x = None;
+
+            if let Some(offset_min) = offset_min {
+                let new_x = cursor_x + offset_min;
+                if new_x >= x && new_x < x + width {
+                    current_offset_x = Some(offset_min);
+                } else {
+                    cursor.offset_min = None;
+                    if new_x >= x + width {
+                        current_offset_x = Some(x + width - cursor_x);
+                        cursor.offset_max = current_offset_x;
+                    } else {
+                        current_offset_x = Some(x - cursor_x);
+                        cursor.offset_min = current_offset_x;
+                    }
+                }
+            } else if let Some(offset_max) = offset_max {
+                let new_x = cursor_x + offset_max;
+                if new_x >= x && new_x < x + width {
+                    current_offset_x = Some(offset_max);
+                } else {
+                    cursor.offset_max = None;
+                    if new_x < x {
+                        current_offset_x = Some(x - cursor_x);
+                        cursor.offset_min = current_offset_x;
+                    } else {
+                        current_offset_x = Some(x + width - cursor_x);
+                        cursor.offset_max = current_offset_x;
+                    }
+                }
+            }
+
+            if current_offset_x.is_none() {
+                if cursor_x >= x + width {
+                    let offset = x + width - cursor_x;
+                    cursor.offset_min = None;
+                    cursor.offset_max = Some(offset);
+                    current_offset_x = Some(offset);
+                } else if cursor_x < x {
+                    let offset = x - cursor_x;
+                    cursor.offset_min = Some(offset);
+                    cursor.offset_max = None;
+                    current_offset_x = Some(offset);
+                } else {
+                    cursor.offset_min = None;
+                    cursor.offset_max = None;
+                }
+            }
+
+            if blink_visibility {
+                let x = current_offset_x.unwrap_or(0.0) + cursor_x;
+                renderer::draw_colored_quad(
+                    (x - 0.5, y + 1.0, x + 0.5, y + font_size - 1.0),
+                    (0, 0, 0, 0xFF),
+                    z,
+                    renderer::DRAW_CALL_INDEX_UI,
+                );
+            }
+
+            if let Some(offset_x) = current_offset_x {
+                final_glyphs = offset_glyphs(final_glyphs, offset_x, 0.0, dpi);
+            }
+        }
+
+        self.cached_text.push(TextRender {
+            glyphs: final_glyphs,
+            clip_area: rect::Rect::Dims(x, y, width, font_size),
+            z,
+        });
+    }
+
+    fn collect_glyphs(
+        &self,
+        x: f32,
+        y: f32,
+        width: f32,
+        multiline: bool,
+        font_size: f32,
+        text: &str,
+    ) -> Vec<Vec<SizedGlyph>> {
+        let dpi = self.dpi;
+        let scale = Scale::uniform(font_size * dpi);
+        let x = x * dpi;
+        let y = y * dpi;
+
+        let mut rows = Vec::new();
+        rows.push(Vec::with_capacity(text.len()));
+        let v_metrics = self.font.v_metrics(scale);
         let advance_height = v_metrics.ascent - v_metrics.descent + v_metrics.line_gap;
         let mut caret = point(x, y + v_metrics.ascent);
         let mut last_glyph_id = None;
 
-        let next_row = |caret: &mut Point<f32>, rows: &mut Vec<Vec<SizedGlyph<'a>>>| {
+        let next_row = |caret: &mut Point<f32>, rows: &mut Vec<Vec<SizedGlyph>>| {
             *caret = point(x, caret.y + advance_height);
             // Pre-allocate based on the last row's length
             let len = rows.last().unwrap().len();
@@ -370,9 +341,9 @@ fn collect_glyphs<'a>(
                 current_word_length += 1;
             }
 
-            let glyph = font.glyph(c);
+            let glyph = self.font.glyph(c);
             if let Some(id) = last_glyph_id.take() {
-                caret.x += font.pair_kerning(scale, id, glyph.id());
+                caret.x += self.font.pair_kerning(scale, id, glyph.id());
             }
 
             if caret.x > x + width && multiline {
@@ -401,17 +372,14 @@ fn collect_glyphs<'a>(
                 width: advance_width,
             });
         }
+        rows
     }
-    rows
-}
 
-pub(crate) fn draw_text() {
-    let mut text_cache = TEXT_CACHE.lock().unwrap();
+    pub(crate) fn draw_text(&mut self) {
+        let dpi = self.dpi;
+        let mut cache = self.cache.borrow_mut();
 
-    if let Some(ref cache) = &text_cache.cache {
-        let mut cache = cache.borrow_mut();
-
-        for text in &text_cache.cached_text {
+        for text in &self.cached_text {
             for glyph in &text.glyphs {
                 cache.queue_glyph(0, glyph.glyph.clone());
             }
@@ -438,9 +406,7 @@ pub(crate) fn draw_text() {
         };
         cache.cache_queued(upload_new_texture).ok();
 
-        let dpi = get_dpi();
-
-        for text in &text_cache.cached_text {
+        for text in &self.cached_text {
             let z = text.z;
             let clip_area = text.clip_area.coords();
             for glyph in &text.glyphs {
@@ -463,7 +429,7 @@ pub(crate) fn draw_text() {
                 }
             }
         }
-    }
 
-    text_cache.cached_text.clear();
+        self.cached_text.clear();
+    }
 }

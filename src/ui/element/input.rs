@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 use std::time::Instant;
 use text::TextCursor;
-use ui::{self, UIElement, UIElementKind, UIState};
+use ui::{UIElement, UIElementKind, UIState};
 
 struct TextField {
     selection_time: Instant,
@@ -17,6 +17,7 @@ impl TextField {
     }
 }
 
+// TODO: Replace this when restructuring the whole element system
 lazy_static! {
     static ref TEXT_FIELDS: Mutex<HashMap<u64, TextField>> = Mutex::new(HashMap::new());
 }
@@ -121,7 +122,7 @@ impl UIState {
             focused && (Instant::now() - field.selection_time).subsec_millis() < 500;
 
         let text = field.text();
-        ui::draw_element(&element, &text, false, Some(&mut field.cursor));
+        self.draw_element(&element, &text, false, Some(&mut field.cursor));
         self.insert_element(element);
 
         text

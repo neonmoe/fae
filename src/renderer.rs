@@ -6,7 +6,7 @@
 
 use gl;
 use gl::types::*;
-use image::load_image;
+use resources::load_png;
 use std::error::Error;
 use std::mem;
 use std::ptr;
@@ -126,7 +126,7 @@ pub fn initialize_renderer(opengl21: bool, ui_spritesheet_image: &[u8]) -> Resul
         draw_state.calls.push(call);
     }
 
-    let image = load_image(ui_spritesheet_image).unwrap();
+    let image = load_png(ui_spritesheet_image).unwrap();
     insert_texture(
         draw_state.calls[DRAW_CALL_INDEX_UI].texture,
         gl::RGBA as GLint,
@@ -176,7 +176,7 @@ pub fn create_draw_call(image: &[u8]) -> usize {
         attributes,
     });
 
-    let image = load_image(image).unwrap();
+    let image = load_png(image).unwrap();
     insert_texture(
         draw_state.calls[index].texture,
         gl::RGBA as GLint,
@@ -542,8 +542,6 @@ pub(crate) fn render(width: f32, height: f32) {
     let matrix = [
         m00, 0.0, 0.0, -1.0, 0.0, m11, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
     ];
-
-    text::draw_text();
 
     let mut draw_state = DRAW_STATE.lock().unwrap();
     let opengl21 = draw_state.opengl21;

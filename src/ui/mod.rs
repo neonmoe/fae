@@ -2,12 +2,13 @@ pub mod element;
 pub mod keyboard;
 
 pub use glutin::{ModifiersState, VirtualKeyCode};
+use std::error::Error;
 
 use clip;
 use renderer;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
-use text::{self, TextCursor};
+use text::{TextCursor, TextRenderer};
 
 use self::element::{UIElement, UIElementKind};
 use self::keyboard::KeyStatus;
@@ -20,6 +21,32 @@ const PADDING: f32 = 2.0;
 const NORMAL_UI_ELEMENT_DEPTH: f32 = 0.0;
 const NORMAL_UI_TEXT_DEPTH: f32 = NORMAL_UI_ELEMENT_DEPTH - 0.1;
 
+pub struct UIStatus {
+    pub hovering_button: bool,
+}
+
+/// Describes the current status of the mouse.
+#[derive(Clone, Copy)]
+pub struct MouseStatus {
+    /// The x-coordinate of the mouse in logical pixels.
+    pub x: f32,
+    /// The y-coordinate of the mouse in logical pixels.
+    pub y: f32,
+    /// Was the mouse pressed during the previous frame?
+    pub last_pressed: bool,
+    /// Is the mouse pressed currently?
+    pub pressed: bool,
+}
+
+impl MouseStatus {
+    /// Returns true if the mouse was clicked, ie. was just
+    /// released. True for one frame per click.
+    #[inline]
+    pub fn clicked(&self) -> bool {
+        !self.pressed && self.last_pressed
+    }
+}
+
 /// The state of the UI.
 pub struct UIState {
     elements: HashMap<u64, UIElement>,
@@ -31,12 +58,13 @@ pub struct UIState {
     last_key_input_time: Option<Instant>,
     window_dimensions: (f32, f32),
     keyboard: Keyboard,
+    text_renderer: TextRenderer,
 }
 
 impl UIState {
     /// Creates a new instance of the UI.
-    pub fn new() -> UIState {
-        UIState {
+    pub fn create(font_data: Vec<u8>) -> Result<UIState, Box<Error>> {
+        Ok(UIState {
             elements: HashMap::new(),
             last_element: None,
             mouse: MouseStatus {
@@ -51,7 +79,8 @@ impl UIState {
             keyboard: Keyboard::new(),
             last_key_input_time: None,
             window_dimensions: (0.0, 0.0),
-        }
+            text_renderer: TextRenderer::create(font_data)?,
+        })
     }
 
     fn insert_element(&mut self, element: UIElement) {
@@ -70,9 +99,11 @@ impl UIState {
         key_inputs: Vec<KeyStatus>,
         characters: Vec<char>,
     ) -> UIStatus {
+        self.text_renderer.draw_text();
         renderer::render(width, height);
-        text::update_dpi(dpi);
+
         self.window_dimensions = (width as f32, height as f32);
+        self.text_renderer.update_dpi(dpi);
 
         let hovering_button;
         let focused_element;
@@ -134,75 +165,55 @@ impl UIState {
 
         UIStatus { hovering_button }
     }
-}
 
-pub struct UIStatus {
-    pub hovering_button: bool,
-}
+    fn draw_element(
+        &mut self,
+        element: &UIElement,
+        text: &str,
+        multiline: bool,
+        cursor: Option<&mut TextCursor>,
+    ) {
+        let &UIElement {
+            kind,
+            rect,
+            alignment,
+            ..
+        } = element;
+        let (left, top, right, bottom) = rect.coords();
 
-/// Describes the current status of the mouse.
-#[derive(Clone, Copy)]
-pub struct MouseStatus {
-    /// The x-coordinate of the mouse in logical pixels.
-    pub x: f32,
-    /// The y-coordinate of the mouse in logical pixels.
-    pub y: f32,
-    /// Was the mouse pressed during the previous frame?
-    pub last_pressed: bool,
-    /// Is the mouse pressed currently?
-    pub pressed: bool,
-}
+        if kind != UIElementKind::NoBackground {
+            let sheet_length = UIElementKind::KindCount as i32;
+            let tx = kind as i32 as f32 / sheet_length as f32; // The UV offset based on the element type
+            let ty = 0.0;
+            let tw = 1.0 / (3.0 * sheet_length as f32); // UV width of a spritesheet tile
+            let th = 1.0 / 3.0; // UV height of a spritesheet tile
+            let tx = [tx, tx + tw, tx + tw * 2.0];
+            let ty = [ty, ty + th, ty + th * 2.0];
 
-impl MouseStatus {
-    /// Returns true if the mouse was clicked, ie. was just
-    /// released. True for one frame per click.
-    #[inline]
-    pub fn clicked(&self) -> bool {
-        !self.pressed && self.last_pressed
-    }
-}
+            let left_ = [left - TILE_SIZE - PADDING, left - PADDING, right + PADDING];
+            let top_ = [top - TILE_SIZE - PADDING, top - PADDING, bottom + PADDING];
+            let right_ = [left_[1], left_[2], left_[2] + TILE_SIZE];
+            let bottom_ = [top_[1], top_[2], top_[2] + TILE_SIZE];
+            let z = NORMAL_UI_ELEMENT_DEPTH;
 
-fn draw_element(element: &UIElement, text: &str, multiline: bool, cursor: Option<&mut TextCursor>) {
-    let &UIElement {
-        kind,
-        rect,
-        alignment,
-        ..
-    } = element;
-    let (left, top, right, bottom) = rect.coords();
-
-    if kind != UIElementKind::NoBackground {
-        let sheet_length = UIElementKind::KindCount as i32;
-        let tx = kind as i32 as f32 / sheet_length as f32; // The UV offset based on the element type
-        let ty = 0.0;
-        let tw = 1.0 / (3.0 * sheet_length as f32); // UV width of a spritesheet tile
-        let th = 1.0 / 3.0; // UV height of a spritesheet tile
-        let tx = [tx, tx + tw, tx + tw * 2.0];
-        let ty = [ty, ty + th, ty + th * 2.0];
-
-        let left_ = [left - TILE_SIZE - PADDING, left - PADDING, right + PADDING];
-        let top_ = [top - TILE_SIZE - PADDING, top - PADDING, bottom + PADDING];
-        let right_ = [left_[1], left_[2], left_[2] + TILE_SIZE];
-        let bottom_ = [top_[1], top_[2], top_[2] + TILE_SIZE];
-        let z = NORMAL_UI_ELEMENT_DEPTH;
-
-        for i in 0..9 {
-            let xi = i % 3;
-            let yi = i / 3;
-            let coords = (left_[xi], top_[yi], right_[xi], bottom_[yi]);
-            let texcoords = (tx[xi], ty[yi], tx[xi] + tw, ty[yi] + th);
-            let color = (0xFF, 0xFF, 0xFF, 0xFF);
-            renderer::draw_quad(coords, texcoords, color, z, renderer::DRAW_CALL_INDEX_UI);
+            for i in 0..9 {
+                let xi = i % 3;
+                let yi = i / 3;
+                let coords = (left_[xi], top_[yi], right_[xi], bottom_[yi]);
+                let texcoords = (tx[xi], ty[yi], tx[xi] + tw, ty[yi] + th);
+                let color = (0xFF, 0xFF, 0xFF, 0xFF);
+                renderer::draw_quad(coords, texcoords, color, z, renderer::DRAW_CALL_INDEX_UI);
+            }
         }
-    }
 
-    text::queue_text(
-        text,
-        (rect.left(), rect.top(), NORMAL_UI_TEXT_DEPTH),
-        rect.width(),
-        rect.height(),
-        alignment,
-        multiline,
-        cursor,
-    );
+        self.text_renderer.queue_text(
+            text,
+            (rect.left(), rect.top(), NORMAL_UI_TEXT_DEPTH),
+            rect.width(),
+            rect.height(),
+            alignment,
+            multiline,
+            cursor,
+        );
+    }
 }

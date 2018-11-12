@@ -24,18 +24,14 @@ mod window;
 #[cfg(feature = "window_bootstrap")]
 pub use window::*;
 
-#[cfg(feature = "default_resources")]
-pub mod resources;
-
 mod clip;
-mod image;
 pub mod rect;
 pub mod renderer;
+pub mod resources;
 mod text;
 mod ui;
 
 pub use renderer::initialize_renderer;
-pub use text::initialize_font;
 pub use ui::keyboard::{KeyStatus, Keyboard};
 pub use ui::{ModifiersState, MouseStatus, UIState, VirtualKeyCode};
 

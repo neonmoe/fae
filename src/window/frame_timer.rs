@@ -21,7 +21,7 @@ pub struct FrameTimer {
 }
 
 impl FrameTimer {
-    pub fn new() -> FrameTimer {
+    pub(crate) fn new() -> FrameTimer {
         FrameTimer {
             frame_durations: Vec::with_capacity(STORED_FRAME_TIMES + 1),
             vsync_duration: None,
@@ -33,7 +33,7 @@ impl FrameTimer {
         }
     }
 
-    pub fn end_frame(&mut self) {
+    pub(crate) fn end_frame(&mut self) {
         let end = Instant::now();
         if let Some(last_end) = self.end {
             if end > last_end {
@@ -43,7 +43,7 @@ impl FrameTimer {
         self.end = Some(end);
     }
 
-    pub fn begin_frame(&mut self) {
+    pub(crate) fn begin_frame(&mut self) {
         let (end, frame_duration, last_start) =
             if let (Some(a), Some(b), Some(c)) = (self.end, self.frame_duration, self.start) {
                 (a, b, c)
@@ -66,11 +66,10 @@ impl FrameTimer {
             // duration is less than a millisecond, assume that we're
             // bound by vsync (which would result in little variance),
             // and set it.
-            if avg > REFRESH_DURATION_ERROR_MARGIN && self
-                .refresh_durations
-                .iter()
-                .all(|&d| if d > avg { d - avg } else { avg - d } < REFRESH_DURATION_ERROR_MARGIN)
-            {
+            if avg > REFRESH_DURATION_ERROR_MARGIN
+                && self.refresh_durations.iter().all(
+                    |&d| if d > avg { d - avg } else { avg - d } < REFRESH_DURATION_ERROR_MARGIN,
+                ) {
                 self.vsync_duration = Some(avg - REFRESH_DURATION_ERROR_MARGIN);
             }
 
@@ -100,6 +99,9 @@ impl FrameTimer {
         self.start = Some(Instant::now());
     }
 
+    /// Returns the average duration of the last 60 frames. A "frame"
+    /// includes operations between the latest refresh() and the one
+    /// before that, except waiting for vsync.
     pub fn avg_frame_duration(&self) -> Duration {
         if self.frame_durations.is_empty() {
             Duration::from_millis(0)
