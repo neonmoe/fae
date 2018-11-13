@@ -4,7 +4,6 @@ use self::frame_timer::FrameTimer;
 use gl;
 use glutin::dpi::*;
 use glutin::*;
-use renderer;
 #[cfg(feature = "default_resources")]
 use resources;
 use std::default::Default;
@@ -197,8 +196,7 @@ impl Window {
             }*/
         }
 
-        let ui = UIState::create(settings.font)?;
-        renderer::initialize_renderer(opengl21, &settings.ui_spritesheet)?;
+        let ui = UIState::create(settings.font, settings.ui_spritesheet, opengl21)?;
 
         Ok(Window {
             width: settings.width,

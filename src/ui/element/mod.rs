@@ -100,9 +100,9 @@ impl UIState {
         z: f32,
         tex_index: usize,
     ) -> bool {
-        use renderer;
         let (clicked, element) = button_meta(self, identifier);
-        renderer::draw_quad(element.rect.coords(), texcoords, color, z, tex_index);
+        self.renderer
+            .draw_quad(element.rect.coords(), texcoords, color, z, tex_index);
         self.insert_element(element);
         clicked
     }

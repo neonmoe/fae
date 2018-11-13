@@ -5,7 +5,7 @@ pub use glutin::{ModifiersState, VirtualKeyCode};
 use std::error::Error;
 
 use clip;
-use renderer;
+use renderer::{self, Renderer};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 use text::{TextCursor, TextRenderer};
@@ -59,11 +59,17 @@ pub struct UIState {
     window_dimensions: (f32, f32),
     keyboard: Keyboard,
     text_renderer: TextRenderer,
+    /// The renderer that renders the UI on the screen.
+    pub renderer: Renderer,
 }
 
 impl UIState {
     /// Creates a new instance of the UI.
-    pub fn create(font_data: Vec<u8>) -> Result<UIState, Box<Error>> {
+    pub fn create(
+        font_data: Vec<u8>,
+        ui_spritesheet_data: Vec<u8>,
+        opengl21: bool,
+    ) -> Result<UIState, Box<Error>> {
         Ok(UIState {
             elements: HashMap::new(),
             last_element: None,
@@ -80,6 +86,7 @@ impl UIState {
             last_key_input_time: None,
             window_dimensions: (0.0, 0.0),
             text_renderer: TextRenderer::create(font_data)?,
+            renderer: Renderer::create(opengl21, &ui_spritesheet_data)?,
         })
     }
 
@@ -99,8 +106,12 @@ impl UIState {
         key_inputs: Vec<KeyStatus>,
         characters: Vec<char>,
     ) -> UIStatus {
-        self.text_renderer.draw_text();
-        renderer::render(width, height);
+        {
+            let renderer = &mut self.renderer;
+            let text_renderer = &mut self.text_renderer;
+            text_renderer.draw_text(renderer);
+            renderer.render(width, height);
+        }
 
         self.window_dimensions = (width as f32, height as f32);
         self.text_renderer.update_dpi(dpi);
@@ -202,7 +213,8 @@ impl UIState {
                 let coords = (left_[xi], top_[yi], right_[xi], bottom_[yi]);
                 let texcoords = (tx[xi], ty[yi], tx[xi] + tw, ty[yi] + th);
                 let color = (0xFF, 0xFF, 0xFF, 0xFF);
-                renderer::draw_quad(coords, texcoords, color, z, renderer::DRAW_CALL_INDEX_UI);
+                self.renderer
+                    .draw_quad(coords, texcoords, color, z, renderer::DRAW_CALL_INDEX_UI);
             }
         }
 

@@ -25,18 +25,19 @@ mod window;
 pub use window::*;
 
 mod clip;
-pub mod rect;
-pub mod renderer;
-pub mod resources;
+mod rect;
+mod renderer;
+mod resources;
 mod text;
 mod ui;
 
-pub use renderer::initialize_renderer;
+pub use rect::Rect;
+pub use renderer::{Renderer, Shaders};
+pub use resources::Image;
 pub use ui::keyboard::{KeyStatus, Keyboard};
 pub use ui::{ModifiersState, MouseStatus, UIState, VirtualKeyCode};
 
-mod gl {
-    #![allow(unknown_lints)]
-    #![allow(clippy::all)]
+#[allow(missing_docs, unknown_lints, clippy::all)]
+pub mod gl {
     include!(concat!(env!("OUT_DIR"), "/gl_bindings.rs"));
 }

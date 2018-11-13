@@ -1,7 +1,7 @@
 use gl;
 use gl::types::*;
 use rect;
-use renderer;
+use renderer::{self, Renderer};
 use rusttype::gpu_cache::Cache;
 use rusttype::*;
 use std::cell::RefCell;
@@ -14,6 +14,7 @@ pub(crate) const GLYPH_CACHE_HEIGHT: u32 = 1024;
 struct TextRender {
     glyphs: Vec<SizedGlyph>,
     clip_area: rect::Rect,
+    cursor_quad: Option<rect::Rect>,
     z: f32,
 }
 
@@ -196,7 +197,7 @@ impl TextRenderer {
             }
         }
 
-        // Add cursor character
+        let mut cursor_quad = None;
         if let Some(&mut TextCursor {
             index,
             blink_visibility,
@@ -275,12 +276,7 @@ impl TextRenderer {
 
             if blink_visibility {
                 let x = current_offset_x.unwrap_or(0.0) + cursor_x;
-                renderer::draw_colored_quad(
-                    (x - 0.5, y + 1.0, x + 0.5, y + font_size - 1.0),
-                    (0, 0, 0, 0xFF),
-                    z,
-                    renderer::DRAW_CALL_INDEX_UI,
-                );
+                cursor_quad = Some(rect::Rect::Dims(x - 0.5, y + 1.0, 1.0, font_size - 1.0));
             }
 
             if let Some(offset_x) = current_offset_x {
@@ -291,6 +287,7 @@ impl TextRenderer {
         self.cached_text.push(TextRender {
             glyphs: final_glyphs,
             clip_area: rect::Rect::Dims(x, y, width, font_size),
+            cursor_quad,
             z,
         });
     }
@@ -375,7 +372,7 @@ impl TextRenderer {
         rows
     }
 
-    pub(crate) fn draw_text(&mut self) {
+    pub(crate) fn draw_text(&mut self, renderer: &mut Renderer) {
         let dpi = self.dpi;
         let mut cache = self.cache.borrow_mut();
 
@@ -385,7 +382,7 @@ impl TextRenderer {
             }
         }
 
-        let tex = renderer::get_texture(renderer::DRAW_CALL_INDEX_TEXT);
+        let tex = renderer.get_texture(renderer::DRAW_CALL_INDEX_TEXT);
         unsafe {
             gl::BindTexture(gl::TEXTURE_2D, tex);
             gl::PixelStorei(gl::UNPACK_ALIGNMENT, 1);
@@ -407,8 +404,8 @@ impl TextRenderer {
         cache.cache_queued(upload_new_texture).ok();
 
         for text in &self.cached_text {
-            let z = text.z;
             let clip_area = text.clip_area.coords();
+            let z = text.z;
             for glyph in &text.glyphs {
                 if let Ok(Some((uv_rect, screen_rect))) = cache.rect_for(0, &glyph.glyph) {
                     let coords = (
@@ -418,7 +415,7 @@ impl TextRenderer {
                         screen_rect.max.y as f32 / dpi,
                     );
                     let texcoords = (uv_rect.min.x, uv_rect.min.y, uv_rect.max.x, uv_rect.max.y);
-                    renderer::draw_quad_clipped(
+                    renderer.draw_quad_clipped(
                         coords,
                         texcoords,
                         (0, 0, 0, 0xFF),
@@ -427,6 +424,10 @@ impl TextRenderer {
                         renderer::DRAW_CALL_INDEX_TEXT,
                     );
                 }
+            }
+            if let Some(quad) = text.cursor_quad {
+                let quad = quad.coords();
+                renderer.draw_colored_quad(quad, (0, 0, 0, 0xFF), z, renderer::DRAW_CALL_INDEX_UI);
             }
         }
 

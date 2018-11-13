@@ -6,11 +6,10 @@
 
 use gl;
 use gl::types::*;
-use resources::load_png;
+use resources::Image;
 use std::error::Error;
 use std::mem;
 use std::ptr;
-use std::sync::Mutex;
 use text;
 
 const TEXTURE_COUNT: usize = 2; // UI elements, glyph cache
@@ -25,6 +24,23 @@ type TexQuad = [(PositionAttribute, TexCoordAttribute, ColorAttribute); 6];
 type Texture = GLuint;
 type VertexBufferObject = GLuint;
 type VertexArrayObject = GLuint;
+
+/// Represents the shader code for a shader. Used in [`Renderer::create_draw_call`].
+#[derive(Clone, Debug)]
+pub struct Shaders {
+    /// The GLSL 3.30 version of the vertex shader. Ensure that the
+    /// first line is `#version 330`!
+    pub vertex_shader_330: &'static str,
+    /// The GLSL 3.30 version of the fragment shader. Ensure that the
+    /// first line is `#version 330`!
+    pub fragment_shader_330: &'static str,
+    /// The GLSL 1.10 version of the vertex shader. Ensure that the
+    /// first line is `#version 110`!
+    pub vertex_shader_110: &'static str,
+    /// The GLSL 1.10 version of the fragment shader. Ensure that the
+    /// first line is `#version 110`!
+    pub fragment_shader_110: &'static str,
+}
 
 #[derive(Clone, Copy, Debug)]
 struct ShaderProgram {
@@ -50,143 +66,352 @@ struct DrawCall {
     attributes: Attributes,
 }
 
+/// Contains the data and functionality needed to draw rectangles with
+/// OpenGL. **Requires** a valid OpenGL context.
 #[derive(Debug)]
-struct DrawState {
+pub struct Renderer {
     calls: Vec<DrawCall>,
     opengl21: bool,
 }
 
-lazy_static! {
-    static ref DRAW_STATE: Mutex<DrawState> = Mutex::new(DrawState {
-        calls: Vec::with_capacity(TEXTURE_COUNT),
-        opengl21: true
-    });
-}
+impl Renderer {
+    /// Create a new UI rendering system. This must be done after window
+    /// and context creation, but before any drawing calls.
+    ///
+    /// `opengl21` disables some post-OpenGL 2.1 functionality, like
+    /// VAOs. Ideally this should be `false` in all cases where the OpenGL
+    /// version is >=3.0 (or OpenGL ES >=3) to allow for more optimized
+    /// rendering.
+    ///
+    /// `ui_spritesheet_image` should a Vec of the bytes of a .png file
+    /// with an alpha channel.
+    pub fn create(opengl21: bool, ui_spritesheet_image: &[u8]) -> Result<Renderer, Box<Error>> {
+        let mut renderer = Renderer {
+            calls: Vec::with_capacity(TEXTURE_COUNT),
+            opengl21,
+        };
 
-const VERTEX_SHADER_SOURCE: [&str; TEXTURE_COUNT] = [
-    include_str!("shaders/texquad.vert"),
-    include_str!("shaders/text.vert"),
-];
-const FRAGMENT_SHADER_SOURCE: [&str; TEXTURE_COUNT] = [
-    include_str!("shaders/texquad.frag"),
-    include_str!("shaders/text.frag"),
-];
-
-const VERTEX_SHADER_SOURCE_210: [&str; TEXTURE_COUNT] = [
-    include_str!("shaders/legacy/texquad.vert"),
-    include_str!("shaders/legacy/text.vert"),
-];
-const FRAGMENT_SHADER_SOURCE_210: [&str; TEXTURE_COUNT] = [
-    include_str!("shaders/legacy/texquad.frag"),
-    include_str!("shaders/legacy/text.frag"),
-];
-
-/// Initialize the UI rendering system. Handled by
-/// `window_bootstrap`. This must be done after window and context
-/// creation, but before any drawing calls.
-///
-/// `opengl21` disables some post-OpenGL 2.1 functionality, like
-/// VAOs. Ideally this should be `false` in all cases where the OpenGL
-/// version is >=3.0 (or OpenGL ES >=3) to allow for more optimized
-/// rendering.
-///
-/// `ui_spritesheet_image` should a Vec of the bytes of a .png file
-/// with an alpha channel. To load the image at compile-time, you
-/// could run the following (of course, with your own path):
-/// ```no_run
-/// fungui::initialize_renderer(false, include_bytes!("resources/gui.png"));
-/// ```
-pub fn initialize_renderer(opengl21: bool, ui_spritesheet_image: &[u8]) -> Result<(), Box<Error>> {
-    let mut draw_state = DRAW_STATE.lock().unwrap();
-    draw_state.opengl21 = opengl21;
-
-    unsafe {
-        if draw_state.opengl21 {
-            gl::Enable(gl::TEXTURE_2D);
+        unsafe {
+            gl::Enable(gl::DEPTH_TEST);
+            gl::Enable(gl::BLEND);
+            gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
         }
-        gl::Enable(gl::DEPTH_TEST);
-        gl::Enable(gl::BLEND);
-        gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
+        print_gl_errors("after enables");
+
+        // UI
+        let ui_spritesheet_image = Image::from_png(ui_spritesheet_image)?;
+        renderer.create_draw_call(
+            ui_spritesheet_image,
+            Some(&DEFAULT_SHADERS[DRAW_CALL_INDEX_UI]),
+        );
+        print_gl_errors("after ui spritesheet texture creation");
+
+        // Glyph cache
+        let glyph_cache_image = Image::from_color(
+            text::GLYPH_CACHE_WIDTH as i32,
+            text::GLYPH_CACHE_HEIGHT as i32,
+            vec![0],
+        )
+        .format(gl::RED);
+        renderer.create_draw_call(
+            glyph_cache_image,
+            Some(&DEFAULT_SHADERS[DRAW_CALL_INDEX_TEXT]),
+        );
+        print_gl_errors("after glyph cache texture creation");
+
+        Ok(renderer)
     }
 
-    // TODO: Use create_draw_call here and clean up
-    for i in 0..TEXTURE_COUNT {
-        let program = if draw_state.opengl21 {
-            create_program(VERTEX_SHADER_SOURCE_210[i], FRAGMENT_SHADER_SOURCE_210[i])
+    /// Creates a new draw call in the pipeline, and returns its
+    /// index. Using the index, you can call [`Renderer::draw_quad`]
+    /// to draw sprites from your image. As a rule of thumb, try to
+    /// minimize the amount of draw calls.
+    ///
+    /// If you want to use your own GLSL shaders, you can provide them
+    /// with the `shaders` parameter. Use `None` for defaults. Make
+    /// sure to study the uniform variables and attributes of the
+    /// default shaders before making your own.
+    pub fn create_draw_call(&mut self, image: Image, shaders: Option<&Shaders>) -> usize {
+        let shaders = shaders.unwrap_or(&DEFAULT_SHADERS[DRAW_CALL_INDEX_UI]);
+        let (vert, frag) = if self.opengl21 {
+            (shaders.vertex_shader_110, shaders.fragment_shader_110)
         } else {
-            create_program(VERTEX_SHADER_SOURCE[i], FRAGMENT_SHADER_SOURCE[i])
+            (shaders.vertex_shader_330, shaders.fragment_shader_330)
         };
-        let attributes = create_attributes(draw_state.opengl21, program);
+        let index = self.calls.len();
+
+        let program = create_program(&vert, &frag);
+        let attributes = create_attributes(self.opengl21, program);
         let texture = create_texture();
-        let call = DrawCall {
+        self.calls.push(DrawCall {
             texture,
             program,
             attributes,
-        };
-        draw_state.calls.push(call);
+        });
+
+        insert_texture(
+            self.calls[index].texture,
+            image.format,
+            image.width,
+            image.height,
+            &image.pixels,
+        );
+
+        index
     }
 
-    let image = load_png(ui_spritesheet_image).unwrap();
-    insert_texture(
-        draw_state.calls[DRAW_CALL_INDEX_UI].texture,
-        gl::RGBA as GLint,
-        image.width,
-        image.height,
-        &image.pixels,
-    );
+    /// Draws a rectangle on the screen.
+    ///
+    /// - `coords`: The coordinates of the corners of the quad, in
+    /// (logical) pixels. Arrangement: (left, top, right, bottom)
+    ///
+    /// - `color`: The color of the quad, in the range 0-255. Arrangement:
+    /// (red, green, blue, alpha)
+    ///
+    /// - `z`: Used for ordering sprites on screen, in the range -1.0 -
+    /// 1.0. Positive values are in front.
+    ///
+    /// - `call_index`: The index of the draw call to draw the quad
+    /// in. This is the returned value from [`Renderer::create_draw_call`].
+    pub fn draw_colored_quad(
+        &mut self,
+        coords: (f32, f32, f32, f32),
+        color: (u8, u8, u8, u8),
+        z: f32,
+        call_index: usize,
+    ) {
+        let (x0, y0, x1, y1) = coords;
 
-    // This creates the glyph cache texture
-    insert_texture(
-        draw_state.calls[DRAW_CALL_INDEX_TEXT].texture,
-        gl::RED as GLint,
-        text::GLYPH_CACHE_WIDTH as GLint,
-        text::GLYPH_CACHE_HEIGHT as GLint,
-        &[0; (text::GLYPH_CACHE_WIDTH * text::GLYPH_CACHE_HEIGHT) as usize],
-    );
+        self.calls[call_index].attributes.vbo_data.push([
+            ((x0, y0, z), (-1.0, -1.0), color),
+            ((x1, y0, z), (-1.0, -1.0), color),
+            ((x1, y1, z), (-1.0, -1.0), color),
+            ((x0, y0, z), (-1.0, -1.0), color),
+            ((x1, y1, z), (-1.0, -1.0), color),
+            ((x0, y1, z), (-1.0, -1.0), color),
+        ]);
+    }
 
-    print_gl_errors("after initialization");
-    Ok(())
+    /// Draws a textured rectangle on the screen.
+    ///
+    /// - `coords`: The coordinates of the corners of the quad, in
+    /// (logical) pixels. Arrangement: (left, top, right, bottom)
+    ///
+    /// - `texcoords`: The texture coordinates (UVs) of the quad, in the
+    /// range 0.0 - 1.0. Same arrangement as `coords`.
+    ///
+    /// - `color`: The color tint of the quad, in the range
+    /// 0-255. Arrangement: (red, green, blue, alpha)
+    ///
+    /// - `z`: Used for ordering sprites on screen, in the range -1.0 -
+    /// 1.0. Positive values are in front.
+    ///
+    /// - `call_index`: The index of the draw call to draw the quad
+    /// in. This is the returned value from [`Renderer::create_draw_call`].
+    pub fn draw_quad(
+        &mut self,
+        coords: (f32, f32, f32, f32),
+        texcoords: (f32, f32, f32, f32),
+        color: (u8, u8, u8, u8),
+        z: f32,
+        call_index: usize,
+    ) {
+        let (x0, y0, x1, y1) = coords;
+        let (tx0, ty0, tx1, ty1) = texcoords;
+
+        self.calls[call_index].attributes.vbo_data.push([
+            ((x0, y0, z), (tx0, ty0), color),
+            ((x1, y0, z), (tx1, ty0), color),
+            ((x1, y1, z), (tx1, ty1), color),
+            ((x0, y0, z), (tx0, ty0), color),
+            ((x1, y1, z), (tx1, ty1), color),
+            ((x0, y1, z), (tx0, ty1), color),
+        ]);
+    }
+
+    /// Draws a textured rectangle on the screen.
+    ///
+    /// See docs for [`Renderer::draw_quad`]. The only difference is
+    /// `rotation`, which describes how much the quad is rotated, in
+    /// radians.
+    pub fn draw_rotated_quad(
+        &mut self,
+        coords: (f32, f32, f32, f32),
+        texcoords: (f32, f32, f32, f32),
+        c: (u8, u8, u8, u8),
+        z: f32,
+        call_index: usize,
+        rotation: f32,
+    ) {
+        let cos = rotation.cos();
+        let sin = rotation.sin();
+        let rotx = |x, y| x * cos - y * sin;
+        let roty = |x, y| x * sin + y * cos;
+
+        let (x0, y0, x1, y1) = coords;
+        let (cx, cy) = ((x0 + x1) * 0.5, (y0 + y1) * 0.5);
+        let (rx0, ry0, rx1, ry1) = (x0 - cx, y0 - cy, x1 - cx, y1 - cy);
+
+        let (x00, y00) = (cx + rotx(rx0, ry0), cy + roty(rx0, ry0));
+        let (x10, y10) = (cx + rotx(rx1, ry0), cy + roty(rx1, ry0));
+        let (x11, y11) = (cx + rotx(rx1, ry1), cy + roty(rx1, ry1));
+        let (x01, y01) = (cx + rotx(rx0, ry1), cy + roty(rx0, ry1));
+
+        let (tx0, ty0, tx1, ty1) = texcoords;
+
+        self.calls[call_index].attributes.vbo_data.push([
+            ((x00, y00, z), (tx0, ty0), c),
+            ((x10, y10, z), (tx1, ty0), c),
+            ((x11, y11, z), (tx1, ty1), c),
+            ((x00, y00, z), (tx0, ty0), c),
+            ((x11, y11, z), (tx1, ty1), c),
+            ((x01, y01, z), (tx0, ty1), c),
+        ]);
+    }
+
+    /// Draws a textured rectangle on the screen, but only the parts
+    /// inside `clip_area`.
+    ///
+    /// - `coords`: The coordinates of the corners of the quad, in
+    /// (logical) pixels. Arrangement: (left, top, right, bottom)
+    ///
+    /// - `texcoords`: The texture coordinates (UVs) of the quad, in the
+    /// range 0.0 - 1.0. Same arrangement as `coords`.
+    ///
+    /// - `color`: The color tint of the quad, in the range
+    /// 0-255. Arrangement: (red, green, blue, alpha)
+    ///
+    /// - `clip_area`: The coordinates of the corners of the clipping
+    /// area, in (logical) pixels. Arrangement: (left, top, right, bottom)
+    ///
+    /// - `z`: Used for ordering sprites on screen, in the range -1.0 -
+    /// 1.0. Positive values are in front.
+    ///
+    /// - `call_index`: The index of the texture / draw call to draw
+    /// the quad in. This is the returned value from
+    /// [`Renderer::create_draw_call`].
+    pub fn draw_quad_clipped(
+        &mut self,
+        coords: (f32, f32, f32, f32),
+        texcoords: (f32, f32, f32, f32),
+        color: (u8, u8, u8, u8),
+        clip_area: (f32, f32, f32, f32),
+        z: f32,
+        call_index: usize,
+    ) {
+        let (cx0, cy0, cx1, cy1) = clip_area; // Clip coords
+        let (ox0, oy0, ox1, oy1) = coords; // Original coords
+        if ox0 > cx1 || ox1 < cx0 || oy0 > cy1 || oy1 < cy0 {
+            return;
+        }
+        let (x0, y0, x1, y1) = (
+            // Real coords
+            ox0.max(cx0).min(cx1),
+            oy0.max(cy0).min(cy1),
+            ox1.max(cx0).min(cx1),
+            oy1.max(cx0).min(cy1),
+        );
+        let (tx0, ty0, tx1, ty1) = texcoords; // Texture coords
+        let (tx0, ty0, tx1, ty1) = (
+            tx0.max(tx0 + (tx1 - tx0) * (x0 - ox0) / (ox1 - ox0)),
+            ty0.max(ty0 + (ty1 - ty0) * (y0 - oy0) / (oy1 - oy0)),
+            tx1.min(tx1 - (tx1 - tx0) * (ox1 - x1) / (ox1 - ox0)),
+            ty1.min(ty1 - (ty1 - ty0) * (oy1 - y1) / (oy1 - oy0)),
+        );
+
+        self.calls[call_index].attributes.vbo_data.push([
+            ((x0, y0, z), (tx0, ty0), color),
+            ((x1, y0, z), (tx1, ty0), color),
+            ((x1, y1, z), (tx1, ty1), color),
+            ((x0, y0, z), (tx0, ty0), color),
+            ((x1, y1, z), (tx1, ty1), color),
+            ((x0, y1, z), (tx0, ty1), color),
+        ]);
+    }
+
+    pub(crate) fn render(&mut self, width: f32, height: f32) {
+        let m00 = 2.0 / width;
+        let m11 = -2.0 / height;
+        let matrix = [
+            m00, 0.0, 0.0, -1.0, 0.0, m11, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+        ];
+
+        let opengl21 = self.opengl21;
+        for (i, call) in self.calls.iter_mut().enumerate() {
+            if call.attributes.vbo_data.is_empty() {
+                continue;
+            }
+
+            unsafe {
+                gl::UseProgram(call.program.program);
+                gl::UniformMatrix4fv(
+                    call.program.projection_matrix_location,
+                    1,
+                    gl::FALSE,
+                    matrix.as_ptr(),
+                );
+                if !opengl21 {
+                    gl::BindVertexArray(call.attributes.vao);
+                }
+                gl::BindTexture(gl::TEXTURE_2D, call.texture);
+                gl::BindBuffer(gl::ARRAY_BUFFER, call.attributes.vbo);
+            }
+
+            let buffer_length =
+                (mem::size_of::<TexQuad>() * call.attributes.vbo_data.len()) as isize;
+            let buffer_ptr = call.attributes.vbo_data.as_ptr() as *const _;
+
+            if buffer_length < call.attributes.allocated_vbo_data_size {
+                unsafe {
+                    gl::BufferSubData(gl::ARRAY_BUFFER, 0, buffer_length, buffer_ptr);
+                }
+            } else {
+                call.attributes.allocated_vbo_data_size = buffer_length;
+                unsafe {
+                    gl::BufferData(gl::ARRAY_BUFFER, buffer_length, buffer_ptr, gl::STREAM_DRAW);
+                }
+            }
+
+            if opengl21 {
+                unsafe {
+                    enable_vertex_attribs(call.program);
+                }
+            }
+
+            unsafe {
+                gl::DrawArrays(gl::TRIANGLES, 0, call.attributes.vbo_data.len() as i32 * 6);
+            }
+
+            if opengl21 {
+                unsafe {
+                    disable_vertex_attribs(call.program);
+                }
+            }
+
+            call.attributes.vbo_data.clear();
+            print_gl_errors(&*format!("after render #{}", i));
+        }
+    }
+
+    pub(crate) fn get_texture(&self, index: usize) -> GLuint {
+        self.calls[index].texture
+    }
 }
 
-/// Creates a new draw call in the pipeline, and returns its
-/// index. Using the index, you can call `draw_quad` to draw sprites
-/// from your image. As a rule of thumb, try to minimize the amount of
-/// draw calls.
-pub fn create_draw_call(image: &[u8]) -> usize {
-    let mut draw_state = DRAW_STATE.lock().unwrap();
-    let vert = if draw_state.opengl21 {
-        VERTEX_SHADER_SOURCE_210[DRAW_CALL_INDEX_UI]
-    } else {
-        VERTEX_SHADER_SOURCE[DRAW_CALL_INDEX_UI]
-    };
-    let frag = if draw_state.opengl21 {
-        FRAGMENT_SHADER_SOURCE_210[DRAW_CALL_INDEX_UI]
-    } else {
-        FRAGMENT_SHADER_SOURCE[DRAW_CALL_INDEX_UI]
-    };
-    let index = draw_state.calls.len();
-    let opengl21 = draw_state.opengl21;
-
-    let program = create_program(vert, frag);
-    let attributes = create_attributes(opengl21, program);
-    let texture = create_texture();
-    draw_state.calls.push(DrawCall {
-        texture,
-        program,
-        attributes,
-    });
-
-    let image = load_png(image).unwrap();
-    insert_texture(
-        draw_state.calls[index].texture,
-        gl::RGBA as GLint,
-        image.width,
-        image.height,
-        &image.pixels,
-    );
-
-    index
-}
+const DEFAULT_SHADERS: [Shaders; TEXTURE_COUNT] = [
+    Shaders {
+        vertex_shader_110: include_str!("shaders/legacy/texquad.vert"),
+        fragment_shader_110: include_str!("shaders/legacy/texquad.frag"),
+        vertex_shader_330: include_str!("shaders/texquad.vert"),
+        fragment_shader_330: include_str!("shaders/texquad.frag"),
+    },
+    Shaders {
+        vertex_shader_110: include_str!("shaders/legacy/text.vert"),
+        fragment_shader_110: include_str!("shaders/legacy/text.frag"),
+        vertex_shader_330: include_str!("shaders/text.vert"),
+        fragment_shader_330: include_str!("shaders/text.frag"),
+    },
+];
 
 #[inline]
 fn create_program(vert_source: &str, frag_source: &str) -> ShaderProgram {
@@ -352,278 +577,43 @@ fn create_texture() -> GLuint {
 }
 
 #[inline]
-fn insert_texture(tex: GLuint, components: GLint, w: GLint, h: GLint, pixels: &[u8]) {
+fn insert_texture(tex: GLuint, format: GLuint, w: GLint, h: GLint, pixels: &[u8]) {
     unsafe {
         gl::BindTexture(gl::TEXTURE_2D, tex);
         gl::TexImage2D(
             gl::TEXTURE_2D,
             0,
-            components,
+            format as i32,
             w,
             h,
             0,
-            components as GLuint,
+            format,
             gl::UNSIGNED_BYTE,
             pixels.as_ptr() as *const _,
         );
     }
 }
 
-/// Draws a rectangle on the screen.
-///
-/// - `coords`: The coordinates of the corners of the quad, in
-/// (logical) pixels. Arrangement: (left, top, right, bottom)
-///
-/// - `color`: The color of the quad, in the range 0-255. Arrangement:
-/// (red, green, blue, alpha)
-///
-/// - `z`: Used for ordering sprites on screen, in the range -1.0 -
-/// 1.0. Positive values are in front.
-///
-/// - `tex_index`: The index of the texture / draw call to draw the
-/// quad in. This is the returned value from `create_draw_call`.
-pub fn draw_colored_quad(
-    coords: (f32, f32, f32, f32),
-    color: (u8, u8, u8, u8),
-    z: f32,
-    tex_index: usize,
-) {
-    let (x0, y0, x1, y1) = coords;
-
-    let mut draw_state = DRAW_STATE.lock().unwrap();
-    draw_state.calls[tex_index].attributes.vbo_data.push([
-        ((x0, y0, z), (-1.0, -1.0), color),
-        ((x1, y0, z), (-1.0, -1.0), color),
-        ((x1, y1, z), (-1.0, -1.0), color),
-        ((x0, y0, z), (-1.0, -1.0), color),
-        ((x1, y1, z), (-1.0, -1.0), color),
-        ((x0, y1, z), (-1.0, -1.0), color),
-    ]);
-}
-
-/// Draws a textured rectangle on the screen.
-///
-/// - `coords`: The coordinates of the corners of the quad, in
-/// (logical) pixels. Arrangement: (left, top, right, bottom)
-///
-/// - `texcoords`: The texture coordinates (UVs) of the quad, in the
-/// range 0.0 - 1.0. Same arrangement as `coords`.
-///
-/// - `color`: The color tint of the quad, in the range
-/// 0-255. Arrangement: (red, green, blue, alpha)
-///
-/// - `z`: Used for ordering sprites on screen, in the range -1.0 -
-/// 1.0. Positive values are in front.
-///
-/// - `tex_index`: The index of the texture / draw call to draw the
-/// quad in. This is the returned value from `create_draw_call`.
-pub fn draw_quad(
-    coords: (f32, f32, f32, f32),
-    texcoords: (f32, f32, f32, f32),
-    color: (u8, u8, u8, u8),
-    z: f32,
-    tex_index: usize,
-) {
-    let (x0, y0, x1, y1) = coords;
-    let (tx0, ty0, tx1, ty1) = texcoords;
-
-    let mut draw_state = DRAW_STATE.lock().unwrap();
-    draw_state.calls[tex_index].attributes.vbo_data.push([
-        ((x0, y0, z), (tx0, ty0), color),
-        ((x1, y0, z), (tx1, ty0), color),
-        ((x1, y1, z), (tx1, ty1), color),
-        ((x0, y0, z), (tx0, ty0), color),
-        ((x1, y1, z), (tx1, ty1), color),
-        ((x0, y1, z), (tx0, ty1), color),
-    ]);
-}
-
-/// Draws a textured rectangle on the screen.
-///
-/// See docs for `draw_quad`. The only difference is `rotation`, which
-/// describes how much the quad is rotated, in radians.
-pub fn draw_rotated_quad(
-    coords: (f32, f32, f32, f32),
-    texcoords: (f32, f32, f32, f32),
-    c: (u8, u8, u8, u8),
-    z: f32,
-    tex_index: usize,
-    rotation: f32,
-) {
-    let cos = rotation.cos();
-    let sin = rotation.sin();
-    let rotx = |x, y| x * cos - y * sin;
-    let roty = |x, y| x * sin + y * cos;
-
-    let (x0, y0, x1, y1) = coords;
-    let (cx, cy) = ((x0 + x1) * 0.5, (y0 + y1) * 0.5);
-    let (rx0, ry0, rx1, ry1) = (x0 - cx, y0 - cy, x1 - cx, y1 - cy);
-
-    let (x00, y00) = (cx + rotx(rx0, ry0), cy + roty(rx0, ry0));
-    let (x10, y10) = (cx + rotx(rx1, ry0), cy + roty(rx1, ry0));
-    let (x11, y11) = (cx + rotx(rx1, ry1), cy + roty(rx1, ry1));
-    let (x01, y01) = (cx + rotx(rx0, ry1), cy + roty(rx0, ry1));
-
-    let (tx0, ty0, tx1, ty1) = texcoords;
-
-    let mut draw_state = DRAW_STATE.lock().unwrap();
-    draw_state.calls[tex_index].attributes.vbo_data.push([
-        ((x00, y00, z), (tx0, ty0), c),
-        ((x10, y10, z), (tx1, ty0), c),
-        ((x11, y11, z), (tx1, ty1), c),
-        ((x00, y00, z), (tx0, ty0), c),
-        ((x11, y11, z), (tx1, ty1), c),
-        ((x01, y01, z), (tx0, ty1), c),
-    ]);
-}
-
-/// Draws a textured rectangle on the screen, but only the parts
-/// inside `clip_area`.
-///
-/// - `coords`: The coordinates of the corners of the quad, in
-/// (logical) pixels. Arrangement: (left, top, right, bottom)
-///
-/// - `texcoords`: The texture coordinates (UVs) of the quad, in the
-/// range 0.0 - 1.0. Same arrangement as `coords`.
-///
-/// - `color`: The color tint of the quad, in the range
-/// 0-255. Arrangement: (red, green, blue, alpha)
-///
-/// - `clip_area`: The coordinates of the corners of the clipping
-/// area, in (logical) pixels. Arrangement: (left, top, right, bottom)
-///
-/// - `z`: Used for ordering sprites on screen, in the range -1.0 -
-/// 1.0. Positive values are in front.
-///
-/// - `tex_index`: The index of the texture / draw call to draw the
-/// quad in. This is the returned value from `create_draw_call`.
-pub fn draw_quad_clipped(
-    coords: (f32, f32, f32, f32),
-    texcoords: (f32, f32, f32, f32),
-    color: (u8, u8, u8, u8),
-    clip_area: (f32, f32, f32, f32),
-    z: f32,
-    tex_index: usize,
-) {
-    let (cx0, cy0, cx1, cy1) = clip_area; // Clip coords
-    let (ox0, oy0, ox1, oy1) = coords; // Original coords
-    if ox0 > cx1 || ox1 < cx0 || oy0 > cy1 || oy1 < cy0 {
-        return;
-    }
-    let (x0, y0, x1, y1) = (
-        // Real coords
-        ox0.max(cx0).min(cx1),
-        oy0.max(cy0).min(cy1),
-        ox1.max(cx0).min(cx1),
-        oy1.max(cx0).min(cy1),
-    );
-    let (tx0, ty0, tx1, ty1) = texcoords; // Texture coords
-    let (tx0, ty0, tx1, ty1) = (
-        tx0.max(tx0 + (tx1 - tx0) * (x0 - ox0) / (ox1 - ox0)),
-        ty0.max(ty0 + (ty1 - ty0) * (y0 - oy0) / (oy1 - oy0)),
-        tx1.min(tx1 - (tx1 - tx0) * (ox1 - x1) / (ox1 - ox0)),
-        ty1.min(ty1 - (ty1 - ty0) * (oy1 - y1) / (oy1 - oy0)),
-    );
-
-    let mut draw_state = DRAW_STATE.lock().unwrap();
-    draw_state.calls[tex_index].attributes.vbo_data.push([
-        ((x0, y0, z), (tx0, ty0), color),
-        ((x1, y0, z), (tx1, ty0), color),
-        ((x1, y1, z), (tx1, ty1), color),
-        ((x0, y0, z), (tx0, ty0), color),
-        ((x1, y1, z), (tx1, ty1), color),
-        ((x0, y1, z), (tx0, ty1), color),
-    ]);
-}
-
-pub(crate) fn render(width: f32, height: f32) {
-    let m00 = 2.0 / width;
-    let m11 = -2.0 / height;
-    let matrix = [
-        m00, 0.0, 0.0, -1.0, 0.0, m11, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
-    ];
-
-    let mut draw_state = DRAW_STATE.lock().unwrap();
-    let opengl21 = draw_state.opengl21;
-    for (i, call) in draw_state.calls.iter_mut().enumerate() {
-        if call.attributes.vbo_data.is_empty() {
-            continue;
-        }
-
-        unsafe {
-            gl::UseProgram(call.program.program);
-            gl::UniformMatrix4fv(
-                call.program.projection_matrix_location,
-                1,
-                gl::FALSE,
-                matrix.as_ptr(),
-            );
-            if !opengl21 {
-                gl::BindVertexArray(call.attributes.vao);
-            }
-            gl::BindTexture(gl::TEXTURE_2D, call.texture);
-            gl::BindBuffer(gl::ARRAY_BUFFER, call.attributes.vbo);
-        }
-
-        let buffer_length = (mem::size_of::<TexQuad>() * call.attributes.vbo_data.len()) as isize;
-        let buffer_ptr = call.attributes.vbo_data.as_ptr() as *const _;
-
-        if buffer_length < call.attributes.allocated_vbo_data_size {
-            unsafe {
-                gl::BufferSubData(gl::ARRAY_BUFFER, 0, buffer_length, buffer_ptr);
-            }
-        } else {
-            call.attributes.allocated_vbo_data_size = buffer_length;
-            unsafe {
-                gl::BufferData(gl::ARRAY_BUFFER, buffer_length, buffer_ptr, gl::STREAM_DRAW);
-            }
-        }
-
-        if opengl21 {
-            unsafe {
-                enable_vertex_attribs(call.program);
-            }
-        }
-
-        unsafe {
-            gl::DrawArrays(gl::TRIANGLES, 0, call.attributes.vbo_data.len() as i32 * 6);
-        }
-
-        if opengl21 {
-            unsafe {
-                disable_vertex_attribs(call.program);
-            }
-        }
-
-        call.attributes.vbo_data.clear();
-        print_gl_errors(&*format!("after render #{}", i));
-    }
-}
-
-pub(crate) fn get_texture(index: usize) -> GLuint {
-    let draw_state = DRAW_STATE.lock().unwrap();
-    draw_state.calls[index].texture
-}
-
+// TODO: Change this to print out to env_logger or such, not stderr
 fn print_gl_errors(context: &str) {
     let mut error = unsafe { gl::GetError() };
     while error != gl::NO_ERROR {
-        println!("GL error @ {}: {}", context, gl_error_to_string(error));
+        eprintln!("GL error {}: {}", context, gl_error_to_string(error));
         error = unsafe { gl::GetError() };
     }
 }
 
-fn gl_error_to_string(error: GLuint) -> &'static str {
+fn gl_error_to_string(error: GLuint) -> String {
     match error {
-        0x0500 => "GL_INVALID_ENUM",
-        0x0501 => "GL_INVALID_VALUE",
-        0x0502 => "GL_INVALID_OPERATION",
-        0x0503 => "GL_STACK_OVERFLOW",
-        0x0504 => "GL_STACK_UNDERFLOW",
-        0x0505 => "GL_OUT_OF_MEMORY",
-        0x0506 => "GL_INVALID_FRAMEBUFFER_OPERATION",
-        0x0507 => "GL_CONTEXT_LOST",
-        0x0531 => "GL_TABLE_TOO_LARGE",
-        _ => "unknown error",
+        0x0500 => "GL_INVALID_ENUM (0x0500)".to_owned(),
+        0x0501 => "GL_INVALID_VALUE (0x0501)".to_owned(),
+        0x0502 => "GL_INVALID_OPERATION (0x0502)".to_owned(),
+        0x0503 => "GL_STACK_OVERFLOW (0x0503)".to_owned(),
+        0x0504 => "GL_STACK_UNDERFLOW (0x0504)".to_owned(),
+        0x0505 => "GL_OUT_OF_MEMORY (0x0505)".to_owned(),
+        0x0506 => "GL_INVALID_FRAMEBUFFER_OPERATION (0x0506)".to_owned(),
+        0x0507 => "GL_CONTEXT_LOST (0x0507)".to_owned(),
+        0x0531 => "GL_TABLE_TOO_LARGE (0x0531)".to_owned(),
+        _ => format!("unknown error ({:#06x})", error),
     }
 }
