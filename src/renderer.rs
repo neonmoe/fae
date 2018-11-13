@@ -1,9 +1,5 @@
 //! This module does the OpenGL stuff.
 
-// TODO: Make the pub functions self-contained
-// ie. assume that the user is doing something with the OpenGL
-// context, and try to keep everything running.
-
 use gl;
 use gl::types::*;
 use resources::Image;
@@ -66,12 +62,29 @@ struct DrawCall {
     attributes: Attributes,
 }
 
+#[derive(Clone, Copy, Debug)]
+struct OpenGLState {
+    legacy: bool,
+    // The fields below are settings set by other possible OpenGL
+    // calls made in the surrounding program, because the point of
+    // this crate is to behave well with other OpenGL code running
+    // alongside it.
+    pushed: bool,
+    depth_test: bool,
+    blend: bool,
+    blend_func: (GLint, GLint),
+    program: GLint,
+    vao: GLint,
+    texture: GLint,
+    vbo: GLint,
+}
+
 /// Contains the data and functionality needed to draw rectangles with
 /// OpenGL. **Requires** a valid OpenGL context.
 #[derive(Debug)]
 pub struct Renderer {
     calls: Vec<DrawCall>,
-    opengl21: bool,
+    gl_state: OpenGLState,
 }
 
 impl Renderer {
@@ -88,15 +101,20 @@ impl Renderer {
     pub fn create(opengl21: bool, ui_spritesheet_image: &[u8]) -> Result<Renderer, Box<Error>> {
         let mut renderer = Renderer {
             calls: Vec::with_capacity(TEXTURE_COUNT),
-            opengl21,
+            gl_state: OpenGLState {
+                legacy: opengl21,
+                pushed: false,
+                depth_test: false,
+                blend: false,
+                blend_func: (0, 0),
+                program: 0,
+                vao: 0,
+                texture: 0,
+                vbo: 0,
+            },
         };
 
-        unsafe {
-            gl::Enable(gl::DEPTH_TEST);
-            gl::Enable(gl::BLEND);
-            gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
-        }
-        print_gl_errors("after enables");
+        renderer.gl_push();
 
         // UI
         let ui_spritesheet_image = Image::from_png(ui_spritesheet_image)?;
@@ -119,6 +137,8 @@ impl Renderer {
         );
         print_gl_errors("after glyph cache texture creation");
 
+        renderer.gl_pop();
+
         Ok(renderer)
     }
 
@@ -132,8 +152,10 @@ impl Renderer {
     /// sure to study the uniform variables and attributes of the
     /// default shaders before making your own.
     pub fn create_draw_call(&mut self, image: Image, shaders: Option<&Shaders>) -> usize {
+        self.gl_push();
+
         let shaders = shaders.unwrap_or(&DEFAULT_SHADERS[DRAW_CALL_INDEX_UI]);
-        let (vert, frag) = if self.opengl21 {
+        let (vert, frag) = if self.gl_state.legacy {
             (shaders.vertex_shader_110, shaders.fragment_shader_110)
         } else {
             (shaders.vertex_shader_330, shaders.fragment_shader_330)
@@ -141,7 +163,7 @@ impl Renderer {
         let index = self.calls.len();
 
         let program = create_program(&vert, &frag);
-        let attributes = create_attributes(self.opengl21, program);
+        let attributes = create_attributes(self.gl_state.legacy, program);
         let texture = create_texture();
         self.calls.push(DrawCall {
             texture,
@@ -157,6 +179,7 @@ impl Renderer {
             &image.pixels,
         );
 
+        self.gl_pop();
         index
     }
 
@@ -336,7 +359,8 @@ impl Renderer {
             m00, 0.0, 0.0, -1.0, 0.0, m11, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
         ];
 
-        let opengl21 = self.opengl21;
+        self.gl_push();
+        let legacy = self.gl_state.legacy;
         for (i, call) in self.calls.iter_mut().enumerate() {
             if call.attributes.vbo_data.is_empty() {
                 continue;
@@ -350,7 +374,7 @@ impl Renderer {
                     gl::FALSE,
                     matrix.as_ptr(),
                 );
-                if !opengl21 {
+                if !legacy {
                     gl::BindVertexArray(call.attributes.vao);
                 }
                 gl::BindTexture(gl::TEXTURE_2D, call.texture);
@@ -372,7 +396,7 @@ impl Renderer {
                 }
             }
 
-            if opengl21 {
+            if legacy {
                 unsafe {
                     enable_vertex_attribs(call.program);
                 }
@@ -382,7 +406,7 @@ impl Renderer {
                 gl::DrawArrays(gl::TRIANGLES, 0, call.attributes.vbo_data.len() as i32 * 6);
             }
 
-            if opengl21 {
+            if legacy {
                 unsafe {
                     disable_vertex_attribs(call.program);
                 }
@@ -391,10 +415,70 @@ impl Renderer {
             call.attributes.vbo_data.clear();
             print_gl_errors(&*format!("after render #{}", i));
         }
+        self.gl_pop();
     }
 
+    /// Returns the OpenGL texture handle for the texture used by draw
+    /// call `index`.
     pub(crate) fn get_texture(&self, index: usize) -> GLuint {
         self.calls[index].texture
+    }
+
+    /// Saves the current OpenGL state for [`Renderer::gl_pop`] and
+    /// then sets some defaults used by this crate.
+    fn gl_push(&mut self) {
+        if !self.gl_state.pushed {
+            unsafe {
+                self.gl_state.depth_test = gl::IsEnabled(gl::DEPTH_TEST) != 0;
+                self.gl_state.blend = gl::IsEnabled(gl::BLEND) != 0;
+                let mut src = 0;
+                let mut dst = 0;
+                gl::GetIntegerv(gl::BLEND_SRC, &mut src);
+                gl::GetIntegerv(gl::BLEND_DST, &mut dst);
+                self.gl_state.blend_func = (src, dst);
+                gl::GetIntegerv(gl::CURRENT_PROGRAM, &mut self.gl_state.program);
+                if !self.gl_state.legacy {
+                    gl::GetIntegerv(gl::VERTEX_ARRAY_BINDING, &mut self.gl_state.vao);
+                }
+                gl::GetIntegerv(gl::TEXTURE_BINDING_2D, &mut self.gl_state.texture);
+                gl::GetIntegerv(gl::ARRAY_BUFFER_BINDING, &mut self.gl_state.vbo);
+            }
+
+            unsafe {
+                gl::Enable(gl::DEPTH_TEST);
+                gl::Enable(gl::BLEND);
+                gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
+            }
+
+            self.gl_state.pushed = true;
+            print_gl_errors("after glEnables");
+        }
+    }
+
+    /// Restores the OpenGL state saved in [`Renderer::gl_push`].
+    fn gl_pop(&mut self) {
+        if self.gl_state.pushed {
+            unsafe {
+                if !self.gl_state.depth_test {
+                    gl::Disable(gl::DEPTH_TEST);
+                }
+                if !self.gl_state.blend {
+                    gl::Disable(gl::BLEND);
+                }
+                gl::BlendFunc(
+                    self.gl_state.blend_func.0 as GLuint,
+                    self.gl_state.blend_func.1 as GLuint,
+                );
+                gl::UseProgram(self.gl_state.program as GLuint);
+                if !self.gl_state.legacy {
+                    gl::BindVertexArray(self.gl_state.vao as GLuint);
+                }
+                gl::BindTexture(gl::TEXTURE_2D, self.gl_state.texture as GLuint);
+                gl::BindBuffer(gl::ARRAY_BUFFER, self.gl_state.vbo as GLuint);
+            }
+            self.gl_state.pushed = false;
+            print_gl_errors("after restoring OpenGL state");
+        }
     }
 }
 
