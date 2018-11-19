@@ -252,11 +252,13 @@ impl Window {
                     }
                     WindowEvent::KeyboardInput { input, .. } => {
                         if let Some(keycode) = input.virtual_keycode {
+                            let pressed = input.state == ElementState::Pressed;
                             key_inputs.push(KeyStatus {
                                 keycode,
                                 modifiers: input.modifiers,
                                 last_pressed: false,
-                                pressed: input.state == ElementState::Pressed,
+                                pressed: pressed,
+                                just_pressed: pressed,
                             });
                         }
                     }

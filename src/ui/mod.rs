@@ -7,7 +7,6 @@ use std::error::Error;
 use clip;
 use renderer::{self, Renderer};
 use std::collections::HashMap;
-use std::time::{Duration, Instant};
 use text::{TextCursor, TextRenderer};
 
 use self::element::{UIElement, UIElementKind};
@@ -55,7 +54,6 @@ pub struct UIState {
     pressed_element: Option<u64>,
     focused_element: Option<u64>,
     hovering: bool,
-    last_key_input_time: Option<Instant>,
     window_dimensions: (f32, f32),
     keyboard: Keyboard,
     text_renderer: TextRenderer,
@@ -83,7 +81,6 @@ impl UIState {
             focused_element: None,
             hovering: false,
             keyboard: Keyboard::new(),
-            last_key_input_time: None,
             window_dimensions: (0.0, 0.0),
             text_renderer: TextRenderer::create(font_data)?,
             renderer: Renderer::create(opengl21, &ui_spritesheet_data)?,
@@ -149,29 +146,14 @@ impl UIState {
                 }
             }
 
-            let right_held = self.keyboard.key_held(VirtualKeyCode::Right, None);
-            let left_held = self.keyboard.key_held(VirtualKeyCode::Left, None);
-            let now = Instant::now();
-            if !right_held && !left_held {
-                self.last_key_input_time = None;
-            } else {
-                let amount = if right_held && left_held {
-                    0
-                } else if right_held {
-                    1
-                } else {
-                    -1
-                };
-                if let Some(time) = self.last_key_input_time {
-                    if now > time && now - time > Duration::from_millis(500) {
-                        element::move_cursor(self, amount);
-                        self.last_key_input_time = Some(now - Duration::from_millis(470));
-                    }
-                } else {
-                    self.last_key_input_time = Some(now);
-                    element::move_cursor(self, amount);
-                }
+            let mut delta = 0;
+            if self.keyboard.key_just_pressed(VirtualKeyCode::Right, None) {
+                delta += 1;
             }
+            if self.keyboard.key_just_pressed(VirtualKeyCode::Left, None) {
+                delta -= 1;
+            }
+            element::move_cursor(self, delta);
         }
 
         UIStatus { hovering_button }
