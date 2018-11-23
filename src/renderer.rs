@@ -119,7 +119,7 @@ impl Renderer {
         // UI
         let ui_spritesheet_image = Image::from_png(ui_spritesheet_image)?;
         renderer.create_draw_call(
-            ui_spritesheet_image,
+            &ui_spritesheet_image,
             Some(&DEFAULT_SHADERS[DRAW_CALL_INDEX_UI]),
         );
         print_gl_errors("after ui spritesheet texture creation");
@@ -128,11 +128,11 @@ impl Renderer {
         let glyph_cache_image = Image::from_color(
             text::GLYPH_CACHE_WIDTH as i32,
             text::GLYPH_CACHE_HEIGHT as i32,
-            vec![0],
+            &[0],
         )
         .format(gl::RED);
         renderer.create_draw_call(
-            glyph_cache_image,
+            &glyph_cache_image,
             Some(&DEFAULT_SHADERS[DRAW_CALL_INDEX_TEXT]),
         );
         print_gl_errors("after glyph cache texture creation");
@@ -151,7 +151,7 @@ impl Renderer {
     /// with the `shaders` parameter. Use `None` for defaults. Make
     /// sure to study the uniform variables and attributes of the
     /// default shaders before making your own.
-    pub fn create_draw_call(&mut self, image: Image, shaders: Option<&Shaders>) -> usize {
+    pub fn create_draw_call(&mut self, image: &Image, shaders: Option<&Shaders>) -> usize {
         self.gl_push();
 
         let shaders = shaders.unwrap_or(&DEFAULT_SHADERS[DRAW_CALL_INDEX_UI]);

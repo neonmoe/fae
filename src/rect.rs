@@ -29,49 +29,57 @@ impl Rect {
 
     /// Returns the x coordinate of the rectangle's top-left corner.
     pub fn left(&self) -> f32 {
-        match self {
-            &Rect::Dims(x, ..) => x,
-            &Rect::Coords(x, ..) => x,
+        match *self {
+            Rect::Dims(x, ..) => x,
+            Rect::Coords(x, ..) => x,
         }
     }
 
     /// Returns the y coordinate of the rectangle's top-left corner.
     pub fn top(&self) -> f32 {
-        match self {
-            &Rect::Dims(_, y, ..) => y,
-            &Rect::Coords(_, y, ..) => y,
+        match *self {
+            Rect::Dims(_, y, ..) => y,
+            Rect::Coords(_, y, ..) => y,
         }
     }
 
     /// Returns the x coordinate of the rectangle's bottom-right corner.
     pub fn right(&self) -> f32 {
-        match self {
-            &Rect::Dims(x, _, w, _) => x + w,
-            &Rect::Coords(.., x1, _) => x1,
+        match *self {
+            Rect::Dims(x, _, w, _) => x + w,
+            Rect::Coords(.., x1, _) => x1,
         }
     }
 
     /// Returns the y coordinate of the rectangle's bottom-right corner.
     pub fn bottom(&self) -> f32 {
-        match self {
-            &Rect::Dims(_, y, _, h) => y + h,
-            &Rect::Coords(.., y1) => y1,
+        match *self {
+            Rect::Dims(_, y, _, h) => y + h,
+            Rect::Coords(.., y1) => y1,
         }
     }
 
     /// Returns the width of the rectangle.
     pub fn width(&self) -> f32 {
-        match self {
-            &Rect::Dims(.., w, _) => w,
-            &Rect::Coords(x0, _, x1, ..) => x1 - x0,
+        match *self {
+            Rect::Dims(.., w, _) => w,
+            Rect::Coords(x0, _, x1, ..) => x1 - x0,
         }
     }
 
     /// Returns the height of the rectangle.
     pub fn height(&self) -> f32 {
-        match self {
-            &Rect::Dims(.., h) => h,
-            &Rect::Coords(_, y0, _, y1) => y1 - y0,
+        match *self {
+            Rect::Dims(.., h) => h,
+            Rect::Coords(_, y0, _, y1) => y1 - y0,
+        }
+    }
+
+    /// Returns the width and height of the image in a tuple.
+    pub fn dimensions(&self) -> (f32, f32) {
+        match *self {
+            Rect::Dims(.., w, h) => (w, h),
+            Rect::Coords(x0, y0, x1, y1) => (x1 - x0, y1 - y0),
         }
     }
 

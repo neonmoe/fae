@@ -47,10 +47,11 @@ impl Keyboard {
         }
     }
 
-    /// Returns true if the given key is held, and the modifiers were
-    /// active when the key was initially pressed. If you don't care
-    /// about the modifiers, leave `modifiers` as None.
-    pub fn key_held(&self, keycode: VirtualKeyCode, modifiers: Option<ModifiersState>) -> bool {
+    /// Returns true if the given key is currently being pressed, and
+    /// the modifiers were active when the key was initially
+    /// pressed. If you don't care about the modifiers, leave
+    /// `modifiers` as None.
+    pub fn held(&self, keycode: VirtualKeyCode, modifiers: Option<ModifiersState>) -> bool {
         if !self.keys.contains_key(&keycode) {
             false
         } else {
@@ -62,7 +63,7 @@ impl Keyboard {
     /// Returns true if the given key was just released, and the
     /// modifiers were active when the key was initially pressed. If
     /// you don't care about the modifiers, leave `modifiers` as None.
-    pub fn key_typed(&self, keycode: VirtualKeyCode, modifiers: Option<ModifiersState>) -> bool {
+    pub fn released(&self, keycode: VirtualKeyCode, modifiers: Option<ModifiersState>) -> bool {
         if !self.keys.contains_key(&keycode) {
             false
         } else {
@@ -74,13 +75,12 @@ impl Keyboard {
     }
 
     /// Returns true on the frame that the key was initially
-    /// pressed.If you don't care about the modifiers, leave
-    /// `modifiers` as None.
-    pub fn key_just_pressed(
-        &self,
-        keycode: VirtualKeyCode,
-        modifiers: Option<ModifiersState>,
-    ) -> bool {
+    /// pressed. If the key is held and the operating system sends
+    /// repeated key events (which most probably is the case), this
+    /// will start returning true a few times a second after a delay
+    /// because of that repeating functionality. If you don't care
+    /// about the modifiers, leave `modifiers` as None.
+    pub fn typed(&self, keycode: VirtualKeyCode, modifiers: Option<ModifiersState>) -> bool {
         if !self.keys.contains_key(&keycode) {
             false
         } else {

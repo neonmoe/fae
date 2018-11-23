@@ -196,7 +196,7 @@ impl Window {
             }*/
         }
 
-        let ui = UIState::create(settings.font, settings.ui_spritesheet, opengl21)?;
+        let ui = UIState::create(settings.font, &settings.ui_spritesheet, opengl21)?;
 
         Ok(Window {
             width: settings.width,
@@ -257,7 +257,7 @@ impl Window {
                                 keycode,
                                 modifiers: input.modifiers,
                                 last_pressed: false,
-                                pressed: pressed,
+                                pressed,
                                 just_pressed: pressed,
                             });
                         }

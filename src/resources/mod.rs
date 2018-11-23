@@ -56,10 +56,10 @@ impl Image {
     /// # Example
     /// ```
     /// use fungui::Image;
-    /// let image = Image::from_color(128, 128, vec![0xB4, 0x6E, 0xC8, 0xFF]);
+    /// let image = Image::from_color(128, 128, &[0xB4, 0x6E, 0xC8, 0xFF]);
     /// // image now represents a 128px by 128px image that consists of fully opaque violet pixels.
     /// ```
-    pub fn from_color(width: i32, height: i32, color: Vec<u8>) -> Image {
+    pub fn from_color(width: i32, height: i32, color: &[u8]) -> Image {
         let mut pixels = vec![0; (width * height) as usize * color.len()];
         for i in 0..pixels.len() {
             pixels[i] = color[i % color.len()];
@@ -79,7 +79,7 @@ impl Image {
     /// ```
     /// use fungui::Image;
     /// use fungui::gl;
-    /// let image = Image::from_color(128, 128, vec![0x88]).format(gl::RED);
+    /// let image = Image::from_color(128, 128, &[0x88]).format(gl::RED);
     /// // image now represents a 128px by 128px image that consists of half-red pixels taking up only one byte per pixel.
     /// ```
     pub fn format(mut self, format: u32) -> Image {

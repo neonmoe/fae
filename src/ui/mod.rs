@@ -65,7 +65,7 @@ impl UIState {
     /// Creates a new instance of the UI.
     pub fn create(
         font_data: Vec<u8>,
-        ui_spritesheet_data: Vec<u8>,
+        ui_spritesheet_data: &[u8],
         opengl21: bool,
     ) -> Result<UIState, Box<Error>> {
         Ok(UIState {
@@ -83,7 +83,7 @@ impl UIState {
             keyboard: Keyboard::new(),
             window_dimensions: (0.0, 0.0),
             text_renderer: TextRenderer::create(font_data)?,
-            renderer: Renderer::create(opengl21, &ui_spritesheet_data)?,
+            renderer: Renderer::create(opengl21, ui_spritesheet_data)?,
         })
     }
 
@@ -132,7 +132,7 @@ impl UIState {
                 element::insert_input(id, character);
             }
 
-            if self.keyboard.key_typed(
+            if self.keyboard.typed(
                 VirtualKeyCode::V,
                 Some(ModifiersState {
                     ctrl: true,
@@ -147,10 +147,10 @@ impl UIState {
             }
 
             let mut delta = 0;
-            if self.keyboard.key_just_pressed(VirtualKeyCode::Right, None) {
+            if self.keyboard.typed(VirtualKeyCode::Right, None) {
                 delta += 1;
             }
-            if self.keyboard.key_just_pressed(VirtualKeyCode::Left, None) {
+            if self.keyboard.typed(VirtualKeyCode::Left, None) {
                 delta -= 1;
             }
             element::move_cursor(self, delta);
@@ -203,8 +203,7 @@ impl UIState {
         self.text_renderer.queue_text(
             text,
             (rect.left(), rect.top(), NORMAL_UI_TEXT_DEPTH),
-            rect.width(),
-            rect.height(),
+            rect.dimensions(),
             alignment,
             multiline,
             cursor,

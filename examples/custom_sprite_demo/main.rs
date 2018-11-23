@@ -11,7 +11,7 @@ fn main() {
 
     let spritesheet_tex_index = {
         let renderer = &mut window.ui.renderer;
-        renderer.create_draw_call(Image::from_png(include_bytes!("test.png")).unwrap(), None)
+        renderer.create_draw_call(&Image::from_png(include_bytes!("test.png")).unwrap(), None)
     };
 
     while window.refresh(0.8, 0.8, 0.8) {
