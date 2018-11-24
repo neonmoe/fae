@@ -13,7 +13,11 @@ fn main() {
         let frame_timer = &window.frame_timer;
         ui.label(
             "frame-time",
-            &format!("{:?}", frame_timer.avg_frame_duration()),
+            &format!(
+                "{} Hz, {:?}",
+                frame_timer.frames_last_second(),
+                frame_timer.avg_frame_duration()
+            ),
         );
     }
 }

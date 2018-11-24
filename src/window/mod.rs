@@ -226,16 +226,19 @@ impl Window {
         background_green: f32,
         background_blue: f32,
     ) -> bool {
-        let mut running = true;
-
-        self.frame_timer.end_frame();
-        let _ = self.gl_window.swap_buffers();
+        self.frame_timer.start_clear();
         unsafe {
             gl::ClearColor(background_red, background_green, background_blue, 1.0);
             gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
         }
+        self.frame_timer.end_clear();
+        self.ui.update_post_application(self.width, self.height);
+
+        self.frame_timer.end_frame();
+        let _ = self.gl_window.swap_buffers();
         self.frame_timer.begin_frame();
 
+        let mut running = true;
         let mut resized_logical_size = None;
         let mut mouse_position = None;
         let mut mouse_pressed = None;

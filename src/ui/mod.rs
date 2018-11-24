@@ -92,7 +92,17 @@ impl UIState {
         self.elements.insert(element.id(), element);
     }
 
-    /// Handled by the `window_bootstrap` feature, if in use.
+    /// Handled by the `window_bootstrap` feature, if in use. Renders
+    /// the UI.
+    pub fn update_post_application(&mut self, width: f32, height: f32) {
+        let renderer = &mut self.renderer;
+        let text_renderer = &mut self.text_renderer;
+        text_renderer.draw_text(renderer);
+        renderer.render(width, height);
+    }
+
+    /// Handled by the `window_bootstrap` feature, if in use. Updates
+    /// the UI state and reads current system status.
     // TODO: Keyboard navigation of the UI
     pub fn update(
         &mut self,
@@ -103,13 +113,6 @@ impl UIState {
         key_inputs: Vec<KeyStatus>,
         characters: Vec<char>,
     ) -> UIStatus {
-        {
-            let renderer = &mut self.renderer;
-            let text_renderer = &mut self.text_renderer;
-            text_renderer.draw_text(renderer);
-            renderer.render(width, height);
-        }
-
         self.window_dimensions = (width as f32, height as f32);
         self.text_renderer.update_dpi(dpi);
 

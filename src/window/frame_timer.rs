@@ -13,11 +13,19 @@ const STORED_FRAME_TIMES: usize = 60;
 pub struct FrameTimer {
     frame_durations: Vec<Duration>,
     vsync_duration: Option<Duration>,
+
     end: Option<Instant>,
     start: Option<Instant>,
+    clear_duration: Option<Duration>,
+    clear_start: Option<Instant>,
+
     frame_duration: Option<Duration>,
     wait_duration: Option<Duration>,
     refresh_durations: Vec<Duration>,
+
+    fps_counter: u32,
+    fps: u32,
+    last_fps_update: Instant,
 }
 
 impl FrameTimer {
@@ -27,17 +35,32 @@ impl FrameTimer {
             vsync_duration: None,
             end: None,
             start: None,
+            clear_duration: None,
+            clear_start: None,
             frame_duration: None,
             wait_duration: None,
             refresh_durations: Vec::with_capacity(STABLE_REFRESH_COUNT + 1),
+            fps_counter: 0,
+            fps: 0,
+            last_fps_update: Instant::now(),
+        }
+    }
+
+    pub(crate) fn start_clear(&mut self) {
+        self.clear_start = Some(Instant::now());
+    }
+
+    pub(crate) fn end_clear(&mut self) {
+        if let Some(last_clear_start) = self.clear_start {
+            self.clear_duration = Some(Instant::now() - last_clear_start);
         }
     }
 
     pub(crate) fn end_frame(&mut self) {
         let end = Instant::now();
-        if let Some(last_end) = self.end {
-            if end > last_end {
-                self.frame_duration = Some(end - last_end);
+        if let (Some(last_end), Some(last_clear_duration)) = (self.end, self.clear_duration) {
+            if end > last_end + last_clear_duration {
+                self.frame_duration = Some(end - (last_end + last_clear_duration));
             }
         }
         self.end = Some(end);
@@ -96,6 +119,13 @@ impl FrameTimer {
             }
         }
 
+        self.fps_counter += 1;
+        if Instant::now() - self.last_fps_update >= Duration::from_secs(1) {
+            self.fps = self.fps_counter;
+            self.last_fps_update = Instant::now();
+            self.fps_counter = 0;
+        }
+
         self.start = Some(Instant::now());
     }
 
@@ -112,5 +142,11 @@ impl FrameTimer {
                 .fold(Duration::from_millis(0), |acc, &duration| acc + duration);
             sum / self.frame_durations.len() as u32
         }
+    }
+
+    /// Returns the how many frames were rendered during the last
+    /// second. This is updated once per second.
+    pub fn frames_last_second(&self) -> u32 {
+        self.fps
     }
 }
