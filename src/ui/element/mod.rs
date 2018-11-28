@@ -6,7 +6,7 @@ use rect::Rect;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use text::Alignment;
-use ui::{UIState, OUTER_TILE_WIDTH, PADDING};
+use ui::{UIState, PADDING};
 
 /// Represents what kind of element this is, used for deciding which
 /// sprite to use for rendering, and which state the element is in.
@@ -58,10 +58,7 @@ impl UIElement {
 
     pub(crate) fn is_point_inside(&self, x: f32, y: f32) -> bool {
         let (x0, y0, x1, y1) = self.rect.coords();
-        !(x < x0 - PADDING - OUTER_TILE_WIDTH
-            || x >= x1 + PADDING + OUTER_TILE_WIDTH
-            || y < y0 - PADDING - OUTER_TILE_WIDTH
-            || y >= y1 + PADDING + OUTER_TILE_WIDTH)
+        !(x < x0 - PADDING || x >= x1 + PADDING || y < y0 - PADDING || y >= y1 + PADDING)
     }
 }
 

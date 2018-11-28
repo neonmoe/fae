@@ -13,9 +13,9 @@ use self::element::{UIElement, UIElementKind};
 use self::keyboard::KeyStatus;
 use self::keyboard::Keyboard;
 
-const TILE_SIZE: f32 = 16.0;
-const OUTER_TILE_WIDTH: f32 = 4.0;
-const PADDING: f32 = 2.0;
+// TODO: Move these two consts to styles when those exist
+const NINEPATCH_TILE_SIZES: ((f32, f32, f32), (f32, f32, f32)) = ((4.0, 4.0, 4.0), (4.0, 4.0, 4.0));
+const PADDING: f32 = 6.0;
 
 const NORMAL_UI_ELEMENT_DEPTH: f32 = 0.0;
 const NORMAL_UI_TEXT_DEPTH: f32 = NORMAL_UI_ELEMENT_DEPTH - 0.1;
@@ -175,41 +175,29 @@ impl UIState {
             alignment,
             ..
         } = element;
-        let (left, top, right, bottom) = rect.coords();
+        let (x0, y0, x1, y1) = rect.coords();
 
         if kind != UIElementKind::NoBackground {
             let sheet_length = UIElementKind::KindCount as i32;
-            let tx = kind as i32 as f32 / sheet_length as f32; // The UV offset based on the element type
-            let ty = 0.0;
-            let tw = 1.0 / (3.0 * sheet_length as f32); // UV width of a spritesheet tile
-            let th = 1.0 / 3.0; // UV height of a spritesheet tile
-            let tx = [tx, tx + tw, tx + tw * 2.0];
-            let ty = [ty, ty + th, ty + th * 2.0];
+            let tx0 = kind as i32 as f32 / sheet_length as f32;
+            let ty0 = 0.0;
+            let tx1 = tx0 + 1.0 / (sheet_length as f32);
+            let ty1 = ty0 + 1.0;
+            let coords = (x0 - PADDING, y0 - PADDING, x1 + PADDING, y1 + PADDING);
 
-            let left_ = [left - TILE_SIZE - PADDING, left - PADDING, right + PADDING];
-            let top_ = [top - TILE_SIZE - PADDING, top - PADDING, bottom + PADDING];
-            let right_ = [left_[1], left_[2], left_[2] + TILE_SIZE];
-            let bottom_ = [top_[1], top_[2], top_[2] + TILE_SIZE];
-            let z = NORMAL_UI_ELEMENT_DEPTH;
-
-            for i in 0..9 {
-                let xi = i % 3;
-                let yi = i / 3;
-                let coords = (left_[xi], top_[yi], right_[xi], bottom_[yi]);
-                let texcoords = (tx[xi], ty[yi], tx[xi] + tw, ty[yi] + th);
-                let color = (0xFF, 0xFF, 0xFF, 0xFF);
-                self.renderer
-                    .draw_quad(coords, texcoords, color, z, renderer::DRAW_CALL_INDEX_UI);
-            }
+            self.renderer.draw_quad_ninepatch(
+                NINEPATCH_TILE_SIZES,
+                coords,
+                (tx0, ty0, tx1, ty1),
+                (0xFF, 0xFF, 0xFF, 0xFF),
+                NORMAL_UI_ELEMENT_DEPTH,
+                renderer::DRAW_CALL_INDEX_UI,
+            );
         }
 
-        self.text_renderer.queue_text(
-            text,
-            (rect.left(), rect.top(), NORMAL_UI_TEXT_DEPTH),
-            rect.dimensions(),
-            alignment,
-            multiline,
-            cursor,
-        );
+        let coords = (x0, y0, NORMAL_UI_TEXT_DEPTH);
+        let dims = rect.dimensions();
+        self.text_renderer
+            .queue_text(text, coords, dims, alignment, multiline, cursor);
     }
 }
