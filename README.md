@@ -1,50 +1,35 @@
-# fungui
-This is a work-in-progress GUI crate for making easy-to-code
-lightweight GUIs. Main features / ideas of the crate:
-- [IMGUI](https://caseymuratori.com/blog_0001)-inspired design
-- Lightweight (not a wrapper for another UI library, like GTK or Qt)
-- No native controls (because of the above point) -> graphics are
-  implemented using OpenGL
+# fae
+*Sprites are a supernatural entities, often depicted as fae-like
+creatures.*
 
-## Current status
-The crate is still very much in development and the API is changing
-all the time. Wouldn't recommend using this crate for anything
-currently. However, there is one working example, `counter`.
+Fae is a simple, performant and compatible 2D rendering package with
+optional window creation functionality and text rendering. Its main
+design goals are simplicity and performance while keeping support for
+older target platforms. Rendering is implemented in OpenGL, glyph
+drawing is done by `rusttype`, and the window initialization by
+`glutin`. The crate supports OpenGL 2.1+ and OpenGL ES 2.0+ contexts,
+but will do optimizations if a 3.3 or ES 3.0 context is available.
 
-Here's a roadmap, half to describe the status of the crate, half as a
-high level todo list:
-- [x] Windows, rendering sprites and text, "graphics backend"
-- [ ] Mouse stuff
-  - [x] Button hovers
-  - [x] Button presses (NOTE: buttons on top of eachother still require handling)
-  - [ ] Input field focusing
-  - [ ] Text selection (Click-and-drag, see also under Keyboard stuff)
-  - [ ] Context menu
-- [ ] Keyboard stuff
-  - [x] Arrows to move around in an editable text field
-  - [x] Text deletion by backspace and delete (NOTE: delete not currently implemented)
-  - [ ] Ctrl as a modifier to move/delete by word rather than by char
-  - [ ] Ctrl+Z to undo, Ctrl+Shift+Z / Ctrl+Y to redo
-  - [x] Ctrl+V to paste
-  - [ ] Text selection (Shift+[Ctrl]+Arrows, see also under Mouse stuff)
-  - [ ] Ctrl+C to copy selection
-  - [ ] Tab to switch focus, Shift+Tab to switch to previous
-- [ ] Layout
-  - [ ] Plan: A structure for the layout system
-  - [ ] Plan: The public api for the system
-- [ ] Widgets
-  - [x] Button (-> bool)
-  - [x] Editable one-line text field (-> String)
-  - [x] Editable one-line passwordy text field (-> String)
-  - [ ] Editable multiline text field (-> String)
-  - [x] Normal text field
-  - [ ] Radio button (-> bool?)
-  - [ ] Checkbox (-> bool)
-  - [ ] Slider (-> T: Add + Sub?)
-  - [ ] Number input field (-> i32/f32?)
-  - [ ] Dropdown (-> Enum?)
-  - [ ] File (-> Path)
+## Features
+As is, without the default features, the crate has the functionality
+for drawing rectangles in various ways: rotated, tinted, and
+sprited. Ninepatch sprites, ie. sprites with borders defined
+separately from the middle part, are supported as well.
+
+The optional features (all enabled by default) consist of the
+following:
+- The **glutin** feature implements the `window` mod, which allows for
+  easy window creation using glutin, with all the required OpenGL
+  context wrangling done for you.
+- The **text** feature implements the `text` mod, which adds rendering
+  strings to the available render functions. Fonts are provided in the
+  form of .ttf files shipped with your application. The glyph
+  rendering is done by `rusttype`, which this feature adds as a
+  dependency, as well as `unicode-normalization`.
+- The **png** feature implements the `Image::from_png` function, which
+  allows you to load images from PNG data. This is a very convenient
+  feature, but not necessarily a requirement for using the crate, so
+  it's optional.
 
 ## License
-I wouldn't recommend using this crate at this time, but you're free to
-do so under the terms of the [MIT license](LICENSE.md).
+The `fae` crate is distributed under the MIT license.

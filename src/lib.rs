@@ -1,43 +1,21 @@
-//! # fungui
-//!
-//! Work-in-progress GUI crate for making easy-to-code lightweight
-//! GUIs. See the README for more information. Since the crate is deep
-//! in development, I won't write a general guide to using it yet,
-//! aside from the examples.
-#![warn(missing_docs)]
-
-// TODO: Refactor away lazy statics and create a specific
-// static-feeling wrapper for the stateful stuff
-
-#[cfg(feature = "window_bootstrap")]
-extern crate glutin;
-#[macro_use]
-extern crate lazy_static;
-#[cfg(feature = "clipboard")]
-extern crate clipboard;
-extern crate png;
-extern crate rusttype;
-extern crate unicode_normalization;
-
-#[cfg(feature = "window_bootstrap")]
-mod window;
-#[cfg(feature = "window_bootstrap")]
-pub use window::*;
-
-mod clip;
-mod rect;
-mod renderer;
-mod resources;
-mod text;
-mod ui;
-
-pub use rect::Rect;
-pub use renderer::{Renderer, Shaders};
-pub use resources::Image;
-pub use ui::keyboard::{KeyStatus, Keyboard};
-pub use ui::{ModifiersState, MouseStatus, UIState, VirtualKeyCode};
+//#![warn(missing_docs)]
 
 #[allow(missing_docs, unknown_lints, clippy::all)]
 pub mod gl {
     include!(concat!(env!("OUT_DIR"), "/gl_bindings.rs"));
 }
+
+mod image;
+mod rect;
+pub mod renderer;
+
+pub use crate::image::Image;
+pub use crate::rect::Rect;
+
+#[cfg(feature = "text")]
+pub mod text;
+
+#[cfg(feature = "glutin")]
+mod frame_timer;
+#[cfg(feature = "glutin")]
+pub mod window;

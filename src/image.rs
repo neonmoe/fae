@@ -1,16 +1,8 @@
-//! Default resources, included with the default feature
-//! `default_resources`.
-
-use gl;
+use crate::gl;
+#[cfg(feature = "png")]
 use png;
+#[cfg(feature = "png")]
 use std::error::Error;
-
-/// Default spritesheet for the GUI elements.
-#[cfg(feature = "default_resources")]
-pub static DEFAULT_UI_SPRITESHEET: &'static [u8] = include_bytes!("gui.png");
-/// Default font, Fira Sans.
-#[cfg(feature = "default_resources")]
-pub static DEFAULT_FONT: &'static [u8] = include_bytes!("FiraSans.ttf");
 
 /// Contains the raw pixel color data of an image (`u8` per color
 /// channel).
@@ -32,10 +24,12 @@ impl Image {
     /// Tries to load a PNG image and make an `Image` out of it.
     ///
     /// # Example
+    /// ```should_panic
+    /// use fae::Image;
+    /// use std::fs;
+    /// let sprite = Image::from_png(&fs::read("sprite.png").unwrap()).unwrap();
     /// ```
-    /// use fungui::Image;
-    /// let image = Image::from_png(include_bytes!("gui.png")).unwrap();
-    /// ```
+    #[cfg(feature = "png")]
     pub fn from_png(bytes: &[u8]) -> Result<Image, Box<Error>> {
         let decoder = png::Decoder::new(bytes);
         let (info, mut reader) = decoder.read_info()?;
@@ -55,7 +49,7 @@ impl Image {
     ///
     /// # Example
     /// ```
-    /// use fungui::Image;
+    /// use fae::Image;
     /// let image = Image::from_color(128, 128, &[0xB4, 0x6E, 0xC8, 0xFF]);
     /// // image now represents a 128px by 128px image that consists of fully opaque violet pixels.
     /// ```
@@ -77,8 +71,7 @@ impl Image {
     ///
     /// # Example
     /// ```
-    /// use fungui::Image;
-    /// use fungui::gl;
+    /// use fae::{gl, Image};
     /// let image = Image::from_color(128, 128, &[0x88]).format(gl::RED);
     /// // image now represents a 128px by 128px image that consists of half-red pixels taking up only one byte per pixel.
     /// ```

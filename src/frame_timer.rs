@@ -16,8 +16,6 @@ pub struct FrameTimer {
 
     end: Option<Instant>,
     start: Option<Instant>,
-    clear_duration: Option<Duration>,
-    clear_start: Option<Instant>,
 
     frame_duration: Option<Duration>,
     wait_duration: Option<Duration>,
@@ -35,8 +33,6 @@ impl FrameTimer {
             vsync_duration: None,
             end: None,
             start: None,
-            clear_duration: None,
-            clear_start: None,
             frame_duration: None,
             wait_duration: None,
             refresh_durations: Vec::with_capacity(STABLE_REFRESH_COUNT + 1),
@@ -46,21 +42,11 @@ impl FrameTimer {
         }
     }
 
-    pub(crate) fn start_clear(&mut self) {
-        self.clear_start = Some(Instant::now());
-    }
-
-    pub(crate) fn end_clear(&mut self) {
-        if let Some(last_clear_start) = self.clear_start {
-            self.clear_duration = Some(Instant::now() - last_clear_start);
-        }
-    }
-
     pub(crate) fn end_frame(&mut self) {
         let end = Instant::now();
-        if let (Some(last_end), Some(last_clear_duration)) = (self.end, self.clear_duration) {
-            if end > last_end + last_clear_duration {
-                self.frame_duration = Some(end - (last_end + last_clear_duration));
+        if let Some(last_end) = self.end {
+            if end > last_end {
+                self.frame_duration = Some(end - last_end);
             }
         }
         self.end = Some(end);

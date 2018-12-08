@@ -1,7 +1,8 @@
-use gl;
-use gl::types::*;
-use rect;
-use renderer::{self, Renderer};
+use crate::gl;
+use crate::gl::types::*;
+use crate::image::Image;
+use crate::rect;
+use crate::renderer::{Renderer, Shaders};
 use rusttype::gpu_cache::Cache;
 use rusttype::*;
 use std::cell::RefCell;
@@ -11,37 +12,12 @@ use unicode_normalization::UnicodeNormalization;
 pub(crate) const GLYPH_CACHE_WIDTH: u32 = 1024;
 pub(crate) const GLYPH_CACHE_HEIGHT: u32 = 1024;
 
-struct TextRender {
-    glyphs: Vec<SizedGlyph>,
-    clip_area: rect::Rect,
-    cursor_quad: Option<rect::Rect>,
-    z: f32,
-}
-
-#[derive(Clone)]
-struct SizedGlyph {
-    glyph: PositionedGlyph<'static>,
-    width: f32,
-}
-
-#[derive(Clone, Copy)]
-pub(crate) struct TextCursor {
-    pub index: usize,
-    pub blink_visibility: bool,
-    offset_min: Option<f32>,
-    offset_max: Option<f32>,
-}
-
-impl TextCursor {
-    pub fn new(index: usize, blink_visibility: bool) -> TextCursor {
-        TextCursor {
-            index,
-            blink_visibility,
-            offset_min: None,
-            offset_max: None,
-        }
-    }
-}
+const DEFAULT_TEXT_SHADERS: Shaders = Shaders {
+    vertex_shader_110: include_str!("shaders/legacy/text.vert"),
+    fragment_shader_110: include_str!("shaders/legacy/text.frag"),
+    vertex_shader_330: include_str!("shaders/text.vert"),
+    fragment_shader_330: include_str!("shaders/text.frag"),
+};
 
 /// Defines the alignment of text.
 #[allow(dead_code)]
@@ -55,73 +31,16 @@ pub enum Alignment {
     Center,
 }
 
-/// Will only return `None` when `index >= glyphs.len()`.
-fn measure_text_at_index(glyphs: &[SizedGlyph], index: usize, dpi: f32) -> Option<rect::Rect> {
-    if index >= glyphs.len() {
-        return None;
-    }
-
-    let width = glyphs[index].width;
-    let glyph = &glyphs[index].glyph;
-    let position = glyph.position();
-    if let Some(rect) = glyph.pixel_bounding_box() {
-        return Some(rect::Rect::Coords(
-            rect.min.x as f32 / dpi,
-            rect.min.y as f32 / dpi,
-            rect.max.x as f32 / dpi,
-            rect.max.y as f32 / dpi,
-        ));
-    } else {
-        return Some(rect::Rect::Dims(
-            position.x / dpi,
-            position.y / dpi,
-            width / dpi,
-            1.0,
-        ));
-    }
+struct TextRender {
+    glyphs: Vec<SizedGlyph>,
+    clip_area: rect::Rect,
+    z: f32,
 }
 
-fn measure_text(glyphs: &[SizedGlyph], dpi: f32) -> Option<(f32, f32)> {
-    let mut result: Option<rect::Rect> = None;
-
-    for i in 0..glyphs.len() {
-        if let Some(glyph_rect) = measure_text_at_index(glyphs, i, dpi) {
-            if let Some(ref mut rect) = result {
-                let (x0, y0, x1, y1) = (
-                    rect.left().min(glyph_rect.left()),
-                    rect.top().min(glyph_rect.top()),
-                    rect.right().max(glyph_rect.right()),
-                    rect.bottom().max(glyph_rect.bottom()),
-                );
-                rect.set_coords(x0, y0, x1, y1);
-            } else {
-                result = Some(glyph_rect);
-            }
-        }
-    }
-
-    if let Some(rect) = result {
-        Some((rect.width(), rect.height()))
-    } else {
-        None
-    }
-}
-
-fn offset_glyphs(glyphs: Vec<SizedGlyph>, x: f32, y: f32, dpi: f32) -> Vec<SizedGlyph> {
-    glyphs
-        .into_iter()
-        .map(|glyph| offset_glyph(glyph, x, y, dpi))
-        .collect()
-}
-
-fn offset_glyph(glyph: SizedGlyph, x: f32, y: f32, dpi: f32) -> SizedGlyph {
-    let width = glyph.width;
-    let glyph = glyph.glyph;
-    let position = glyph.position() + vector(x, y) * dpi;
-    SizedGlyph {
-        width,
-        glyph: glyph.into_unpositioned().positioned(position),
-    }
+#[derive(Clone)]
+struct SizedGlyph {
+    glyph: PositionedGlyph<'static>,
+    width: f32,
 }
 
 pub struct TextRenderer {
@@ -129,10 +48,16 @@ pub struct TextRenderer {
     cache: RefCell<Cache<'static>>,
     cached_text: Vec<TextRender>,
     dpi: f32,
+    draw_call: usize,
 }
 
 impl TextRenderer {
-    pub(crate) fn create(font_data: Vec<u8>) -> Result<TextRenderer, Box<Error>> {
+    pub fn create(font_data: Vec<u8>, renderer: &mut Renderer) -> Result<TextRenderer, Box<Error>> {
+        let glyph_cache_image =
+            Image::from_color(GLYPH_CACHE_WIDTH as i32, GLYPH_CACHE_HEIGHT as i32, &[0])
+                .format(gl::RED);
+        let draw_call = renderer.create_draw_call(&glyph_cache_image, Some(&DEFAULT_TEXT_SHADERS));
+
         Ok(TextRenderer {
             font: Font::from_bytes(font_data)?,
             cache: RefCell::new(
@@ -142,21 +67,21 @@ impl TextRenderer {
             ),
             cached_text: Vec::new(),
             dpi: 1.0,
+            draw_call,
         })
     }
 
-    pub(crate) fn update_dpi(&mut self, dpi: f32) {
+    pub fn update_dpi(&mut self, dpi: f32) {
         self.dpi = dpi;
     }
 
-    pub(crate) fn queue_text(
+    pub fn queue_text(
         &mut self,
         text: &str,
         (x, y, z): (f32, f32, f32),
         (width, font_size): (f32, f32),
         alignment: Alignment,
         multiline: bool,
-        cursor: Option<&mut TextCursor>,
     ) {
         let rows = self.collect_glyphs(x, y, width, multiline, font_size, text);
         let dpi = self.dpi;
@@ -196,97 +121,9 @@ impl TextRenderer {
             }
         }
 
-        let mut cursor_quad = None;
-        if let Some(&mut TextCursor {
-            index,
-            blink_visibility,
-            offset_min,
-            offset_max,
-        }) = cursor
-        {
-            let mut cursor_x = if index > 0 && index < final_glyphs.len() {
-                let cursor_rect = measure_text_at_index(&final_glyphs, index, dpi).unwrap();
-                cursor_rect.left()
-            } else if index > 0 {
-                let cursor_rect = measure_text_at_index(&final_glyphs, index - 1, dpi).unwrap();
-                cursor_rect.right()
-            } else if let Some(rect) = measure_text_at_index(&final_glyphs, 0, dpi) {
-                rect.left()
-            } else {
-                match alignment {
-                    Alignment::Left => x,
-                    Alignment::Right => x + width - 4.0 * dpi,
-                    Alignment::Center => x + width / 2.0,
-                }
-            };
-
-            // TODO: Clean up offsets caused by cursors
-            // Because this code is a *mess*.
-
-            let cursor = cursor.unwrap();
-            let mut current_offset_x = None;
-
-            if let Some(offset_min) = offset_min {
-                let new_x = cursor_x + offset_min;
-                if new_x >= x && new_x < x + width {
-                    current_offset_x = Some(offset_min);
-                } else {
-                    cursor.offset_min = None;
-                    if new_x >= x + width {
-                        current_offset_x = Some(x + width - cursor_x);
-                        cursor.offset_max = current_offset_x;
-                    } else {
-                        current_offset_x = Some(x - cursor_x);
-                        cursor.offset_min = current_offset_x;
-                    }
-                }
-            } else if let Some(offset_max) = offset_max {
-                let new_x = cursor_x + offset_max;
-                if new_x >= x && new_x < x + width {
-                    current_offset_x = Some(offset_max);
-                } else {
-                    cursor.offset_max = None;
-                    if new_x < x {
-                        current_offset_x = Some(x - cursor_x);
-                        cursor.offset_min = current_offset_x;
-                    } else {
-                        current_offset_x = Some(x + width - cursor_x);
-                        cursor.offset_max = current_offset_x;
-                    }
-                }
-            }
-
-            if current_offset_x.is_none() {
-                if cursor_x >= x + width {
-                    let offset = x + width - cursor_x;
-                    cursor.offset_min = None;
-                    cursor.offset_max = Some(offset);
-                    current_offset_x = Some(offset);
-                } else if cursor_x < x {
-                    let offset = x - cursor_x;
-                    cursor.offset_min = Some(offset);
-                    cursor.offset_max = None;
-                    current_offset_x = Some(offset);
-                } else {
-                    cursor.offset_min = None;
-                    cursor.offset_max = None;
-                }
-            }
-
-            if blink_visibility {
-                let x = current_offset_x.unwrap_or(0.0) + cursor_x;
-                cursor_quad = Some(rect::Rect::Dims(x - 0.5, y + 1.0, 1.0, font_size - 1.0));
-            }
-
-            if let Some(offset_x) = current_offset_x {
-                final_glyphs = offset_glyphs(final_glyphs, offset_x, 0.0, dpi);
-            }
-        }
-
         self.cached_text.push(TextRender {
             glyphs: final_glyphs,
             clip_area: rect::Rect::Dims(x, y, width, font_size),
-            cursor_quad,
             z,
         });
     }
@@ -371,8 +208,8 @@ impl TextRenderer {
         rows
     }
 
-    pub(crate) fn draw_text(&mut self, renderer: &mut Renderer) {
-        let dpi = self.dpi;
+    pub fn draw_text(&mut self, renderer: &mut Renderer) {
+        let &mut TextRenderer { dpi, draw_call, .. } = self;
         let mut cache = self.cache.borrow_mut();
 
         for text in &self.cached_text {
@@ -381,7 +218,7 @@ impl TextRenderer {
             }
         }
 
-        let tex = renderer.get_texture(renderer::DRAW_CALL_INDEX_TEXT);
+        let tex = renderer.get_texture(draw_call);
         unsafe {
             gl::BindTexture(gl::TEXTURE_2D, tex);
             gl::PixelStorei(gl::UNPACK_ALIGNMENT, 1);
@@ -420,16 +257,81 @@ impl TextRenderer {
                         (0, 0, 0, 0xFF),
                         clip_area,
                         z,
-                        renderer::DRAW_CALL_INDEX_TEXT,
+                        draw_call,
                     );
                 }
-            }
-            if let Some(quad) = text.cursor_quad {
-                let quad = quad.coords();
-                renderer.draw_colored_quad(quad, (0, 0, 0, 0xFF), z, renderer::DRAW_CALL_INDEX_UI);
             }
         }
 
         self.cached_text.clear();
+    }
+}
+
+/// Will only return `None` when `index >= glyphs.len()`.
+fn measure_text_at_index(glyphs: &[SizedGlyph], index: usize, dpi: f32) -> Option<rect::Rect> {
+    if index >= glyphs.len() {
+        return None;
+    }
+
+    let width = glyphs[index].width;
+    let glyph = &glyphs[index].glyph;
+    let position = glyph.position();
+    if let Some(rect) = glyph.pixel_bounding_box() {
+        return Some(rect::Rect::Coords(
+            rect.min.x as f32 / dpi,
+            rect.min.y as f32 / dpi,
+            rect.max.x as f32 / dpi,
+            rect.max.y as f32 / dpi,
+        ));
+    } else {
+        return Some(rect::Rect::Dims(
+            position.x / dpi,
+            position.y / dpi,
+            width / dpi,
+            1.0,
+        ));
+    }
+}
+
+fn measure_text(glyphs: &[SizedGlyph], dpi: f32) -> Option<(f32, f32)> {
+    let mut result: Option<rect::Rect> = None;
+
+    for i in 0..glyphs.len() {
+        if let Some(glyph_rect) = measure_text_at_index(glyphs, i, dpi) {
+            if let Some(ref mut rect) = result {
+                let (x0, y0, x1, y1) = (
+                    rect.left().min(glyph_rect.left()),
+                    rect.top().min(glyph_rect.top()),
+                    rect.right().max(glyph_rect.right()),
+                    rect.bottom().max(glyph_rect.bottom()),
+                );
+                rect.set_coords(x0, y0, x1, y1);
+            } else {
+                result = Some(glyph_rect);
+            }
+        }
+    }
+
+    if let Some(rect) = result {
+        Some((rect.width(), rect.height()))
+    } else {
+        None
+    }
+}
+
+fn offset_glyphs(glyphs: Vec<SizedGlyph>, x: f32, y: f32, dpi: f32) -> Vec<SizedGlyph> {
+    glyphs
+        .into_iter()
+        .map(|glyph| offset_glyph(glyph, x, y, dpi))
+        .collect()
+}
+
+fn offset_glyph(glyph: SizedGlyph, x: f32, y: f32, dpi: f32) -> SizedGlyph {
+    let width = glyph.width;
+    let glyph = glyph.glyph;
+    let position = glyph.position() + vector(x, y) * dpi;
+    SizedGlyph {
+        width,
+        glyph: glyph.into_unpositioned().positioned(position),
     }
 }

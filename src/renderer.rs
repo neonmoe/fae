@@ -1,17 +1,11 @@
 //! This module does the OpenGL stuff.
 
-use gl;
-use gl::types::*;
-use resources::Image;
+use crate::gl;
+use crate::gl::types::*;
+use crate::image::Image;
 use std::error::Error;
 use std::mem;
 use std::ptr;
-use text;
-
-const TEXTURE_COUNT: usize = 2; // UI elements, glyph cache
-
-pub(crate) const DRAW_CALL_INDEX_UI: usize = 0;
-pub(crate) const DRAW_CALL_INDEX_TEXT: usize = 1;
 
 type PositionAttribute = (f32, f32, f32);
 type TexCoordAttribute = (f32, f32);
@@ -41,6 +35,8 @@ pub struct Shaders {
 #[derive(Clone, Copy, Debug)]
 struct ShaderProgram {
     program: GLuint,
+    vertex_shader: GLuint,
+    fragment_shader: GLuint,
     projection_matrix_location: GLint,
     position_attrib_location: GLuint,
     texcoord_attrib_location: GLuint,
@@ -95,12 +91,9 @@ impl Renderer {
     /// VAOs. Ideally this should be `false` in all cases where the OpenGL
     /// version is >=3.0 (or OpenGL ES >=3) to allow for more optimized
     /// rendering.
-    ///
-    /// `ui_spritesheet_image` should a Vec of the bytes of a .png file
-    /// with an alpha channel.
-    pub fn create(opengl21: bool, ui_spritesheet_image: &[u8]) -> Result<Renderer, Box<Error>> {
-        let mut renderer = Renderer {
-            calls: Vec::with_capacity(TEXTURE_COUNT),
+    pub fn create(opengl21: bool) -> Result<Renderer, Box<Error>> {
+        Ok(Renderer {
+            calls: Vec::with_capacity(2),
             gl_state: OpenGLState {
                 legacy: opengl21,
                 pushed: false,
@@ -112,34 +105,7 @@ impl Renderer {
                 texture: 0,
                 vbo: 0,
             },
-        };
-
-        renderer.gl_push();
-
-        // UI
-        let ui_spritesheet_image = Image::from_png(ui_spritesheet_image)?;
-        renderer.create_draw_call(
-            &ui_spritesheet_image,
-            Some(&DEFAULT_SHADERS[DRAW_CALL_INDEX_UI]),
-        );
-        print_gl_errors("after ui spritesheet texture creation");
-
-        // Glyph cache
-        let glyph_cache_image = Image::from_color(
-            text::GLYPH_CACHE_WIDTH as i32,
-            text::GLYPH_CACHE_HEIGHT as i32,
-            &[0],
-        )
-        .format(gl::RED);
-        renderer.create_draw_call(
-            &glyph_cache_image,
-            Some(&DEFAULT_SHADERS[DRAW_CALL_INDEX_TEXT]),
-        );
-        print_gl_errors("after glyph cache texture creation");
-
-        renderer.gl_pop();
-
-        Ok(renderer)
+        })
     }
 
     /// Creates a new draw call in the pipeline, and returns its
@@ -154,7 +120,7 @@ impl Renderer {
     pub fn create_draw_call(&mut self, image: &Image, shaders: Option<&Shaders>) -> usize {
         self.gl_push();
 
-        let shaders = shaders.unwrap_or(&DEFAULT_SHADERS[DRAW_CALL_INDEX_UI]);
+        let shaders = shaders.unwrap_or(&DEFAULT_QUAD_SHADERS);
         let (vert, frag) = if self.gl_state.legacy {
             (shaders.vertex_shader_110, shaders.fragment_shader_110)
         } else {
@@ -226,7 +192,7 @@ impl Renderer {
     ///
     /// - `ninepatch_dimensions`: Contains the widths and the heights
     /// of the tiles. Arrangement: ((left tile width, middle, right),
-    /// (top, middle, bottom))
+    /// (top tile height, middle, bottom))
     ///
     /// - `coords`: The coordinates of the corners of the quad, in
     /// (logical) pixels. Arrangement: (left, top, right, bottom)
@@ -422,16 +388,24 @@ impl Renderer {
         ]);
     }
 
-    pub(crate) fn render(&mut self, width: f32, height: f32) {
+    pub fn render(&mut self, width: f32, height: f32) {
         let m00 = 2.0 / width;
         let m11 = -2.0 / height;
         let matrix = [
             m00, 0.0, 0.0, -1.0, 0.0, m11, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
         ];
 
+        unsafe {
+            gl::ClearColor(1.0, 1.0, 1.0, 1.0);
+            gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
+        }
+
         self.gl_push();
         let legacy = self.gl_state.legacy;
-        for (i, call) in self.calls.iter_mut().enumerate() {
+
+        // The call order is reversed so that the text layer draws
+        // last, for optimal text rendering quality.
+        for (i, call) in self.calls.iter_mut().enumerate().rev() {
             if call.attributes.vbo_data.is_empty() {
                 continue;
             }
@@ -490,6 +464,7 @@ impl Renderer {
 
     /// Returns the OpenGL texture handle for the texture used by draw
     /// call `index`.
+    #[cfg(feature = "text")]
     pub(crate) fn get_texture(&self, index: usize) -> GLuint {
         self.calls[index].texture
     }
@@ -552,20 +527,37 @@ impl Renderer {
     }
 }
 
-const DEFAULT_SHADERS: [Shaders; TEXTURE_COUNT] = [
-    Shaders {
-        vertex_shader_110: include_str!("shaders/legacy/texquad.vert"),
-        fragment_shader_110: include_str!("shaders/legacy/texquad.frag"),
-        vertex_shader_330: include_str!("shaders/texquad.vert"),
-        fragment_shader_330: include_str!("shaders/texquad.frag"),
-    },
-    Shaders {
-        vertex_shader_110: include_str!("shaders/legacy/text.vert"),
-        fragment_shader_110: include_str!("shaders/legacy/text.frag"),
-        vertex_shader_330: include_str!("shaders/text.vert"),
-        fragment_shader_330: include_str!("shaders/text.frag"),
-    },
-];
+impl Drop for Renderer {
+    fn drop(&mut self) {
+        let legacy = self.gl_state.legacy;
+        for call in self.calls.iter() {
+            let ShaderProgram {
+                program,
+                vertex_shader,
+                fragment_shader,
+                ..
+            } = call.program;
+            let Attributes { vbo, vao, .. } = call.attributes;
+            unsafe {
+                gl::DeleteShader(vertex_shader);
+                gl::DeleteShader(fragment_shader);
+                gl::DeleteProgram(program);
+                gl::DeleteTextures(1, [call.texture].as_ptr());
+                gl::DeleteBuffers(1, [vbo].as_ptr());
+                if !legacy {
+                    gl::DeleteVertexArrays(1, [vao].as_ptr());
+                }
+            }
+        }
+    }
+}
+
+const DEFAULT_QUAD_SHADERS: Shaders = Shaders {
+    vertex_shader_110: include_str!("shaders/legacy/texquad.vert"),
+    fragment_shader_110: include_str!("shaders/legacy/texquad.frag"),
+    vertex_shader_330: include_str!("shaders/texquad.vert"),
+    fragment_shader_330: include_str!("shaders/texquad.frag"),
+};
 
 #[inline]
 fn create_program(vert_source: &str, frag_source: &str) -> ShaderProgram {
@@ -584,6 +576,8 @@ fn create_program(vert_source: &str, frag_source: &str) -> ShaderProgram {
     };
 
     let program;
+    let vertex_shader;
+    let fragment_shader;
     let projection_matrix_location;
     let position_attrib_location;
     let texcoord_attrib_location;
@@ -591,28 +585,28 @@ fn create_program(vert_source: &str, frag_source: &str) -> ShaderProgram {
     unsafe {
         program = gl::CreateProgram();
 
-        let vert_shader = gl::CreateShader(gl::VERTEX_SHADER);
+        vertex_shader = gl::CreateShader(gl::VERTEX_SHADER);
         gl::ShaderSource(
-            vert_shader,
+            vertex_shader,
             1,
             [vert_source.as_ptr() as *const _].as_ptr(),
             [vert_source.len() as GLint].as_ptr(),
         );
-        gl::CompileShader(vert_shader);
-        print_shader_error(vert_shader, "vertex");
+        gl::CompileShader(vertex_shader);
+        print_shader_error(vertex_shader, "vertex");
 
-        let frag_shader = gl::CreateShader(gl::FRAGMENT_SHADER);
+        fragment_shader = gl::CreateShader(gl::FRAGMENT_SHADER);
         gl::ShaderSource(
-            frag_shader,
+            fragment_shader,
             1,
             [frag_source.as_ptr() as *const _].as_ptr(),
             [frag_source.len() as GLint].as_ptr(),
         );
-        gl::CompileShader(frag_shader);
-        print_shader_error(frag_shader, "fragment");
+        gl::CompileShader(fragment_shader);
+        print_shader_error(fragment_shader, "fragment");
 
-        gl::AttachShader(program, vert_shader);
-        gl::AttachShader(program, frag_shader);
+        gl::AttachShader(program, vertex_shader);
+        gl::AttachShader(program, fragment_shader);
         gl::LinkProgram(program);
         let mut link_status = 0;
         gl::GetProgramiv(program, gl::LINK_STATUS, &mut link_status);
@@ -638,6 +632,8 @@ fn create_program(vert_source: &str, frag_source: &str) -> ShaderProgram {
 
     ShaderProgram {
         program,
+        vertex_shader,
+        fragment_shader,
         projection_matrix_location,
         position_attrib_location,
         texcoord_attrib_location,

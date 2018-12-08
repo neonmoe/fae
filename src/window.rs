@@ -1,24 +1,20 @@
-mod frame_timer;
-
-use self::frame_timer::FrameTimer;
-use gl;
+use crate::frame_timer::FrameTimer;
+use crate::gl;
 use glutin::dpi::*;
 use glutin::*;
-#[cfg(feature = "default_resources")]
-use resources;
 use std::default::Default;
 use std::env;
 use std::error::Error;
-use ui::keyboard::KeyStatus;
-use ui::{MouseStatus, UIState};
+
+pub use glutin;
 
 /// Defines a window.
 pub struct WindowSettings {
     /// Title of the window. Default value: Name of the executable file
     pub title: String,
-    /// Width of the window in logical pixels. Default value: `320.0`
+    /// Width of the window in logical pixels. Default value: `640.0`
     pub width: f32,
-    /// Height of the window in logical pixels. Default value: `240.0`
+    /// Height of the window in logical pixels. Default value: `480.0`
     pub height: f32,
     /// Whether or not the application is a dialog. Default value: `true`
     ///
@@ -27,47 +23,9 @@ pub struct WindowSettings {
     /// environments](https://en.wikipedia.org/wiki/Tiling_window_manager),
     /// like i3 and sway, this can cause the window to pop up as a
     /// floating window, not a tiled one. This is useful for
-    /// applications that have very fixed layouts, and are supposed to
-    /// be opened for very short amounts of time at a time, like small
-    /// utilities.
+    /// applications that are supposed to be opened for very short
+    /// amounts of time.
     pub is_dialog: bool,
-    /// The bytes of a .png file with an alpha channel, which will be
-    /// used as the application's spritesheet. Default value:
-    /// `resources::DEFAULT_UI_SPRITESHEET.to_vec()`
-    ///
-    /// ![Default GUI][gui]
-    ///
-    /// The layout of the gui spritesheet is very important. Say `H`
-    /// is the height of the texture. When the rendering engine is
-    /// looking for a specific element's sprite, it will look for
-    /// `HxH` areas in the texture, and consider these areas to
-    /// consist of a uniform 3x3 grid. The center tile will be
-    /// stretched to the width and height of a given element, the top
-    /// and bottom tiles will stretch to the width of the element, and
-    /// the left and right tiles will stretch to the height of the
-    /// element. The corner tiles will only be stretched uniformly, as
-    /// described in the following section.
-    ///
-    /// The resolution of the texture is irrelevant, as all tiles will
-    /// be stretched to be 16x16 logical pixels, except for the
-    /// width/height stretching cases described in the previous
-    /// section. To not lose pixel density in HiDPI situations, make
-    /// your tiles 32x32 or higher. At 32x32 tiles, your spritesheet's
-    /// height would be 96px.
-    ///
-    /// The elements should all be on one row, and right next to each
-    /// other. For a reference, cut up the default
-    /// [`gui.png`][gui] into 16x16 chunks, and modify
-    /// from there.
-    ///
-    /// [gui]: https://git.neon.moe/neon/fungui/raw/branch/master/src/resources/gui.png
-    pub ui_spritesheet: Vec<u8>,
-    /// The bytes of a .ttf file that will be used as the
-    /// application's font. Default value: `resources::DEFAULT_FONT.to_vec()`
-    ///
-    /// The default font provided by the `default_resources` feature
-    /// is Fira Sans.
-    pub font: Vec<u8>,
 }
 
 impl Default for WindowSettings {
@@ -78,54 +36,34 @@ impl Default for WindowSettings {
                 .and_then(|p| p.file_name().map(|s| s.to_os_string()))
                 .and_then(|s| s.into_string().ok())
                 .unwrap_or_default(),
-            width: 320.0,
-            height: 240.0,
-            is_dialog: true,
-            ui_spritesheet: get_default_ui_spritesheet(),
-            font: get_default_font(),
+            width: 640.0,
+            height: 480.0,
+            is_dialog: false,
         }
     }
 }
 
-#[cfg(feature = "default_resources")]
-fn get_default_ui_spritesheet() -> Vec<u8> {
-    resources::DEFAULT_UI_SPRITESHEET.to_vec()
-}
-#[cfg(not(feature = "default_resources"))]
-fn get_default_ui_spritesheet() -> Vec<u8> {
-    Vec::new()
-}
-
-#[cfg(feature = "default_resources")]
-fn get_default_font() -> Vec<u8> {
-    resources::DEFAULT_FONT.to_vec()
-}
-#[cfg(not(feature = "default_resources"))]
-fn get_default_font() -> Vec<u8> {
-    Vec::new()
-}
-
 /// Manages the window and propagates events to the UI system.
 pub struct Window {
-    width: f32,
-    height: f32,
-    dpi: f32,
+    /// The width of the window.
+    pub width: f32,
+    /// The height of the window.
+    pub height: f32,
+    /// The dpi of the window.
+    pub dpi: f32,
     gl_window: GlWindow,
     events_loop: EventsLoop,
-    /// The mouse state.
-    pub mouse: MouseStatus,
     /// Information about the frame timings.
     pub frame_timer: FrameTimer,
-    /// The UI state.
-    pub ui: UIState,
+    /// The opengl legacy status for Renderer.
+    pub opengl21: bool,
 }
 
 impl Window {
     /// Creates a new `Window`.
     ///
-    /// Can result in an error if window creation fails, OpenGL
-    /// context creation fails, or resources defined in the `settings`
-    /// can't be loaded.
+    /// Can result in an error if window creation fails or OpenGL
+    /// context creation fails.
     pub fn create(settings: WindowSettings) -> Result<Window, Box<Error>> {
         // Note: At the time of writing, wayland support in winit
         // seems to be buggy. Default to x11, since xwayland at least
@@ -196,22 +134,14 @@ impl Window {
             }*/
         }
 
-        let ui = UIState::create(settings.font, &settings.ui_spritesheet, opengl21)?;
-
         Ok(Window {
             width: settings.width,
             height: settings.height,
             dpi: 1.0,
             gl_window,
             events_loop,
-            mouse: MouseStatus {
-                x: 0.0,
-                y: 0.0,
-                last_pressed: false,
-                pressed: false,
-            },
             frame_timer: FrameTimer::new(),
-            ui,
+            opengl21,
         })
     }
 
@@ -220,53 +150,20 @@ impl Window {
     /// `background_*` colors, which consist of 0.0 - 1.0
     /// values. **Note**: Because of vsync, this function will hang
     /// for a while (usually 16ms at max).
-    pub fn refresh(
-        &mut self,
-        background_red: f32,
-        background_green: f32,
-        background_blue: f32,
-    ) -> bool {
-        self.frame_timer.start_clear();
-        unsafe {
-            gl::ClearColor(background_red, background_green, background_blue, 1.0);
-            gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
-        }
-        self.frame_timer.end_clear();
-        self.ui.update_post_application(self.width, self.height);
-
+    pub fn refresh<F: FnMut(&Event)>(&mut self, mut event_handler: F) -> bool {
         self.frame_timer.end_frame();
         let _ = self.gl_window.swap_buffers();
         self.frame_timer.begin_frame();
 
         let mut running = true;
         let mut resized_logical_size = None;
-        let mut mouse_position = None;
-        let mut mouse_pressed = None;
-        let mut key_inputs = Vec::new();
-        let mut characters = Vec::new();
         self.events_loop.poll_events(|event| {
+            event_handler(&event);
             if let Event::WindowEvent { event, .. } = event {
                 match event {
                     WindowEvent::CloseRequested => running = false,
                     WindowEvent::Resized(logical_size) => resized_logical_size = Some(logical_size),
-                    WindowEvent::CursorMoved { position, .. } => mouse_position = Some(position),
-                    WindowEvent::MouseInput { state, .. } => {
-                        mouse_pressed = Some(state == ElementState::Pressed)
-                    }
-                    WindowEvent::KeyboardInput { input, .. } => {
-                        if let Some(keycode) = input.virtual_keycode {
-                            let pressed = input.state == ElementState::Pressed;
-                            key_inputs.push(KeyStatus {
-                                keycode,
-                                modifiers: input.modifiers,
-                                last_pressed: false,
-                                pressed,
-                                just_pressed: pressed,
-                            });
-                        }
-                    }
-                    WindowEvent::ReceivedCharacter(c) => characters.push(c),
-                    _ => (),
+                    _ => {}
                 }
             }
         });
@@ -285,27 +182,6 @@ impl Window {
             self.height = logical_size.height as f32;
             self.dpi = dpi_factor as f32;
         }
-
-        /* Mouse move event handling */
-        if let Some(position) = mouse_position {
-            self.mouse.x = position.x as f32;
-            self.mouse.y = position.y as f32;
-        }
-
-        /* Mouse button event handling */
-        self.mouse.last_pressed = self.mouse.pressed;
-        if let Some(pressed) = mouse_pressed {
-            self.mouse.pressed = pressed;
-        }
-
-        self.ui.update(
-            self.width,
-            self.height,
-            self.dpi,
-            self.mouse,
-            key_inputs,
-            characters,
-        );
 
         running
     }
