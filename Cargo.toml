@@ -3,9 +3,16 @@ name = "fae"
 version = "0.1.0"
 authors = ["Jens Pitkanen <jens@neon.moe>"]
 edition = "2018"
+description = "A simple and fast 2D rendering crate with optional window creation and text rendering functionality."
 readme = "README.md"
-keywords = ["graphics", "2d", "renderer"]
+# Since the crate isn't ready for usage, don't set these just yet.
+# keywords = ["graphics", "2d", "renderer", "sprite"]
+# categories = ["rendering", "rendering::engine"]
 license = "MIT"
+repository = "https://github.com/neonmoe/fae"
+
+[badges]
+maintenance = { status = "experimental" }
 
 [dependencies]
 glutin = { version = "0.19", optional = true }
