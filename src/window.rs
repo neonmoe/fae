@@ -1,4 +1,3 @@
-use crate::frame_timer::FrameTimer;
 use crate::gl;
 use glutin::dpi::*;
 use glutin::*;
@@ -53,8 +52,6 @@ pub struct Window {
     pub dpi: f32,
     gl_window: GlWindow,
     events_loop: EventsLoop,
-    /// Information about the frame timings.
-    pub frame_timer: FrameTimer,
     /// The opengl legacy status for Renderer.
     pub opengl21: bool,
 }
@@ -140,7 +137,6 @@ impl Window {
             dpi: 1.0,
             gl_window,
             events_loop,
-            frame_timer: FrameTimer::new(),
             opengl21,
         })
     }
@@ -151,10 +147,7 @@ impl Window {
     /// values. **Note**: Because of vsync, this function will hang
     /// for a while (usually 16ms at max).
     pub fn refresh<F: FnMut(&Event)>(&mut self, mut event_handler: F) -> bool {
-        self.frame_timer.end_frame();
         let _ = self.gl_window.swap_buffers();
-        self.frame_timer.begin_frame();
-
         let mut running = true;
         let mut resized_logical_size = None;
         self.events_loop.poll_events(|event| {

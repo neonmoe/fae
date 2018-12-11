@@ -16,7 +16,7 @@ type VertexBufferObject = GLuint;
 type VertexArrayObject = GLuint;
 
 /// Represents the shader code for a shader. Used in [`Renderer::create_draw_call`].
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Shaders {
     /// The GLSL 3.30 version of the vertex shader. Ensure that the
     /// first line is `#version 330`!
@@ -83,6 +83,25 @@ pub struct Renderer {
     gl_state: OpenGLState,
 }
 
+#[derive(Debug, Clone)]
+pub struct DrawCallParameters {
+    pub image: Option<Image>,
+    pub shaders: Option<Shaders>,
+    pub minification_smoothing: bool,
+    pub magnification_smoothing: bool,
+}
+
+impl Default for DrawCallParameters {
+    fn default() -> DrawCallParameters {
+        DrawCallParameters {
+            image: None,
+            shaders: None,
+            minification_smoothing: true,
+            magnification_smoothing: false,
+        }
+    }
+}
+
 impl Renderer {
     /// Create a new UI rendering system. This must be done after window
     /// and context creation, but before any drawing calls.
@@ -117,10 +136,10 @@ impl Renderer {
     /// with the `shaders` parameter. Use `None` for defaults. Make
     /// sure to study the uniform variables and attributes of the
     /// default shaders before making your own.
-    pub fn create_draw_call(&mut self, image: &Image, shaders: Option<&Shaders>) -> usize {
+    pub fn create_draw_call(&mut self, params: DrawCallParameters) -> usize {
         self.gl_push();
 
-        let shaders = shaders.unwrap_or(&DEFAULT_QUAD_SHADERS);
+        let shaders = params.shaders.unwrap_or(DEFAULT_QUAD_SHADERS);
         let (vert, frag) = if self.gl_state.legacy {
             (shaders.vertex_shader_110, shaders.fragment_shader_110)
         } else {
@@ -130,20 +149,26 @@ impl Renderer {
 
         let program = create_program(&vert, &frag);
         let attributes = create_attributes(self.gl_state.legacy, program);
-        let texture = create_texture();
+        let filter = |smoothed| if smoothed { gl::LINEAR } else { gl::NEAREST } as i32;
+        let texture = create_texture(
+            filter(params.minification_smoothing),
+            filter(params.magnification_smoothing),
+        );
         self.calls.push(DrawCall {
             texture,
             program,
             attributes,
         });
 
-        insert_texture(
-            self.calls[index].texture,
-            image.format,
-            image.width,
-            image.height,
-            &image.pixels,
-        );
+        if let Some(image) = params.image {
+            insert_texture(
+                self.calls[index].texture,
+                image.format,
+                image.width,
+                image.height,
+                &image.pixels,
+            );
+        }
 
         self.gl_pop();
         index
@@ -618,6 +643,7 @@ fn create_program(vert_source: &str, frag_source: &str) -> ShaderProgram {
                 String::from_utf8_lossy(&mem::transmute::<[i8; 1024], [u8; 1024]>(info)[..])
             );
         }
+        print_gl_errors("after shader program creation");
 
         gl::UseProgram(program);
         projection_matrix_location =
@@ -713,15 +739,15 @@ unsafe fn disable_vertex_attribs(program: ShaderProgram) {
 }
 
 #[inline]
-fn create_texture() -> GLuint {
+fn create_texture(min_filter: GLint, mag_filter: GLint) -> GLuint {
     let mut tex = 0;
     unsafe {
         gl::GenTextures(1, &mut tex);
         gl::BindTexture(gl::TEXTURE_2D, tex);
         gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::REPEAT as GLint);
         gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, gl::REPEAT as GLint);
-        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as GLint);
-        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::NEAREST as GLint);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, min_filter as GLint);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, mag_filter as GLint);
     }
     tex
 }
@@ -748,7 +774,9 @@ fn insert_texture(tex: GLuint, format: GLuint, w: GLint, h: GLint, pixels: &[u8]
 fn print_gl_errors(context: &str) {
     let mut error = unsafe { gl::GetError() };
     while error != gl::NO_ERROR {
-        eprintln!("GL error {}: {}", context, gl_error_to_string(error));
+        let error_msg = format!("GL error {}: {}", context, gl_error_to_string(error));
+        debug_assert!(false, "{}", error_msg);
+        eprintln!("{}", error_msg);
         error = unsafe { gl::GetError() };
     }
 }

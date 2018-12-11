@@ -16,6 +16,4 @@ pub use crate::rect::Rect;
 pub mod text;
 
 #[cfg(feature = "glutin")]
-mod frame_timer;
-#[cfg(feature = "glutin")]
 pub mod window;

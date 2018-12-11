@@ -2,7 +2,7 @@ use crate::gl;
 use crate::gl::types::*;
 use crate::image::Image;
 use crate::rect;
-use crate::renderer::{Renderer, Shaders};
+use crate::renderer::{DrawCallParameters, Renderer, Shaders};
 use rusttype::gpu_cache::Cache;
 use rusttype::*;
 use std::cell::RefCell;
@@ -56,7 +56,12 @@ impl TextRenderer {
         let glyph_cache_image =
             Image::from_color(GLYPH_CACHE_WIDTH as i32, GLYPH_CACHE_HEIGHT as i32, &[0])
                 .format(gl::RED);
-        let draw_call = renderer.create_draw_call(&glyph_cache_image, Some(&DEFAULT_TEXT_SHADERS));
+        let params = DrawCallParameters {
+            image: Some(glyph_cache_image),
+            shaders: Some(DEFAULT_TEXT_SHADERS),
+            ..Default::default()
+        };
+        let draw_call = renderer.create_draw_call(params);
 
         Ok(TextRenderer {
             font: Font::from_bytes(font_data)?,
@@ -75,7 +80,7 @@ impl TextRenderer {
         self.dpi = dpi;
     }
 
-    pub fn queue_text(
+    pub fn draw_text(
         &mut self,
         text: &str,
         (x, y, z): (f32, f32, f32),
@@ -208,7 +213,7 @@ impl TextRenderer {
         rows
     }
 
-    pub fn draw_text(&mut self, renderer: &mut Renderer) {
+    pub fn compose_draw_call(&mut self, renderer: &mut Renderer) {
         let &mut TextRenderer { dpi, draw_call, .. } = self;
         let mut cache = self.cache.borrow_mut();
 

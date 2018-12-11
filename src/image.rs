@@ -6,6 +6,7 @@ use std::error::Error;
 
 /// Contains the raw pixel color data of an image (`u8` per color
 /// channel).
+#[derive(Clone, Debug)]
 pub struct Image {
     /// The pixels of the image.
     pub pixels: Vec<u8>,
