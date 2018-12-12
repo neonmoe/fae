@@ -8,17 +8,52 @@
 use fae::{
     renderer::{DrawCallParameters, Renderer},
     text::{Alignment, TextRenderer},
-    window::{Window, WindowSettings},
     Image,
 };
+use glfw::{self, Action, Context, Key};
+use std::env;
 use std::error::Error;
 use std::fs;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    // Create the window
-    let mut window = Window::create(WindowSettings::default()).unwrap();
+    let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS)?;
+
+    let (mut window, events) = {
+        glfw.window_hint(glfw::WindowHint::ContextVersionMajor(3));
+        glfw.window_hint(glfw::WindowHint::ContextVersionMinor(3));
+        glfw.window_hint(glfw::WindowHint::OpenGlForwardCompat(true));
+        glfw.window_hint(glfw::WindowHint::OpenGlProfile(
+            glfw::OpenGlProfileHint::Core,
+        ));
+        if let Some(result) = glfw.create_window(640, 480, "bench", glfw::WindowMode::Windowed) {
+            result
+        } else {
+            glfw.window_hint(glfw::WindowHint::ContextVersionMajor(2));
+            glfw.window_hint(glfw::WindowHint::ContextVersionMinor(1));
+            glfw.window_hint(glfw::WindowHint::OpenGlForwardCompat(false));
+            glfw.window_hint(glfw::WindowHint::OpenGlProfile(
+                glfw::OpenGlProfileHint::Any,
+            ));
+            glfw.create_window(640, 480, "bench", glfw::WindowMode::Windowed)
+                .expect("Failed to create GLFW window.")
+        }
+    };
+
+    window.set_key_polling(true);
+    window.set_framebuffer_size_polling(true);
+    glfw.make_context_current(Some(&window));
+    fae::gl::load_with(|symbol| window.get_proc_address(symbol) as *const _);
+
+    if glfw.extension_supported("WGL_EXT_swap_control_tear")
+        || glfw.extension_supported("GLX_EXT_swap_control_tear")
+    {
+        glfw.set_swap_interval(glfw::SwapInterval::Adaptive);
+    } else {
+        glfw.set_swap_interval(glfw::SwapInterval::Sync(1));
+    }
+
     // Create the OpenGL renderer
-    let mut renderer = Renderer::create(window.opengl21)?;
+    let mut renderer = Renderer::create(window.get_context_version().major == 2)?;
     // Create the text renderer
     let mut text = TextRenderer::create(fs::read("examples/res/FiraSans.ttf")?, &mut renderer)?;
     // Create the draw call for the sprite
@@ -28,7 +63,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
     let call = renderer.create_draw_call(params);
 
-    let mut should_quit = false;
+    // Get the most common DE's dpi factor env variables
+    let dpi_factor = env::var("QT_SCALE_FACTOR")
+        .or(env::var("GDK_SCALE"))
+        .or(env::var("ELM_SCALE"))
+        .ok()
+        .and_then(|f| f.parse::<f32>().ok())
+        .unwrap_or(1.0);
+    text.update_dpi_factor(dpi_factor);
+
     let mut quad_count = 1;
 
     use std::time::Instant;
@@ -37,35 +80,11 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Loop until we `should_quit` or refresh returns false, ie. the
     // user pressed the "close window" button.
-    while window.refresh(|event| {
-        // Handle events, as they are currently handled. This system
-        // should really be revamped.
-        if let glutin::Event::WindowEvent { event, .. } = event {
-            match event {
-                glutin::WindowEvent::KeyboardInput { input, .. } => {
-                    if let Some(keycode) = input.virtual_keycode {
-                        if input.state == glutin::ElementState::Pressed {
-                            match keycode {
-                                glutin::VirtualKeyCode::Escape => should_quit = true,
-                                glutin::VirtualKeyCode::Up => quad_count *= 2,
-                                glutin::VirtualKeyCode::Down => {
-                                    if quad_count > 1 {
-                                        quad_count /= 2;
-                                    }
-                                }
-                                _ => {}
-                            }
-                        }
-                    }
-                }
-                _ => {}
-            }
+    while !window.should_close() {
+        glfw.poll_events();
+        for (_, event) in glfw::flush_messages(&events) {
+            handle_window_event(&mut window, event, &mut quad_count);
         }
-    }) && !should_quit
-    {
-        // Update the text renderer's dpi settings, in case refresh
-        // changed them
-        text.update_dpi_factor(window.dpi_factor);
 
         let time = Instant::now() - start;
         let time = time.as_secs() as f32 + time.subsec_millis() as f32 / 1000.0;
@@ -124,8 +143,26 @@ fn main() -> Result<(), Box<dyn Error>> {
         // Render the glyphs into the draw call
         text.compose_draw_call(&mut renderer);
         // Render the OpenGL draw calls
-        renderer.render(window.width, window.height);
+        let (width, height) = window.get_size();
+        renderer.render(width as f32 / dpi_factor, height as f32 / dpi_factor);
+        window.swap_buffers();
     }
 
     Ok(())
+}
+
+fn handle_window_event(window: &mut glfw::Window, event: glfw::WindowEvent, count: &mut i32) {
+    match event {
+        glfw::WindowEvent::Key(Key::Escape, _, Action::Press, _) => window.set_should_close(true),
+        glfw::WindowEvent::Key(Key::Up, _, Action::Press, _) => *count *= 2,
+        glfw::WindowEvent::Key(Key::Down, _, Action::Press, _) => {
+            if *count > 1 {
+                *count /= 2
+            }
+        }
+        glfw::WindowEvent::FramebufferSize(width, height) => unsafe {
+            fae::gl::Viewport(0, 0, width, height)
+        },
+        _ => {}
+    }
 }

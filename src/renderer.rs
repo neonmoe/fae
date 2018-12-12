@@ -360,6 +360,7 @@ impl Renderer {
                 gl::BindTexture(gl::TEXTURE_2D, call.texture);
                 gl::BindBuffer(gl::ARRAY_BUFFER, call.attributes.vbo);
             }
+            print_gl_errors(&format!("after initializing draw call #{}", i));
 
             let buffer_length =
                 (mem::size_of::<TexQuad>() * call.attributes.vbo_data.len()) as isize;
@@ -375,6 +376,7 @@ impl Renderer {
                     gl::BufferData(gl::ARRAY_BUFFER, buffer_length, buffer_ptr, gl::STREAM_DRAW);
                 }
             }
+            print_gl_errors(&format!("after pushing vertex buffer #{}", i));
 
             if legacy {
                 unsafe {
@@ -385,6 +387,7 @@ impl Renderer {
             unsafe {
                 gl::DrawArrays(gl::TRIANGLES, 0, call.attributes.vbo_data.len() as i32 * 6);
             }
+            print_gl_errors(&format!("after drawing buffer #{}", i));
 
             if legacy {
                 unsafe {

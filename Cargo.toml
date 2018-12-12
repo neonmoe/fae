@@ -24,5 +24,8 @@ png = { version = "0.13", optional = true }
 default = ["glutin", "text", "png"]
 text = ["rusttype", "unicode-normalization"]
 
+[dev-dependencies]
+glfw = "0.25"
+
 [build-dependencies]
 gl_generator = "0.10"

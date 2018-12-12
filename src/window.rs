@@ -49,7 +49,7 @@ pub struct Window {
     /// The height of the window.
     pub height: f32,
     /// The dpi of the window.
-    pub dpi: f32,
+    pub dpi_factor: f32,
     gl_window: GlWindow,
     events_loop: EventsLoop,
     /// The opengl legacy status for Renderer.
@@ -134,7 +134,7 @@ impl Window {
         Ok(Window {
             width: settings.width,
             height: settings.height,
-            dpi: 1.0,
+            dpi_factor: 1.0,
             gl_window,
             events_loop,
             opengl21,
@@ -173,7 +173,7 @@ impl Window {
             self.gl_window.resize(physical_size);
             self.width = logical_size.width as f32;
             self.height = logical_size.height as f32;
-            self.dpi = dpi_factor as f32;
+            self.dpi_factor = dpi_factor as f32;
         }
 
         running

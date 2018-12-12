@@ -47,7 +47,7 @@ pub struct TextRenderer {
     font: Font<'static>,
     cache: RefCell<Cache<'static>>,
     cached_text: Vec<TextRender>,
-    dpi: f32,
+    dpi_factor: f32,
     draw_call: usize,
 }
 
@@ -71,13 +71,13 @@ impl TextRenderer {
                     .build(),
             ),
             cached_text: Vec::new(),
-            dpi: 1.0,
+            dpi_factor: 1.0,
             draw_call,
         })
     }
 
-    pub fn update_dpi(&mut self, dpi: f32) {
-        self.dpi = dpi;
+    pub fn update_dpi_factor(&mut self, dpi_factor: f32) {
+        self.dpi_factor = dpi_factor;
     }
 
     pub fn draw_text(
@@ -89,7 +89,7 @@ impl TextRenderer {
         multiline: bool,
     ) {
         let rows = self.collect_glyphs(x, y, width, multiline, font_size, text);
-        let dpi = self.dpi;
+        let dpi = self.dpi_factor;
 
         let mut final_glyphs = Vec::with_capacity(text.len());
 
@@ -142,7 +142,7 @@ impl TextRenderer {
         font_size: f32,
         text: &str,
     ) -> Vec<Vec<SizedGlyph>> {
-        let dpi = self.dpi;
+        let dpi = self.dpi_factor;
         let scale = Scale::uniform(font_size * dpi);
         let x = x * dpi;
         let y = y * dpi;
@@ -214,7 +214,11 @@ impl TextRenderer {
     }
 
     pub fn compose_draw_call(&mut self, renderer: &mut Renderer) {
-        let &mut TextRenderer { dpi, draw_call, .. } = self;
+        let &mut TextRenderer {
+            dpi_factor,
+            draw_call,
+            ..
+        } = self;
         let mut cache = self.cache.borrow_mut();
 
         for text in &self.cached_text {
@@ -250,10 +254,10 @@ impl TextRenderer {
             for glyph in &text.glyphs {
                 if let Ok(Some((uv_rect, screen_rect))) = cache.rect_for(0, &glyph.glyph) {
                     let coords = (
-                        screen_rect.min.x as f32 / dpi,
-                        screen_rect.min.y as f32 / dpi,
-                        screen_rect.max.x as f32 / dpi,
-                        screen_rect.max.y as f32 / dpi,
+                        screen_rect.min.x as f32 / dpi_factor,
+                        screen_rect.min.y as f32 / dpi_factor,
+                        screen_rect.max.x as f32 / dpi_factor,
+                        screen_rect.max.y as f32 / dpi_factor,
                     );
                     let texcoords = (uv_rect.min.x, uv_rect.min.y, uv_rect.max.x, uv_rect.max.y);
                     renderer.draw_quad_clipped(
