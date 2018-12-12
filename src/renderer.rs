@@ -10,7 +10,13 @@ use std::ptr;
 type PositionAttribute = (f32, f32, f32);
 type TexCoordAttribute = (f32, f32);
 type ColorAttribute = (u8, u8, u8, u8);
-type TexQuad = [(PositionAttribute, TexCoordAttribute, ColorAttribute); 6];
+type RotationAttribute = (f32, f32, f32);
+type TexQuad = [(
+    PositionAttribute,
+    TexCoordAttribute,
+    ColorAttribute,
+    RotationAttribute,
+); 6];
 type Texture = GLuint;
 type VertexBufferObject = GLuint;
 type VertexArrayObject = GLuint;
@@ -41,6 +47,7 @@ struct ShaderProgram {
     position_attrib_location: GLuint,
     texcoord_attrib_location: GLuint,
     color_attrib_location: GLuint,
+    rotation_attrib_location: GLuint,
 }
 
 #[derive(Clone, Debug)]
@@ -174,38 +181,6 @@ impl Renderer {
         index
     }
 
-    /// Draws a rectangle on the screen.
-    ///
-    /// - `coords`: The coordinates of the corners of the quad, in
-    /// (logical) pixels. Arrangement: (left, top, right, bottom)
-    ///
-    /// - `color`: The color of the quad, in the range 0-255. Arrangement:
-    /// (red, green, blue, alpha)
-    ///
-    /// - `z`: Used for ordering sprites on screen, in the range -1.0 -
-    /// 1.0. Positive values are in front.
-    ///
-    /// - `call_index`: The index of the draw call to draw the quad
-    /// in. This is the returned value from [`Renderer::create_draw_call`].
-    pub fn draw_colored_quad(
-        &mut self,
-        coords: (f32, f32, f32, f32),
-        color: (u8, u8, u8, u8),
-        z: f32,
-        call_index: usize,
-    ) {
-        let (x0, y0, x1, y1) = coords;
-
-        self.calls[call_index].attributes.vbo_data.push([
-            ((x0, y0, z), (-1.0, -1.0), color),
-            ((x1, y0, z), (-1.0, -1.0), color),
-            ((x1, y1, z), (-1.0, -1.0), color),
-            ((x0, y0, z), (-1.0, -1.0), color),
-            ((x1, y1, z), (-1.0, -1.0), color),
-            ((x0, y1, z), (-1.0, -1.0), color),
-        ]);
-    }
-
     /// Draws a rectangle with a ninepatch texture on the screen. This
     /// is very similar to [`Renderer::draw_quad`], except that
     /// stretching is handled differently.
@@ -219,32 +194,21 @@ impl Renderer {
     /// of the tiles. Arrangement: ((left tile width, middle, right),
     /// (top tile height, middle, bottom))
     ///
-    /// - `coords`: The coordinates of the corners of the quad, in
-    /// (logical) pixels. Arrangement: (left, top, right, bottom)
-    ///
-    /// - `texcoords`: The texture coordinates (UVs) of the quad, in the
-    /// range 0.0 - 1.0. Same arrangement as `coords`.
-    ///
-    /// - `color`: The color tint of the quad, in the range
-    /// 0-255. Arrangement: (red, green, blue, alpha)
-    ///
-    /// - `z`: Used for ordering sprites on screen, in the range -1.0 -
-    /// 1.0. Positive values are in front.
-    ///
-    /// - `call_index`: The index of the draw call to draw the quad
-    /// in. This is the returned value from [`Renderer::create_draw_call`].
+    /// See [`Renderer::draw_quad`] for the rest of the parameters'
+    /// docs.
+    // TODO: Add rotation parameter
     pub fn draw_quad_ninepatch(
         &mut self,
         ninepatch_dimensions: ((f32, f32, f32), (f32, f32, f32)),
         coords: (f32, f32, f32, f32),
-        texcoords: (f32, f32, f32, f32),
+        texcoords: Option<(f32, f32, f32, f32)>,
         color: (u8, u8, u8, u8),
         z: f32,
         call_index: usize,
     ) {
         let ((w0, w1, w2), (h0, h1, h2)) = ninepatch_dimensions;
         let (x0, y0, x1, y1) = coords;
-        let (tx0, ty0, tx1, ty1) = texcoords;
+        let (tx0, ty0, tx1, ty1) = texcoords.unwrap_or((-1.0, -1.0, -1.0, -1.0));
         let (tex_w, tex_h) = (tx1 - tx0, ty1 - ty0);
         let (total_w, total_h) = (w0 + w1 + w2, h0 + h1 + h2);
         let ((tw0, th0), (tw2, th2)) = (
@@ -265,120 +229,31 @@ impl Renderer {
         for i in 0..9 {
             let xi = i % 3;
             let yi = i / 3;
-            self.calls[call_index].attributes.vbo_data.push([
-                ((x0[xi], y0[yi], z), (tx0[xi], ty0[yi]), color),
-                ((x1[xi], y0[yi], z), (tx1[xi], ty0[yi]), color),
-                ((x1[xi], y1[yi], z), (tx1[xi], ty1[yi]), color),
-                ((x0[xi], y0[yi], z), (tx0[xi], ty0[yi]), color),
-                ((x1[xi], y1[yi], z), (tx1[xi], ty1[yi]), color),
-                ((x0[xi], y1[yi], z), (tx0[xi], ty1[yi]), color),
-            ]);
+            self.draw_quad(
+                (x0[xi], y0[yi], x1[xi], y1[yi]),
+                Some((tx0[xi], ty0[yi], tx1[xi], ty1[yi])),
+                color,
+                (0.0, 0.0, 0.0),
+                z,
+                call_index,
+            );
         }
-    }
-
-    /// Draws a textured rectangle on the screen.
-    ///
-    /// - `coords`: The coordinates of the corners of the quad, in
-    /// (logical) pixels. Arrangement: (left, top, right, bottom)
-    ///
-    /// - `texcoords`: The texture coordinates (UVs) of the quad, in the
-    /// range 0.0 - 1.0. Same arrangement as `coords`.
-    ///
-    /// - `color`: The color tint of the quad, in the range
-    /// 0-255. Arrangement: (red, green, blue, alpha)
-    ///
-    /// - `z`: Used for ordering sprites on screen, in the range -1.0 -
-    /// 1.0. Positive values are in front.
-    ///
-    /// - `call_index`: The index of the draw call to draw the quad
-    /// in. This is the returned value from [`Renderer::create_draw_call`].
-    pub fn draw_quad(
-        &mut self,
-        coords: (f32, f32, f32, f32),
-        texcoords: (f32, f32, f32, f32),
-        color: (u8, u8, u8, u8),
-        z: f32,
-        call_index: usize,
-    ) {
-        let (x0, y0, x1, y1) = coords;
-        let (tx0, ty0, tx1, ty1) = texcoords;
-
-        self.calls[call_index].attributes.vbo_data.push([
-            ((x0, y0, z), (tx0, ty0), color),
-            ((x1, y0, z), (tx1, ty0), color),
-            ((x1, y1, z), (tx1, ty1), color),
-            ((x0, y0, z), (tx0, ty0), color),
-            ((x1, y1, z), (tx1, ty1), color),
-            ((x0, y1, z), (tx0, ty1), color),
-        ]);
-    }
-
-    /// Draws a textured rectangle on the screen.
-    ///
-    /// See docs for [`Renderer::draw_quad`]. The only difference is
-    /// `rotation`, which describes how much the quad is rotated, in
-    /// radians.
-    pub fn draw_rotated_quad(
-        &mut self,
-        coords: (f32, f32, f32, f32),
-        texcoords: (f32, f32, f32, f32),
-        c: (u8, u8, u8, u8),
-        z: f32,
-        call_index: usize,
-        rotation: f32,
-    ) {
-        let cos = rotation.cos();
-        let sin = rotation.sin();
-        let rotx = |x, y| x * cos - y * sin;
-        let roty = |x, y| x * sin + y * cos;
-
-        let (x0, y0, x1, y1) = coords;
-        let (cx, cy) = ((x0 + x1) * 0.5, (y0 + y1) * 0.5);
-        let (rx0, ry0, rx1, ry1) = (x0 - cx, y0 - cy, x1 - cx, y1 - cy);
-
-        let (x00, y00) = (cx + rotx(rx0, ry0), cy + roty(rx0, ry0));
-        let (x10, y10) = (cx + rotx(rx1, ry0), cy + roty(rx1, ry0));
-        let (x11, y11) = (cx + rotx(rx1, ry1), cy + roty(rx1, ry1));
-        let (x01, y01) = (cx + rotx(rx0, ry1), cy + roty(rx0, ry1));
-
-        let (tx0, ty0, tx1, ty1) = texcoords;
-
-        self.calls[call_index].attributes.vbo_data.push([
-            ((x00, y00, z), (tx0, ty0), c),
-            ((x10, y10, z), (tx1, ty0), c),
-            ((x11, y11, z), (tx1, ty1), c),
-            ((x00, y00, z), (tx0, ty0), c),
-            ((x11, y11, z), (tx1, ty1), c),
-            ((x01, y01, z), (tx0, ty1), c),
-        ]);
     }
 
     /// Draws a textured rectangle on the screen, but only the parts
     /// inside `clip_area`.
     ///
-    /// - `coords`: The coordinates of the corners of the quad, in
-    /// (logical) pixels. Arrangement: (left, top, right, bottom)
-    ///
-    /// - `texcoords`: The texture coordinates (UVs) of the quad, in the
-    /// range 0.0 - 1.0. Same arrangement as `coords`.
-    ///
-    /// - `color`: The color tint of the quad, in the range
-    /// 0-255. Arrangement: (red, green, blue, alpha)
-    ///
     /// - `clip_area`: The coordinates of the corners of the clipping
     /// area, in (logical) pixels. Arrangement: (left, top, right, bottom)
     ///
-    /// - `z`: Used for ordering sprites on screen, in the range -1.0 -
-    /// 1.0. Positive values are in front.
-    ///
-    /// - `call_index`: The index of the texture / draw call to draw
-    /// the quad in. This is the returned value from
-    /// [`Renderer::create_draw_call`].
+    /// See [`Renderer::draw_quad`] for the rest of the parameters'
+    /// docs.
     pub fn draw_quad_clipped(
         &mut self,
         coords: (f32, f32, f32, f32),
-        texcoords: (f32, f32, f32, f32),
+        texcoords: Option<(f32, f32, f32, f32)>,
         color: (u8, u8, u8, u8),
+        rotation: (f32, f32, f32),
         clip_area: (f32, f32, f32, f32),
         z: f32,
         call_index: usize,
@@ -395,21 +270,57 @@ impl Renderer {
             ox1.max(cx0).min(cx1),
             oy1.max(cx0).min(cy1),
         );
-        let (tx0, ty0, tx1, ty1) = texcoords; // Texture coords
-        let (tx0, ty0, tx1, ty1) = (
+        let (tx0, ty0, tx1, ty1) = texcoords.unwrap_or((-1.0, -1.0, -1.0, -1.0));
+        let texcoords = Some((
             tx0.max(tx0 + (tx1 - tx0) * (x0 - ox0) / (ox1 - ox0)),
             ty0.max(ty0 + (ty1 - ty0) * (y0 - oy0) / (oy1 - oy0)),
             tx1.min(tx1 - (tx1 - tx0) * (ox1 - x1) / (ox1 - ox0)),
             ty1.min(ty1 - (ty1 - ty0) * (oy1 - y1) / (oy1 - oy0)),
-        );
+        ));
+
+        self.draw_quad((x0, y0, x1, y1), texcoords, color, rotation, z, call_index);
+    }
+
+    /// Draws a textured rectangle on the screen.
+    ///
+    /// - `coords`: The coordinates of the corners of the quad, in
+    /// (logical) pixels. Arrangement: (left, top, right, bottom)
+    ///
+    /// - `texcoords`: The texture coordinates (UVs) of the quad, in the
+    /// range 0.0 - 1.0. Same arrangement as `coords`.
+    ///
+    /// - `color`: The color tint of the quad, in the range
+    /// 0-255. Arrangement: (red, green, blue, alpha)
+    ///
+    /// - `rotation`: The rotation of the quad, in radians, and the
+    /// point around which the sprite pivots. Arrangement: (radians,
+    /// x, y)
+    ///
+    /// - `z`: Used for ordering sprites on screen, in the range -1.0 -
+    /// 1.0. Positive values are in front.
+    ///
+    /// - `call_index`: The index of the draw call to draw the quad
+    /// in. This is the returned value from [`Renderer::create_draw_call`].
+    #[inline]
+    pub fn draw_quad(
+        &mut self,
+        coords: (f32, f32, f32, f32),
+        texcoords: Option<(f32, f32, f32, f32)>,
+        color: (u8, u8, u8, u8),
+        rotation: (f32, f32, f32),
+        z: f32,
+        call_index: usize,
+    ) {
+        let (x0, y0, x1, y1) = coords;
+        let (tx0, ty0, tx1, ty1) = texcoords.unwrap_or((-1.0, -1.0, -1.0, -1.0));
 
         self.calls[call_index].attributes.vbo_data.push([
-            ((x0, y0, z), (tx0, ty0), color),
-            ((x1, y0, z), (tx1, ty0), color),
-            ((x1, y1, z), (tx1, ty1), color),
-            ((x0, y0, z), (tx0, ty0), color),
-            ((x1, y1, z), (tx1, ty1), color),
-            ((x0, y1, z), (tx0, ty1), color),
+            ((x0, y0, z), (tx0, ty0), color, rotation),
+            ((x1, y0, z), (tx1, ty0), color, rotation),
+            ((x1, y1, z), (tx1, ty1), color, rotation),
+            ((x0, y0, z), (tx0, ty0), color, rotation),
+            ((x1, y1, z), (tx1, ty1), color, rotation),
+            ((x0, y1, z), (tx0, ty1), color, rotation),
         ]);
     }
 
@@ -607,6 +518,7 @@ fn create_program(vert_source: &str, frag_source: &str) -> ShaderProgram {
     let position_attrib_location;
     let texcoord_attrib_location;
     let color_attrib_location;
+    let rotation_attrib_location;
     unsafe {
         program = gl::CreateProgram();
 
@@ -654,6 +566,9 @@ fn create_program(vert_source: &str, frag_source: &str) -> ShaderProgram {
             gl::GetAttribLocation(program, "texcoord\0".as_ptr() as *const _) as GLuint;
         color_attrib_location =
             gl::GetAttribLocation(program, "color\0".as_ptr() as *const _) as GLuint;
+        rotation_attrib_location =
+            gl::GetAttribLocation(program, "rotation\0".as_ptr() as *const _) as GLuint;
+        print_gl_errors("after searching for attribute locations");
     }
 
     ShaderProgram {
@@ -664,6 +579,7 @@ fn create_program(vert_source: &str, frag_source: &str) -> ShaderProgram {
         position_attrib_location,
         texcoord_attrib_location,
         color_attrib_location,
+        rotation_attrib_location,
     }
 }
 
@@ -688,6 +604,7 @@ fn create_attributes(opengl21: bool, program: ShaderProgram) -> Attributes {
             enable_vertex_attribs(program);
         }
     }
+    print_gl_errors("after attribute creation");
 
     Attributes {
         vao,
@@ -704,7 +621,7 @@ unsafe fn enable_vertex_attribs(program: ShaderProgram) {
         3,                                /* Components */
         gl::FLOAT,                        /* Type */
         gl::FALSE,                        /* Normalize */
-        24,                               /* Stride: sizeof(f32) * (Total component count) */
+        36,                               /* Stride: sizeof(f32) * (Total component count) */
         ptr::null(),                      /* Offset */
     );
     gl::EnableVertexAttribArray(program.position_attrib_location);
@@ -715,7 +632,7 @@ unsafe fn enable_vertex_attribs(program: ShaderProgram) {
         2,                                /* Components */
         gl::FLOAT,                        /* Type */
         gl::FALSE,                        /* Normalize */
-        24,                               /* Stride: sizeof(f32) * (Total component count) */
+        36,                               /* Stride: sizeof(f32) * (Total component count) */
         12 as *const _,                   /* Offset: sizeof(f32) * (Position's component count) */
     );
     gl::EnableVertexAttribArray(program.texcoord_attrib_location);
@@ -726,16 +643,32 @@ unsafe fn enable_vertex_attribs(program: ShaderProgram) {
         4,                             /* Components */
         gl::UNSIGNED_BYTE,             /* Type */
         gl::TRUE,                      /* Normalize */
-        24,                            /* Stride: sizeof(f32) * (Total component count) */
+        36,                            /* Stride: sizeof(f32) * (Total component count) */
         20 as *const _,                /* Offset: sizeof(f32) * (Pos + tex component count) */
     );
     gl::EnableVertexAttribArray(program.color_attrib_location);
+
+    /* Setup the rotation attribute */
+    gl::VertexAttribPointer(
+        program.rotation_attrib_location, /* Attrib location */
+        3,                                /* Components */
+        gl::FLOAT,                        /* Type */
+        gl::FALSE,                        /* Normalize */
+        36,                               /* Stride: sizeof(f32) * (Total component count) */
+        24 as *const _, /* Offset: sizeof(f32) * (Pos + tex + col component count) */
+    );
+    gl::EnableVertexAttribArray(program.rotation_attrib_location);
+
+    print_gl_errors("after enabling vertex attributes");
 }
 
 unsafe fn disable_vertex_attribs(program: ShaderProgram) {
     gl::DisableVertexAttribArray(program.position_attrib_location);
     gl::DisableVertexAttribArray(program.texcoord_attrib_location);
     gl::DisableVertexAttribArray(program.color_attrib_location);
+    gl::DisableVertexAttribArray(program.rotation_attrib_location);
+
+    print_gl_errors("after disabling vertex attributes");
 }
 
 #[inline]
@@ -749,6 +682,7 @@ fn create_texture(min_filter: GLint, mag_filter: GLint) -> GLuint {
         gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, min_filter as GLint);
         gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, mag_filter as GLint);
     }
+    print_gl_errors("after creating a texture");
     tex
 }
 
@@ -768,6 +702,7 @@ fn insert_texture(tex: GLuint, format: GLuint, w: GLint, h: GLint, pixels: &[u8]
             pixels.as_ptr() as *const _,
         );
     }
+    print_gl_errors("after inserting a texture");
 }
 
 // TODO: Change this to print out to env_logger or such, not stderr

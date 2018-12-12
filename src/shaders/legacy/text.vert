@@ -3,12 +3,13 @@
 attribute vec3 position;
 attribute vec2 texcoord;
 attribute vec4 color;
+attribute vec4 rotation;
 varying vec2 frag_texcoord;
 varying vec4 frag_color;
 uniform mat4 projection_matrix;
 
 void main(void) {
-  gl_Position = vec4(position, 1.0) * projection_matrix;
+  gl_Position = vec4(position, 1.0) * projection_matrix + rotation;
   frag_texcoord = texcoord;
   frag_color = color;
 }

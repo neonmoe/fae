@@ -77,8 +77,9 @@ fn main() -> Result<(), Box<dyn Error>> {
             let y = (i as f32 / quad_count as f32 * 3.1415 * 2.0 + time).sin() * 50.0 + 150.0;
             renderer.draw_quad(
                 (x, y, x + 315.0, y + 235.0),
-                (0.0, 0.0, 1.0, 1.0),
+                Some((0.0, 0.0, 1.0, 1.0)),
                 (0xFF, 0xAA, 0xEE, 0xFF),
+                (time * 2.0, 0.5, 0.5),
                 0.5,
                 call,
             );

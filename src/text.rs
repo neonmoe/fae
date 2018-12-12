@@ -258,8 +258,9 @@ impl TextRenderer {
                     let texcoords = (uv_rect.min.x, uv_rect.min.y, uv_rect.max.x, uv_rect.max.y);
                     renderer.draw_quad_clipped(
                         coords,
-                        texcoords,
+                        Some(texcoords),
                         (0, 0, 0, 0xFF),
+                        (0.0, 0.0, 0.0),
                         clip_area,
                         z,
                         draw_call,
