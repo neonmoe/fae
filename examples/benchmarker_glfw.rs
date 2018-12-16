@@ -95,7 +95,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             Some((0.0, 0.0, 1.0, 1.0)),
             (0xFF, 0xFF, 0xFF, 0xFF),
             (0.0, 0.0, 0.0),
-            0.5,
+            0.6,
             call,
         );
         // Draw a tinted sprite
@@ -106,7 +106,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 (x, y, x + 315.0, y + 235.0),
                 Some((0.0, 0.0, 1.0, 1.0)),
                 (0xFF, 0xAA, 0xEE, 0xFF),
-                (0.0, 0.0, 0.0),
+                (time, 0.5, 0.5),
                 0.5,
                 call,
             );
