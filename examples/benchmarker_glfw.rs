@@ -90,6 +90,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         let time = time.as_secs() as f32 + time.subsec_millis() as f32 / 1000.0;
 
         let start_quads = Instant::now();
+        renderer.draw_quad(
+            (0.0, 0.0, 640.0, 480.0),
+            Some((0.0, 0.0, 1.0, 1.0)),
+            (0xFF, 0xFF, 0xFF, 0xFF),
+            (0.0, 0.0, 0.0),
+            0.5,
+            call,
+        );
         // Draw a tinted sprite
         for i in 0..quad_count {
             let x = (i as f32 / quad_count as f32 * 3.1415 * 2.0 + time).cos() * 140.0 + 160.0;
