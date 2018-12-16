@@ -312,6 +312,9 @@ impl Renderer {
         call_index: usize,
     ) {
         let (x0, y0, x1, y1) = coords;
+        // TODO: Replace the option with glVertexAttrib'ing the
+        // default values and instead not including the attribute when
+        // making the draw call
         let (tx0, ty0, tx1, ty1) = texcoords.unwrap_or((-1.0, -1.0, -1.0, -1.0));
 
         self.calls[call_index].attributes.vbo_data.push([
