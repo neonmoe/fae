@@ -13,9 +13,9 @@ pub(crate) const GLYPH_CACHE_WIDTH: u32 = 1024;
 pub(crate) const GLYPH_CACHE_HEIGHT: u32 = 1024;
 
 const DEFAULT_TEXT_SHADERS: Shaders = Shaders {
-    vertex_shader_110: include_str!("shaders/legacy/text.vert"),
+    vertex_shader_110: include_str!("shaders/legacy/texquad.vert"),
     fragment_shader_110: include_str!("shaders/legacy/text.frag"),
-    vertex_shader_330: include_str!("shaders/text.vert"),
+    vertex_shader_330: include_str!("shaders/texquad.vert"),
     fragment_shader_330: include_str!("shaders/text.frag"),
 };
 

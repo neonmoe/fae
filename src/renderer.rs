@@ -316,6 +316,8 @@ impl Renderer {
         // default values and instead not including the attribute when
         // making the draw call
         let (tx0, ty0, tx1, ty1) = texcoords.unwrap_or((-1.0, -1.0, -1.0, -1.0));
+        let (rads, pivot_x, pivot_y) = rotation;
+        let rotation = (rads, pivot_x * (x1 - x0) + x0, pivot_y * (y1 - y0) + y0);
 
         self.calls[call_index].attributes.vbo_data.push([
             ((x0, y0, z), (tx0, ty0), color, rotation),

@@ -81,13 +81,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         );
         // Draw a tinted sprite
         for i in 0..quad_count {
-            let x = (i as f32 / quad_count as f32 * 3.1415 * 2.0 + time).cos() * 140.0 + 160.0;
-            let y = (i as f32 / quad_count as f32 * 3.1415 * 2.0 + time).sin() * 50.0 + 150.0;
+            let f = i as f32 / quad_count as f32;
+            let x = (f * 3.1415 * 8.0 + time).cos() * 150.0 * f.max(0.3) + 270.0;
+            let y = (f * 3.1415 * 8.0 + time).sin() * 150.0 * f.max(0.3) + 190.0;
             renderer.draw_quad(
-                (x, y, x + 315.0, y + 235.0),
+                (x, y, x + 100.0, y + 100.0),
                 Some((0.0, 0.0, 1.0, 1.0)),
                 (0xFF, 0xAA, 0xEE, 0xFF),
-                (time, 0.5, 0.5),
+                (-time * 1.5, 0.5, 0.5),
                 0.5,
                 call,
             );
@@ -97,33 +98,53 @@ fn main() -> Result<(), Box<dyn Error>> {
         frame_boundary = Instant::now();
 
         // Draw some text describing the frame timings
+        let mut y = 20.0;
         text.draw_text(
             &format!("Frametime: {:?}", frame_time),
-            (10.0, 20.0, -0.5),
+            (10.0, y, -0.5),
             (200.0, 16.0),
             Alignment::Left,
             false,
         );
+
+        y += 20.0;
         text.draw_text(
             &format!("Quadtime: {:?}", draw_quads_duration),
-            (10.0, 40.0, -0.5),
+            (10.0, y, -0.5),
             (200.0, 16.0),
             Alignment::Left,
             false,
         );
+
+        y += 20.0;
+        text.draw_text(
+            &format!(
+                "Quadtime of frametime: {:.1} %",
+                draw_quads_duration.subsec_micros() as f64 / frame_time.subsec_micros() as f64
+                    * 100.0
+            ),
+            (10.0, y, -0.5),
+            (200.0, 16.0),
+            Alignment::Left,
+            false,
+        );
+
+        y += 20.0;
         text.draw_text(
             &format!("Quad count: {}", quad_count),
-            (10.0, 60.0, -0.5),
+            (10.0, y, -0.5),
             (200.0, 16.0),
             Alignment::Left,
             false,
         );
+
+        y += 20.0;
         text.draw_text(
             &format!(
                 "Quad VRAM usage (approx.): {:.1} KB",
                 (quad_count * 24) as f32 / 1000.0
             ),
-            (10.0, 80.0, -0.5),
+            (10.0, y, -0.5),
             (400.0, 16.0),
             Alignment::Left,
             false,
