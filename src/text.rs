@@ -1,7 +1,6 @@
 use crate::gl;
 use crate::gl::types::*;
 use crate::image::Image;
-use crate::rect;
 use crate::renderer::{DrawCallParameters, Renderer, Shaders};
 use rusttype::gpu_cache::Cache;
 use rusttype::*;
@@ -33,7 +32,7 @@ pub enum Alignment {
 
 struct TextRender {
     glyphs: Vec<SizedGlyph>,
-    clip_area: rect::Rect,
+    clip_area: Option<(f32, f32, f32, f32)>,
     z: f32,
 }
 
@@ -84,51 +83,58 @@ impl TextRenderer {
         &mut self,
         text: &str,
         (x, y, z): (f32, f32, f32),
-        (width, font_size): (f32, f32),
+        font_size: f32,
         alignment: Alignment,
-        multiline: bool,
+        max_row_width: Option<f32>,
+        clip_area: Option<(f32, f32, f32, f32)>,
     ) {
-        let rows = self.collect_glyphs(x, y, width, multiline, font_size, text);
+        let rows = self.collect_glyphs(x, y, max_row_width, font_size, text);
         let dpi = self.dpi_factor;
 
         let mut final_glyphs = Vec::with_capacity(text.len());
 
         // Collect the rows and offset them according to the alignment
-        match alignment {
-            Alignment::Left => {
-                for row in rows {
-                    final_glyphs.extend_from_slice(&row);
+        if let Some(width) = max_row_width {
+            match alignment {
+                Alignment::Right => {
+                    for row in rows {
+                        let row = if let Some((row_width, _)) = measure_text(&row, dpi) {
+                            let offset = width - row_width;
+                            offset_glyphs(row, offset, 0.0, dpi)
+                        } else {
+                            row
+                        };
+                        final_glyphs.extend_from_slice(&row);
+                    }
+                }
+
+                Alignment::Center => {
+                    for row in rows {
+                        let row = if let Some((row_width, _)) = measure_text(&row, dpi) {
+                            let offset = (width - row_width) / 2.0;
+                            offset_glyphs(row, offset, 0.0, dpi)
+                        } else {
+                            row
+                        };
+                        final_glyphs.extend_from_slice(&row);
+                    }
+                }
+
+                Alignment::Left => {
+                    for row in rows {
+                        final_glyphs.extend_from_slice(&row);
+                    }
                 }
             }
-
-            Alignment::Right => {
-                for row in rows {
-                    let row = if let Some((row_width, _)) = measure_text(&row, dpi) {
-                        let offset = width - row_width;
-                        offset_glyphs(row, offset, 0.0, dpi)
-                    } else {
-                        row
-                    };
-                    final_glyphs.extend_from_slice(&row);
-                }
-            }
-
-            Alignment::Center => {
-                for row in rows {
-                    let row = if let Some((row_width, _)) = measure_text(&row, dpi) {
-                        let offset = (width - row_width) / 2.0;
-                        offset_glyphs(row, offset, 0.0, dpi)
-                    } else {
-                        row
-                    };
-                    final_glyphs.extend_from_slice(&row);
-                }
+        } else {
+            for row in rows {
+                final_glyphs.extend_from_slice(&row);
             }
         }
 
         self.cached_text.push(TextRender {
             glyphs: final_glyphs,
-            clip_area: rect::Rect::Dims(x, y, width, font_size),
+            clip_area,
             z,
         });
     }
@@ -137,8 +143,7 @@ impl TextRenderer {
         &self,
         x: f32,
         y: f32,
-        width: f32,
-        multiline: bool,
+        width: Option<f32>,
         font_size: f32,
         text: &str,
     ) -> Vec<Vec<SizedGlyph>> {
@@ -168,7 +173,7 @@ impl TextRenderer {
             let c = chars[i];
             i += 1;
             if c.is_control() {
-                if c == '\n' && multiline {
+                if c == '\n' {
                     next_row(&mut caret, &mut rows);
                 }
                 continue;
@@ -184,7 +189,7 @@ impl TextRenderer {
                 caret.x += self.font.pair_kerning(scale, id, glyph.id());
             }
 
-            if caret.x > x + width && multiline {
+            if width.is_some() && caret.x > x + width.unwrap() {
                 if let Some(ref mut last_row) = rows.last_mut() {
                     let len = last_row.len();
                     if current_word_length < len {
@@ -249,8 +254,17 @@ impl TextRenderer {
         cache.cache_queued(upload_new_texture).ok();
 
         for text in &self.cached_text {
-            let clip_area = text.clip_area.coords();
             let z = text.z;
+
+            let clip_coords;
+            let clipped;
+            if let Some(clip_area) = text.clip_area {
+                clip_coords = clip_area;
+                clipped = true;
+            } else {
+                clip_coords = (0.0, 0.0, 0.0, 0.0);
+                clipped = false;
+            }
             for glyph in &text.glyphs {
                 if let Ok(Some((uv_rect, screen_rect))) = cache.rect_for(0, &glyph.glyph) {
                     let coords = (
@@ -260,15 +274,26 @@ impl TextRenderer {
                         screen_rect.max.y as f32 / dpi_factor,
                     );
                     let texcoords = (uv_rect.min.x, uv_rect.min.y, uv_rect.max.x, uv_rect.max.y);
-                    renderer.draw_quad_clipped(
-                        coords,
-                        Some(texcoords),
-                        (0, 0, 0, 0xFF),
-                        (0.0, 0.0, 0.0),
-                        clip_area,
-                        z,
-                        draw_call,
-                    );
+                    if clipped {
+                        renderer.draw_quad_clipped(
+                            coords,
+                            Some(texcoords),
+                            (0, 0, 0, 0xFF),
+                            (0.0, 0.0, 0.0),
+                            clip_coords,
+                            z,
+                            draw_call,
+                        );
+                    } else {
+                        renderer.draw_quad(
+                            coords,
+                            Some(texcoords),
+                            (0, 0, 0, 0xFF),
+                            (0.0, 0.0, 0.0),
+                            z,
+                            draw_call,
+                        );
+                    };
                 }
             }
         }
@@ -278,7 +303,11 @@ impl TextRenderer {
 }
 
 /// Will only return `None` when `index >= glyphs.len()`.
-fn measure_text_at_index(glyphs: &[SizedGlyph], index: usize, dpi: f32) -> Option<rect::Rect> {
+fn measure_text_at_index(
+    glyphs: &[SizedGlyph],
+    index: usize,
+    dpi: f32,
+) -> Option<(f32, f32, f32, f32)> {
     if index >= glyphs.len() {
         return None;
     }
@@ -287,35 +316,30 @@ fn measure_text_at_index(glyphs: &[SizedGlyph], index: usize, dpi: f32) -> Optio
     let glyph = &glyphs[index].glyph;
     let position = glyph.position();
     if let Some(rect) = glyph.pixel_bounding_box() {
-        return Some(rect::Rect::Coords(
+        return Some((
             rect.min.x as f32 / dpi,
             rect.min.y as f32 / dpi,
             rect.max.x as f32 / dpi,
             rect.max.y as f32 / dpi,
         ));
     } else {
-        return Some(rect::Rect::Dims(
-            position.x / dpi,
-            position.y / dpi,
-            width / dpi,
-            1.0,
-        ));
+        let (x, y) = (position.x / dpi, position.y / dpi);
+        return Some((x, y, x + width / dpi, y + 1.0));
     }
 }
 
 fn measure_text(glyphs: &[SizedGlyph], dpi: f32) -> Option<(f32, f32)> {
-    let mut result: Option<rect::Rect> = None;
+    let mut result: Option<(f32, f32, f32, f32)> = None;
 
     for i in 0..glyphs.len() {
         if let Some(glyph_rect) = measure_text_at_index(glyphs, i, dpi) {
             if let Some(ref mut rect) = result {
-                let (x0, y0, x1, y1) = (
-                    rect.left().min(glyph_rect.left()),
-                    rect.top().min(glyph_rect.top()),
-                    rect.right().max(glyph_rect.right()),
-                    rect.bottom().max(glyph_rect.bottom()),
+                *rect = (
+                    rect.0.min(glyph_rect.0),
+                    rect.1.min(glyph_rect.1),
+                    rect.2.max(glyph_rect.2),
+                    rect.3.max(glyph_rect.3),
                 );
-                rect.set_coords(x0, y0, x1, y1);
             } else {
                 result = Some(glyph_rect);
             }
@@ -323,7 +347,7 @@ fn measure_text(glyphs: &[SizedGlyph], dpi: f32) -> Option<(f32, f32)> {
     }
 
     if let Some(rect) = result {
-        Some((rect.width(), rect.height()))
+        Some((rect.2 - rect.0, rect.3 - rect.1))
     } else {
         None
     }

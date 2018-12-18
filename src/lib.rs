@@ -6,11 +6,9 @@ pub mod gl {
 }
 
 mod image;
-mod rect;
 pub mod renderer;
 
 pub use crate::image::Image;
-pub use crate::rect::Rect;
 
 #[cfg(feature = "text")]
 pub mod text;

@@ -121,18 +121,20 @@ fn main() -> Result<(), Box<dyn Error>> {
         text.draw_text(
             &format!("Frametime: {:?}", frame_time),
             (10.0, y, -0.5),
-            (200.0, 16.0),
+            16.0,
             Alignment::Left,
-            false,
+            None,
+            None,
         );
 
         y += 20.0;
         text.draw_text(
             &format!("Quadtime: {:?}", draw_quads_duration),
             (10.0, y, -0.5),
-            (200.0, 16.0),
+            16.0,
             Alignment::Left,
-            false,
+            None,
+            None,
         );
 
         y += 20.0;
@@ -143,18 +145,20 @@ fn main() -> Result<(), Box<dyn Error>> {
                     * 100.0
             ),
             (10.0, y, -0.5),
-            (200.0, 16.0),
+            16.0,
             Alignment::Left,
-            false,
+            None,
+            None,
         );
 
         y += 20.0;
         text.draw_text(
             &format!("Quad count: {}", quad_count),
             (10.0, y, -0.5),
-            (200.0, 16.0),
+            16.0,
             Alignment::Left,
-            false,
+            None,
+            None,
         );
 
         y += 20.0;
@@ -164,9 +168,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                 (quad_count * 24) as f32 / 1000.0
             ),
             (10.0, y, -0.5),
-            (400.0, 16.0),
+            16.0,
             Alignment::Left,
-            false,
+            None,
+            None,
         );
 
         // Render the glyphs into the draw call

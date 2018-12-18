@@ -248,6 +248,7 @@ impl Renderer {
     ///
     /// See [`Renderer::draw_quad`] for the rest of the parameters'
     /// docs.
+    #[allow(clippy::too_many_arguments)]
     pub fn draw_quad_clipped(
         &mut self,
         coords: (f32, f32, f32, f32),
@@ -263,19 +264,21 @@ impl Renderer {
         if ox0 > cx1 || ox1 < cx0 || oy0 > cy1 || oy1 < cy0 {
             return;
         }
+        let (ow, oh) = (ox1 - ox0, oy1 - oy0);
         let (x0, y0, x1, y1) = (
             // Real coords
             ox0.max(cx0).min(cx1),
             oy0.max(cy0).min(cy1),
             ox1.max(cx0).min(cx1),
-            oy1.max(cx0).min(cy1),
+            oy1.max(cy0).min(cy1),
         );
         let (tx0, ty0, tx1, ty1) = texcoords.unwrap_or((-1.0, -1.0, -1.0, -1.0));
+        let (tw, th) = (tx1 - tx0, ty1 - ty0);
         let texcoords = Some((
-            tx0.max(tx0 + (tx1 - tx0) * (x0 - ox0) / (ox1 - ox0)),
-            ty0.max(ty0 + (ty1 - ty0) * (y0 - oy0) / (oy1 - oy0)),
-            tx1.min(tx1 - (tx1 - tx0) * (ox1 - x1) / (ox1 - ox0)),
-            ty1.min(ty1 - (ty1 - ty0) * (oy1 - y1) / (oy1 - oy0)),
+            tx0.max(tx0 + tw * (x0 - ox0) / ow),
+            ty0.max(ty0 + th * (y0 - oy0) / oh),
+            tx1.min(tx1 + tw * (x1 - ox1) / ow),
+            ty1.min(ty1 + th * (y1 - oy1) / oh),
         ));
 
         self.draw_quad((x0, y0, x1, y1), texcoords, color, rotation, z, call_index);
