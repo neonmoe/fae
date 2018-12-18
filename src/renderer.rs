@@ -7,16 +7,19 @@ use std::error::Error;
 use std::mem;
 use std::ptr;
 
-type PositionAttribute = (f32, f32, f32);
-type TexCoordAttribute = (f32, f32);
-type ColorAttribute = (u8, u8, u8, u8);
-type RotationAttribute = (f32, f32, f32);
-type TexQuad = [(
-    PositionAttribute,
-    TexCoordAttribute,
-    ColorAttribute,
-    RotationAttribute,
+type LegacyTexQuad = [(
+    (f32, f32, f32),  // Position (x, y, z)
+    (f32, f32),       // Texcoord (x, y)
+    (u8, u8, u8, u8), // Color (r, g, b, a)
+    (f32, f32, f32),  // Rotation (rad, pivot x, pivot y)
 ); 6];
+type TexQuad = (
+    (f32, f32, f32, f32), // Position (x, y, w, h)
+    (f32, f32, f32, f32), // Texcoord (x, y, w, h)
+    (f32, f32, f32, f32), // Color (r, g, b, a)
+    (f32, f32, f32),      // Rotation (rad, pivot x, pivot y)
+    f32,                  // Depth (z)
+);
 type Texture = GLuint;
 type VertexBufferObject = GLuint;
 type VertexArrayObject = GLuint;
@@ -48,13 +51,18 @@ struct ShaderProgram {
     texcoord_attrib_location: GLuint,
     color_attrib_location: GLuint,
     rotation_attrib_location: GLuint,
+    depth_attrib_location: GLuint,
+    shared_position_attrib_location: GLuint,
+    shared_texcoord_attrib_location: GLuint,
 }
 
 #[derive(Clone, Debug)]
 struct Attributes {
     vbo: VertexBufferObject,
+    vbo_static: VertexBufferObject,
     vao: VertexArrayObject,
     vbo_data: Vec<TexQuad>,
+    vbo_data_legacy: Vec<LegacyTexQuad>,
     allocated_vbo_data_size: isize,
 }
 
@@ -154,7 +162,7 @@ impl Renderer {
         };
         let index = self.calls.len();
 
-        let program = create_program(&vert, &frag);
+        let program = create_program(&vert, &frag, self.gl_state.legacy);
         let attributes = create_attributes(self.gl_state.legacy, program);
         let filter = |smoothed| if smoothed { gl::LINEAR } else { gl::NEAREST } as i32;
         let texture = create_texture(
@@ -311,7 +319,7 @@ impl Renderer {
         texcoords: Option<(f32, f32, f32, f32)>,
         color: (u8, u8, u8, u8),
         rotation: (f32, f32, f32),
-        z: f32,
+        depth: f32,
         call_index: usize,
     ) {
         let (x0, y0, x1, y1) = coords;
@@ -319,17 +327,34 @@ impl Renderer {
         // default values and instead not including the attribute when
         // making the draw call
         let (tx0, ty0, tx1, ty1) = texcoords.unwrap_or((-1.0, -1.0, -1.0, -1.0));
-        let (rads, pivot_x, pivot_y) = rotation;
-        let rotation = (rads, pivot_x * (x1 - x0) + x0, pivot_y * (y1 - y0) + y0);
 
-        self.calls[call_index].attributes.vbo_data.push([
-            ((x0, y0, z), (tx0, ty0), color, rotation),
-            ((x1, y0, z), (tx1, ty0), color, rotation),
-            ((x1, y1, z), (tx1, ty1), color, rotation),
-            ((x0, y0, z), (tx0, ty0), color, rotation),
-            ((x1, y1, z), (tx1, ty1), color, rotation),
-            ((x0, y1, z), (tx0, ty1), color, rotation),
-        ]);
+        if self.gl_state.legacy {
+            let (rads, pivot_x, pivot_y) = rotation;
+            let rotation = (rads, pivot_x * (x1 - x0) + x0, pivot_y * (y1 - y0) + y0);
+            self.calls[call_index].attributes.vbo_data_legacy.push([
+                ((x0, y0, depth), (tx0, ty0), color, rotation),
+                ((x1, y0, depth), (tx1, ty0), color, rotation),
+                ((x1, y1, depth), (tx1, ty1), color, rotation),
+                ((x0, y0, depth), (tx0, ty0), color, rotation),
+                ((x1, y1, depth), (tx1, ty1), color, rotation),
+                ((x0, y1, depth), (tx0, ty1), color, rotation),
+            ]);
+        } else {
+            let (r, g, b, a) = color;
+            let color = (
+                f32::from(r) / 255.0,
+                f32::from(g) / 255.0,
+                f32::from(b) / 255.0,
+                f32::from(a) / 255.0,
+            );
+            self.calls[call_index].attributes.vbo_data.push((
+                (x0, y0, x1 - x0, y1 - y0),
+                (tx0, ty0, tx1 - tx0, ty1 - ty0),
+                color,
+                rotation,
+                depth,
+            ));
+        }
     }
 
     pub fn render(&mut self, width: f32, height: f32) {
@@ -350,7 +375,7 @@ impl Renderer {
         // The call order is reversed so that the text layer draws
         // last, for optimal text rendering quality.
         for (i, call) in self.calls.iter_mut().enumerate().rev() {
-            if call.attributes.vbo_data.is_empty() {
+            if call.attributes.vbo_data.is_empty() && call.attributes.vbo_data_legacy.is_empty() {
                 continue;
             }
 
@@ -370,23 +395,38 @@ impl Renderer {
             }
             print_gl_errors(&format!("after initializing draw call #{}", i));
 
-            let buffer_length =
-                (mem::size_of::<TexQuad>() * call.attributes.vbo_data.len()) as isize;
-            let buffer_ptr = call.attributes.vbo_data.as_ptr() as *const _;
-
-            if buffer_length < call.attributes.allocated_vbo_data_size {
-                unsafe {
-                    gl::BufferSubData(gl::ARRAY_BUFFER, 0, buffer_length, buffer_ptr);
+            if legacy {
+                let len = (mem::size_of::<LegacyTexQuad>() * call.attributes.vbo_data_legacy.len())
+                    as isize;
+                let ptr = call.attributes.vbo_data_legacy.as_ptr() as *const _;
+                if len <= call.attributes.allocated_vbo_data_size {
+                    unsafe {
+                        gl::BufferSubData(gl::ARRAY_BUFFER, 0, len, ptr);
+                    }
+                } else {
+                    call.attributes.allocated_vbo_data_size = len;
+                    unsafe {
+                        gl::BufferData(gl::ARRAY_BUFFER, len, ptr, gl::STREAM_DRAW);
+                    }
                 }
             } else {
-                call.attributes.allocated_vbo_data_size = buffer_length;
-                unsafe {
-                    gl::BufferData(gl::ARRAY_BUFFER, buffer_length, buffer_ptr, gl::STREAM_DRAW);
+                let len = (mem::size_of::<TexQuad>() * call.attributes.vbo_data.len()) as isize;
+                let ptr = call.attributes.vbo_data.as_ptr() as *const _;
+                if len <= call.attributes.allocated_vbo_data_size {
+                    unsafe {
+                        gl::BufferSubData(gl::ARRAY_BUFFER, 0, len, ptr);
+                    }
+                } else {
+                    call.attributes.allocated_vbo_data_size = len;
+                    unsafe {
+                        gl::BufferData(gl::ARRAY_BUFFER, len, ptr, gl::STREAM_DRAW);
+                    }
                 }
             }
             print_gl_errors(&format!("after pushing vertex buffer #{}", i));
 
             if legacy {
+                let vertex_count = call.attributes.vbo_data_legacy.len() as i32 * 6;
                 unsafe {
                     enable_vertex_attribs(&[
                         (call.program.position_attrib_location, 3, gl::FLOAT),
@@ -394,16 +434,7 @@ impl Renderer {
                         (call.program.color_attrib_location, 4, gl::UNSIGNED_BYTE),
                         (call.program.rotation_attrib_location, 3, gl::FLOAT),
                     ]);
-                }
-            }
-
-            unsafe {
-                gl::DrawArrays(gl::TRIANGLES, 0, call.attributes.vbo_data.len() as i32 * 6);
-            }
-            print_gl_errors(&format!("after drawing buffer #{}", i));
-
-            if legacy {
-                unsafe {
+                    gl::DrawArrays(gl::TRIANGLES, 0, vertex_count);
                     disable_vertex_attribs(&[
                         call.program.position_attrib_location,
                         call.program.texcoord_attrib_location,
@@ -411,9 +442,18 @@ impl Renderer {
                         call.program.rotation_attrib_location,
                     ]);
                 }
+                print_gl_errors(&format!("[legacy] after drawing buffer #{}", i));
+            } else {
+                let instance_count = call.attributes.vbo_data.len() as i32;
+                unsafe {
+                    gl::DrawArraysInstanced(gl::TRIANGLES, 0, 6, instance_count);
+                }
+                print_gl_errors(&format!("after drawing buffer #{}", i));
             }
 
+            call.attributes.vbo_data_legacy.clear();
             call.attributes.vbo_data.clear();
+
             print_gl_errors(&*format!("after render #{}", i));
         }
         self.gl_pop();
@@ -494,7 +534,12 @@ impl Drop for Renderer {
                 fragment_shader,
                 ..
             } = call.program;
-            let Attributes { vbo, vao, .. } = call.attributes;
+            let Attributes {
+                vbo,
+                vbo_static,
+                vao,
+                ..
+            } = call.attributes;
             unsafe {
                 gl::DeleteShader(vertex_shader);
                 gl::DeleteShader(fragment_shader);
@@ -502,6 +547,7 @@ impl Drop for Renderer {
                 gl::DeleteTextures(1, [call.texture].as_ptr());
                 gl::DeleteBuffers(1, [vbo].as_ptr());
                 if !legacy {
+                    gl::DeleteBuffers(1, [vbo_static].as_ptr());
                     gl::DeleteVertexArrays(1, [vao].as_ptr());
                 }
             }
@@ -517,29 +563,28 @@ const DEFAULT_QUAD_SHADERS: Shaders = Shaders {
 };
 
 #[inline]
-fn create_program(vert_source: &str, frag_source: &str) -> ShaderProgram {
+fn create_program(vert_source: &str, frag_source: &str, legacy: bool) -> ShaderProgram {
     let print_shader_error = |shader, shader_type| unsafe {
         let mut compilation_status = 0;
         gl::GetShaderiv(shader, gl::COMPILE_STATUS, &mut compilation_status);
         if compilation_status as u8 != gl::TRUE {
             let mut info = [0; 1024];
             gl::GetShaderInfoLog(shader, 1024, ptr::null_mut(), info.as_mut_ptr());
-            println!(
+
+            let error_msg = format!(
                 "Shader ({}) compilation failed:\n{}",
                 shader_type,
                 String::from_utf8_lossy(&mem::transmute::<[i8; 1024], [u8; 1024]>(info)[..])
             );
+            debug_assert!(false, "{}", error_msg);
+            eprintln!("{}", error_msg);
         }
     };
 
     let program;
     let vertex_shader;
     let fragment_shader;
-    let projection_matrix_location;
-    let position_attrib_location;
-    let texcoord_attrib_location;
-    let color_attrib_location;
-    let rotation_attrib_location;
+
     unsafe {
         program = gl::CreateProgram();
 
@@ -571,13 +616,26 @@ fn create_program(vert_source: &str, frag_source: &str) -> ShaderProgram {
         if link_status as u8 != gl::TRUE {
             let mut info = [0; 1024];
             gl::GetProgramInfoLog(program, 1024, ptr::null_mut(), info.as_mut_ptr());
-            println!(
+
+            let error_msg = format!(
                 "Program linking failed:\n{}",
                 String::from_utf8_lossy(&mem::transmute::<[i8; 1024], [u8; 1024]>(info)[..])
             );
+            debug_assert!(false, "{}", error_msg);
+            eprintln!("{}", error_msg);
         }
         print_gl_errors("after shader program creation");
+    }
 
+    let projection_matrix_location;
+    let position_attrib_location;
+    let texcoord_attrib_location;
+    let color_attrib_location;
+    let rotation_attrib_location;
+    let mut depth_attrib_location = 0;
+    let mut shared_position_attrib_location = 0;
+    let mut shared_texcoord_attrib_location = 0;
+    unsafe {
         gl::UseProgram(program);
         projection_matrix_location =
             gl::GetUniformLocation(program, "projection_matrix\0".as_ptr() as *const _);
@@ -589,6 +647,16 @@ fn create_program(vert_source: &str, frag_source: &str) -> ShaderProgram {
             gl::GetAttribLocation(program, "color\0".as_ptr() as *const _) as GLuint;
         rotation_attrib_location =
             gl::GetAttribLocation(program, "rotation\0".as_ptr() as *const _) as GLuint;
+
+        if !legacy {
+            depth_attrib_location =
+                gl::GetAttribLocation(program, "depth\0".as_ptr() as *const _) as GLuint;
+            shared_position_attrib_location =
+                gl::GetAttribLocation(program, "shared_position\0".as_ptr() as *const _) as GLuint;
+            shared_texcoord_attrib_location =
+                gl::GetAttribLocation(program, "shared_texcoord\0".as_ptr() as *const _) as GLuint;
+        }
+
         print_gl_errors("after searching for attribute locations");
     }
 
@@ -601,6 +669,9 @@ fn create_program(vert_source: &str, frag_source: &str) -> ShaderProgram {
         texcoord_attrib_location,
         color_attrib_location,
         rotation_attrib_location,
+        depth_attrib_location,
+        shared_position_attrib_location,
+        shared_texcoord_attrib_location,
     }
 }
 
@@ -614,6 +685,28 @@ fn create_attributes(opengl21: bool, program: ShaderProgram) -> Attributes {
         }
     }
 
+    let mut vbo_static = 0;
+    if !opengl21 {
+        unsafe {
+            gl::GenBuffers(1, &mut vbo_static);
+            gl::BindBuffer(gl::ARRAY_BUFFER, vbo_static);
+            enable_vertex_attribs(&[
+                (program.shared_position_attrib_location, 2, gl::FLOAT),
+                (program.shared_texcoord_attrib_location, 2, gl::FLOAT),
+            ]);
+            // This is the vertices of two triangles that form a quad,
+            // interleaved in a (pos x, pos y, tex x, tex y)
+            // arrangement.
+            let static_quad_vertices: [f32; 24] = [
+                0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0,
+                1.0, 1.0, 1.0, 1.0, 0.0, 1.0, 0.0, 1.0,
+            ];
+            let len = (mem::size_of::<f32>() * static_quad_vertices.len()) as isize;
+            let ptr = static_quad_vertices.as_ptr() as *const _;
+            gl::BufferData(gl::ARRAY_BUFFER, len, ptr, gl::STATIC_DRAW);
+        }
+    }
+
     let mut vbo = 0;
     unsafe {
         gl::GenBuffers(1, &mut vbo);
@@ -623,11 +716,17 @@ fn create_attributes(opengl21: bool, program: ShaderProgram) -> Attributes {
     if !opengl21 {
         unsafe {
             enable_vertex_attribs(&[
-                (program.position_attrib_location, 3, gl::FLOAT),
-                (program.texcoord_attrib_location, 2, gl::FLOAT),
-                (program.color_attrib_location, 4, gl::UNSIGNED_BYTE),
+                (program.position_attrib_location, 4, gl::FLOAT),
+                (program.texcoord_attrib_location, 4, gl::FLOAT),
+                (program.color_attrib_location, 4, gl::FLOAT),
                 (program.rotation_attrib_location, 3, gl::FLOAT),
+                (program.depth_attrib_location, 1, gl::FLOAT),
             ]);
+            gl::VertexAttribDivisor(program.position_attrib_location, 1);
+            gl::VertexAttribDivisor(program.texcoord_attrib_location, 1);
+            gl::VertexAttribDivisor(program.color_attrib_location, 1);
+            gl::VertexAttribDivisor(program.rotation_attrib_location, 1);
+            gl::VertexAttribDivisor(program.depth_attrib_location, 1);
         }
     }
     print_gl_errors("after attribute creation");
@@ -635,7 +734,9 @@ fn create_attributes(opengl21: bool, program: ShaderProgram) -> Attributes {
     Attributes {
         vao,
         vbo,
+        vbo_static,
         vbo_data: Vec::new(),
+        vbo_data_legacy: Vec::new(),
         allocated_vbo_data_size: 0,
     }
 }
@@ -647,10 +748,7 @@ unsafe fn enable_vertex_attribs(attribs: &[AttribArray]) {
         gl::FLOAT => 4 * attrib.1,
         _ => attrib.1,
     };
-    let total_components = attribs
-        .iter()
-        .map(get_component_size)
-        .fold(0, |acc, c| acc + c);
+    let total_components = attribs.iter().map(get_component_size).sum();
     let mut offset = 0;
     for attrib in attribs {
         let normalize = match attrib.2 {
@@ -662,8 +760,8 @@ unsafe fn enable_vertex_attribs(attribs: &[AttribArray]) {
             attrib.1,           /* Components */
             attrib.2,           /* Type */
             normalize,          /* Normalize */
-            total_components,   /* Stride: sizeof(f32) * (Total component count) */
-            offset as *const _, /* Offset: sizeof(f32) * (Pos + tex + col component count) */
+            total_components,   /* Stride */
+            offset as *const _, /* Offset */
         );
         gl::EnableVertexAttribArray(attrib.0);
         let component_size = get_component_size(&attrib);

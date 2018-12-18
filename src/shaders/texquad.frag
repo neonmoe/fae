@@ -9,7 +9,7 @@ void main(void) {
   if (frag_texcoord.x == -1.0 && frag_texcoord.y == -1.0) {
     out_color = frag_color;
   } else {
-    out_color = frag_color * texture(tex, frag_texcoord);
+    out_color = frag_color * texture(tex, frag_texcoord.xy);
   }
   if (out_color.a < 0.01) {
     discard;

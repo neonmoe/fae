@@ -39,6 +39,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .ok()
         .and_then(|var| var.parse::<i32>().ok())
         .unwrap_or(30_000);
+    println!("Rendering {} quads.", quad_count);
 
     let start = Instant::now();
     let mut frame_boundary = Instant::now();
@@ -120,19 +121,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         y += 20.0;
         text.draw_text(
             &format!("Quad count: {}", quad_count),
-            (10.0, y, -0.5),
-            16.0,
-            Alignment::Left,
-            None,
-            None,
-        );
-
-        y += 20.0;
-        text.draw_text(
-            &format!(
-                "Quad VRAM usage (approx.): {:.1} KB",
-                (quad_count * 24) as f32 / 1000.0
-            ),
             (10.0, y, -0.5),
             16.0,
             Alignment::Left,

@@ -142,19 +142,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             None,
         );
 
-        y += 20.0;
-        text.draw_text(
-            &format!(
-                "Quad VRAM usage (approx.): {:.1} KB",
-                (quad_count * 24) as f32 / 1000.0
-            ),
-            (10.0, y, -0.5),
-            16.0,
-            Alignment::Left,
-            None,
-            None,
-        );
-
         // Render the glyphs into the draw call
         text.compose_draw_call(&mut renderer);
         // Render the OpenGL draw calls
