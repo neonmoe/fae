@@ -1,7 +1,6 @@
 # Roadmap
 Current planned features/todos before declaring the crate ready for
 any kind of use:
-- Fixing a font rendering issue
 - Instanced rendering (A big performance boost for modern OpenGL
   environments)
 - Making specific vertex attribs optional in draw calls (if benchmarks

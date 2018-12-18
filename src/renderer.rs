@@ -388,7 +388,12 @@ impl Renderer {
 
             if legacy {
                 unsafe {
-                    enable_vertex_attribs(call.program);
+                    enable_vertex_attribs(&[
+                        (call.program.position_attrib_location, 3, gl::FLOAT),
+                        (call.program.texcoord_attrib_location, 2, gl::FLOAT),
+                        (call.program.color_attrib_location, 4, gl::UNSIGNED_BYTE),
+                        (call.program.rotation_attrib_location, 3, gl::FLOAT),
+                    ]);
                 }
             }
 
@@ -399,7 +404,12 @@ impl Renderer {
 
             if legacy {
                 unsafe {
-                    disable_vertex_attribs(call.program);
+                    disable_vertex_attribs(&[
+                        call.program.position_attrib_location,
+                        call.program.texcoord_attrib_location,
+                        call.program.color_attrib_location,
+                        call.program.rotation_attrib_location,
+                    ]);
                 }
             }
 
@@ -612,7 +622,12 @@ fn create_attributes(opengl21: bool, program: ShaderProgram) -> Attributes {
 
     if !opengl21 {
         unsafe {
-            enable_vertex_attribs(program);
+            enable_vertex_attribs(&[
+                (program.position_attrib_location, 3, gl::FLOAT),
+                (program.texcoord_attrib_location, 2, gl::FLOAT),
+                (program.color_attrib_location, 4, gl::UNSIGNED_BYTE),
+                (program.rotation_attrib_location, 3, gl::FLOAT),
+            ]);
         }
     }
     print_gl_errors("after attribute creation");
@@ -625,59 +640,43 @@ fn create_attributes(opengl21: bool, program: ShaderProgram) -> Attributes {
     }
 }
 
-unsafe fn enable_vertex_attribs(program: ShaderProgram) {
-    /* Setup the position attribute */
-    gl::VertexAttribPointer(
-        program.position_attrib_location, /* Attrib location */
-        3,                                /* Components */
-        gl::FLOAT,                        /* Type */
-        gl::FALSE,                        /* Normalize */
-        36,                               /* Stride: sizeof(f32) * (Total component count) */
-        ptr::null(),                      /* Offset */
-    );
-    gl::EnableVertexAttribArray(program.position_attrib_location);
-
-    /* Setup the texture coordinate attribute */
-    gl::VertexAttribPointer(
-        program.texcoord_attrib_location, /* Attrib location */
-        2,                                /* Components */
-        gl::FLOAT,                        /* Type */
-        gl::FALSE,                        /* Normalize */
-        36,                               /* Stride: sizeof(f32) * (Total component count) */
-        12 as *const _,                   /* Offset: sizeof(f32) * (Position's component count) */
-    );
-    gl::EnableVertexAttribArray(program.texcoord_attrib_location);
-
-    /* Setup the color attribute */
-    gl::VertexAttribPointer(
-        program.color_attrib_location, /* Attrib location */
-        4,                             /* Components */
-        gl::UNSIGNED_BYTE,             /* Type */
-        gl::TRUE,                      /* Normalize */
-        36,                            /* Stride: sizeof(f32) * (Total component count) */
-        20 as *const _,                /* Offset: sizeof(f32) * (Pos + tex component count) */
-    );
-    gl::EnableVertexAttribArray(program.color_attrib_location);
-
-    /* Setup the rotation attribute */
-    gl::VertexAttribPointer(
-        program.rotation_attrib_location, /* Attrib location */
-        3,                                /* Components */
-        gl::FLOAT,                        /* Type */
-        gl::FALSE,                        /* Normalize */
-        36,                               /* Stride: sizeof(f32) * (Total component count) */
-        24 as *const _, /* Offset: sizeof(f32) * (Pos + tex + col component count) */
-    );
-    gl::EnableVertexAttribArray(program.rotation_attrib_location);
+// (location, component_count, type)
+type AttribArray = (GLuint, GLint, GLuint);
+unsafe fn enable_vertex_attribs(attribs: &[AttribArray]) {
+    let get_component_size = |attrib: &AttribArray| match attrib.2 {
+        gl::FLOAT => 4 * attrib.1,
+        _ => attrib.1,
+    };
+    let total_components = attribs
+        .iter()
+        .map(get_component_size)
+        .fold(0, |acc, c| acc + c);
+    let mut offset = 0;
+    for attrib in attribs {
+        let normalize = match attrib.2 {
+            gl::FLOAT => gl::FALSE,
+            _ => gl::TRUE,
+        };
+        gl::VertexAttribPointer(
+            attrib.0,           /* Attrib location */
+            attrib.1,           /* Components */
+            attrib.2,           /* Type */
+            normalize,          /* Normalize */
+            total_components,   /* Stride: sizeof(f32) * (Total component count) */
+            offset as *const _, /* Offset: sizeof(f32) * (Pos + tex + col component count) */
+        );
+        gl::EnableVertexAttribArray(attrib.0);
+        let component_size = get_component_size(&attrib);
+        offset += component_size;
+    }
 
     print_gl_errors("after enabling vertex attributes");
 }
 
-unsafe fn disable_vertex_attribs(program: ShaderProgram) {
-    gl::DisableVertexAttribArray(program.position_attrib_location);
-    gl::DisableVertexAttribArray(program.texcoord_attrib_location);
-    gl::DisableVertexAttribArray(program.color_attrib_location);
-    gl::DisableVertexAttribArray(program.rotation_attrib_location);
+unsafe fn disable_vertex_attribs(attrib_locations: &[GLuint]) {
+    for location in attrib_locations {
+        gl::DisableVertexAttribArray(*location);
+    }
 
     print_gl_errors("after disabling vertex attributes");
 }

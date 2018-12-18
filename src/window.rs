@@ -25,6 +25,8 @@ pub struct WindowSettings {
     /// applications that are supposed to be opened for very short
     /// amounts of time.
     pub is_dialog: bool,
+    /// This should always be true for everything except benchmarks.
+    pub vsync: bool,
 }
 
 impl Default for WindowSettings {
@@ -38,6 +40,7 @@ impl Default for WindowSettings {
             width: 640.0,
             height: 480.0,
             is_dialog: false,
+            vsync: true,
         }
     }
 }
@@ -88,7 +91,7 @@ impl Window {
                     window = Window::window_as_dialog(window);
                 }
                 let context = ContextBuilder::new()
-                    .with_vsync(true)
+                    .with_vsync(settings.vsync)
                     .with_srgb(true)
                     .with_gl(gl_request)
                     .with_gl_profile(gl_profile);
