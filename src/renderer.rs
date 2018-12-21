@@ -199,7 +199,7 @@ impl Renderer {
         ninepatch_dimensions: ((f32, f32, f32), (f32, f32, f32)),
         coords: (f32, f32, f32, f32),
         texcoords: Option<(f32, f32, f32, f32)>,
-        color: (f32, f32, f32, f32),
+        color: Option<(f32, f32, f32, f32)>,
         z: f32,
         call_index: usize,
     ) {
@@ -230,7 +230,7 @@ impl Renderer {
                 (x0[xi], y0[yi], x1[xi], y1[yi]),
                 Some((tx0[xi], ty0[yi], tx1[xi], ty1[yi])),
                 color,
-                (0.0, 0.0, 0.0),
+                None,
                 z,
                 call_index,
             );
@@ -250,11 +250,11 @@ impl Renderer {
         &mut self,
         coords: (f32, f32, f32, f32),
         texcoords: Option<(f32, f32, f32, f32)>,
-        color: (f32, f32, f32, f32),
-        rotation: (f32, f32, f32),
-        clip_area: (f32, f32, f32, f32),
+        color: Option<(f32, f32, f32, f32)>,
+        rotation: Option<(f32, f32, f32)>,
         z: f32,
         call_index: usize,
+        clip_area: (f32, f32, f32, f32),
     ) {
         let (cx0, cy0, cx1, cy1) = clip_area; // Clip coords
         let (ox0, oy0, ox1, oy1) = coords; // Original coords
@@ -306,8 +306,8 @@ impl Renderer {
         &mut self,
         coords: (f32, f32, f32, f32),
         texcoords: Option<(f32, f32, f32, f32)>,
-        color: (f32, f32, f32, f32),
-        rotation: (f32, f32, f32),
+        color: Option<(f32, f32, f32, f32)>,
+        rotation: Option<(f32, f32, f32)>,
         depth: f32,
         call_index: usize,
     ) {
@@ -316,8 +316,8 @@ impl Renderer {
         // default values and instead not including the attribute when
         // making the draw call
         let (tx0, ty0, tx1, ty1) = texcoords.unwrap_or((-1.0, -1.0, -1.0, -1.0));
-        let (red, green, blue, alpha) = color;
-        let (rads, pivot_x, pivot_y) = rotation;
+        let (red, green, blue, alpha) = color.unwrap_or((1.0, 1.0, 1.0, 1.0));
+        let (rads, pivot_x, pivot_y) = rotation.unwrap_or((0.0, 0.0, 0.0));
 
         // I apologize for this mess.
         if self.gl_state.legacy {

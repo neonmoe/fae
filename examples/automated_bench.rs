@@ -60,8 +60,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         renderer.draw_quad(
             (0.0, 0.0, 640.0, 480.0),
             Some((0.0, 0.0, 1.0, 1.0)),
-            (1.0, 1.0, 1.0, 1.0),
-            (0.0, 0.0, 0.0),
+            None,
+            None,
             0.6,
             call,
         );
@@ -73,8 +73,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             renderer.draw_quad(
                 (x, y, x + 100.0, y + 100.0),
                 Some((0.0, 0.0, 1.0, 1.0)),
-                (1.0, 0.7, 0.9, 1.0),
-                (-time * 1.5, 0.5, 0.5),
+                Some((1.0, 0.7, 0.9, 1.0)),
+                Some((-time * 1.5, 0.5, 0.5)),
                 0.5,
                 call,
             );

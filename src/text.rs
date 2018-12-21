@@ -278,18 +278,18 @@ impl TextRenderer {
                         renderer.draw_quad_clipped(
                             coords,
                             Some(texcoords),
-                            (0.0, 0.0, 0.0, 1.0),
-                            (0.0, 0.0, 0.0),
-                            clip_coords,
+                            Some((0.0, 0.0, 0.0, 1.0)),
+                            None,
                             z,
                             draw_call,
+                            clip_coords,
                         );
                     } else {
                         renderer.draw_quad(
                             coords,
                             Some(texcoords),
-                            (0.0, 0.0, 0.0, 1.0),
-                            (0.0, 0.0, 0.0),
+                            Some((0.0, 0.0, 0.0, 1.0)),
+                            None,
                             z,
                             draw_call,
                         );
