@@ -16,10 +16,10 @@ uniform mat4 projection_matrix;
 
 void main(void) {
   float rot_radians = rotation.x;
-  vec4 vertex_pos = vec4(shared_position * position.zw - rotation.yz, depth, 1.0);
+  vec4 vertex_pos = vec4((shared_position - rotation.yz) * position.zw, depth, 1.0);
   vertex_pos.xy = vec2(cos(rot_radians) * vertex_pos.x - sin(rot_radians) * vertex_pos.y,
                        sin(rot_radians) * vertex_pos.x + cos(rot_radians) * vertex_pos.y);
-  vertex_pos.xy += position.xy + rotation.yz;
+  vertex_pos.xy += position.xy + rotation.yz * position.zw;
   gl_Position = vertex_pos * projection_matrix;
   frag_texcoord = texcoord.xy + shared_texcoord.xy * texcoord.zw;
   frag_color = color;
