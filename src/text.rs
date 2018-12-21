@@ -278,7 +278,7 @@ impl TextRenderer {
                         renderer.draw_quad_clipped(
                             coords,
                             Some(texcoords),
-                            (0, 0, 0, 0xFF),
+                            (0.0, 0.0, 0.0, 1.0),
                             (0.0, 0.0, 0.0),
                             clip_coords,
                             z,
@@ -288,7 +288,7 @@ impl TextRenderer {
                         renderer.draw_quad(
                             coords,
                             Some(texcoords),
-                            (0, 0, 0, 0xFF),
+                            (0.0, 0.0, 0.0, 1.0),
                             (0.0, 0.0, 0.0),
                             z,
                             draw_call,

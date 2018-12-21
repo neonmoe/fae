@@ -7,22 +7,9 @@ use std::error::Error;
 use std::mem;
 use std::ptr;
 
-type LegacyTexQuad = [(
-    (f32, f32, f32),  // Position (x, y, z)
-    (f32, f32),       // Texcoord (x, y)
-    (u8, u8, u8, u8), // Color (r, g, b, a)
-    (f32, f32, f32),  // Rotation (rad, pivot x, pivot y)
-); 6];
-type TexQuad = (
-    (f32, f32, f32, f32), // Position (x, y, w, h)
-    (f32, f32, f32, f32), // Texcoord (x, y, w, h)
-    (f32, f32, f32, f32), // Color (r, g, b, a)
-    (f32, f32, f32),      // Rotation (rad, pivot x, pivot y)
-    f32,                  // Depth (z)
-);
-type Texture = GLuint;
-type VertexBufferObject = GLuint;
-type VertexArrayObject = GLuint;
+type TextureHandle = GLuint;
+type VBOHandle = GLuint;
+type VAOHandle = GLuint;
 
 /// Represents the shader code for a shader. Used in [`Renderer::create_draw_call`].
 #[derive(Clone, Copy, Debug)]
@@ -58,18 +45,17 @@ struct ShaderProgram {
 
 #[derive(Clone, Debug)]
 struct Attributes {
-    vbo: VertexBufferObject,
-    vbo_static: VertexBufferObject,
-    element_buffer: VertexBufferObject,
-    vao: VertexArrayObject,
-    vbo_data: Vec<TexQuad>,
-    vbo_data_legacy: Vec<LegacyTexQuad>,
+    vbo: VBOHandle,
+    vbo_static: VBOHandle,
+    element_buffer: VBOHandle,
+    vao: VAOHandle,
+    vbo_data: Vec<f32>,
     allocated_vbo_data_size: isize,
 }
 
 #[derive(Clone, Debug)]
 struct DrawCall {
-    texture: Texture,
+    texture: TextureHandle,
     program: ShaderProgram,
     attributes: Attributes,
 }
@@ -213,7 +199,7 @@ impl Renderer {
         ninepatch_dimensions: ((f32, f32, f32), (f32, f32, f32)),
         coords: (f32, f32, f32, f32),
         texcoords: Option<(f32, f32, f32, f32)>,
-        color: (u8, u8, u8, u8),
+        color: (f32, f32, f32, f32),
         z: f32,
         call_index: usize,
     ) {
@@ -264,7 +250,7 @@ impl Renderer {
         &mut self,
         coords: (f32, f32, f32, f32),
         texcoords: Option<(f32, f32, f32, f32)>,
-        color: (u8, u8, u8, u8),
+        color: (f32, f32, f32, f32),
         rotation: (f32, f32, f32),
         clip_area: (f32, f32, f32, f32),
         z: f32,
@@ -320,7 +306,7 @@ impl Renderer {
         &mut self,
         coords: (f32, f32, f32, f32),
         texcoords: Option<(f32, f32, f32, f32)>,
-        color: (u8, u8, u8, u8),
+        color: (f32, f32, f32, f32),
         rotation: (f32, f32, f32),
         depth: f32,
         call_index: usize,
@@ -330,33 +316,37 @@ impl Renderer {
         // default values and instead not including the attribute when
         // making the draw call
         let (tx0, ty0, tx1, ty1) = texcoords.unwrap_or((-1.0, -1.0, -1.0, -1.0));
+        let (red, green, blue, alpha) = color;
+        let (rads, pivot_x, pivot_y) = rotation;
 
+        // I apologize for this mess.
         if self.gl_state.legacy {
-            let (rads, pivot_x, pivot_y) = rotation;
-            let rotation = (rads, pivot_x * (x1 - x0) + x0, pivot_y * (y1 - y0) + y0);
-            self.calls[call_index].attributes.vbo_data_legacy.push([
-                ((x0, y0, depth), (tx0, ty0), color, rotation),
-                ((x1, y0, depth), (tx1, ty0), color, rotation),
-                ((x1, y1, depth), (tx1, ty1), color, rotation),
-                ((x0, y0, depth), (tx0, ty0), color, rotation),
-                ((x1, y1, depth), (tx1, ty1), color, rotation),
-                ((x0, y1, depth), (tx0, ty1), color, rotation),
-            ]);
+            let (pivot_x, pivot_y) = (pivot_x * (x1 - x0) + x0, pivot_y * (y1 - y0) + y0);
+            // 6 vertices, each of which consist of: position (x, y,
+            // z), texcoord (x, y), colors (r, g, b, a), rotation
+            // rads, rotation pivot (x, y)
+            let quad = [
+                x0, y0, depth, tx0, ty0, red, green, blue, alpha, rads, pivot_x, pivot_y, x1, y0,
+                depth, tx1, ty0, red, green, blue, alpha, rads, pivot_x, pivot_y, x1, y1, depth,
+                tx1, ty1, red, green, blue, alpha, rads, pivot_x, pivot_y, x0, y0, depth, tx0, ty0,
+                red, green, blue, alpha, rads, pivot_x, pivot_y, x1, y1, depth, tx1, ty1, red,
+                green, blue, alpha, rads, pivot_x, pivot_y, x0, y1, depth, tx0, ty1, red, green,
+                blue, alpha, rads, pivot_x, pivot_y,
+            ];
+            self.calls[call_index]
+                .attributes
+                .vbo_data
+                .extend_from_slice(&quad);
         } else {
-            let (r, g, b, a) = color;
-            let color = (
-                f32::from(r) / 255.0,
-                f32::from(g) / 255.0,
-                f32::from(b) / 255.0,
-                f32::from(a) / 255.0,
-            );
-            self.calls[call_index].attributes.vbo_data.push((
-                (x0, y0, x1 - x0, y1 - y0),
-                (tx0, ty0, tx1 - tx0, ty1 - ty0),
-                color,
-                rotation,
-                depth,
-            ));
+            let (width, height, tw, th) = (x1 - x0, y1 - y0, tx1 - tx0, ty1 - ty0);
+            let quad = [
+                x0, y0, width, height, tx0, ty0, tw, th, red, green, blue, alpha, rads, pivot_x,
+                pivot_y, depth,
+            ];
+            self.calls[call_index]
+                .attributes
+                .vbo_data
+                .extend_from_slice(&quad);
         }
     }
 
@@ -378,7 +368,7 @@ impl Renderer {
         // The call order is reversed so that the text layer draws
         // last, for optimal text rendering quality.
         for (i, call) in self.calls.iter_mut().enumerate().rev() {
-            if call.attributes.vbo_data.is_empty() && call.attributes.vbo_data_legacy.is_empty() {
+            if call.attributes.vbo_data.is_empty() {
                 continue;
             }
 
@@ -399,44 +389,29 @@ impl Renderer {
             }
             print_gl_errors(&format!("after initializing draw call #{}", i));
 
-            if legacy {
-                let len = (mem::size_of::<LegacyTexQuad>() * call.attributes.vbo_data_legacy.len())
-                    as isize;
-                let ptr = call.attributes.vbo_data_legacy.as_ptr() as *const _;
-                if len <= call.attributes.allocated_vbo_data_size {
-                    unsafe {
-                        gl::BufferSubData(gl::ARRAY_BUFFER, 0, len, ptr);
-                    }
-                } else {
-                    call.attributes.allocated_vbo_data_size = len;
-                    unsafe {
-                        gl::BufferData(gl::ARRAY_BUFFER, len, ptr, gl::STREAM_DRAW);
-                    }
+            let len = (mem::size_of::<f32>() * call.attributes.vbo_data.len()) as isize;
+            let ptr = call.attributes.vbo_data.as_ptr() as *const _;
+            if len <= call.attributes.allocated_vbo_data_size {
+                unsafe {
+                    gl::BufferSubData(gl::ARRAY_BUFFER, 0, len, ptr);
                 }
             } else {
-                let len = (mem::size_of::<TexQuad>() * call.attributes.vbo_data.len()) as isize;
-                let ptr = call.attributes.vbo_data.as_ptr() as *const _;
-                if len <= call.attributes.allocated_vbo_data_size {
-                    unsafe {
-                        gl::BufferSubData(gl::ARRAY_BUFFER, 0, len, ptr);
-                    }
-                } else {
-                    call.attributes.allocated_vbo_data_size = len;
-                    unsafe {
-                        gl::BufferData(gl::ARRAY_BUFFER, len, ptr, gl::STREAM_DRAW);
-                    }
+                call.attributes.allocated_vbo_data_size = len;
+                unsafe {
+                    gl::BufferData(gl::ARRAY_BUFFER, len, ptr, gl::STREAM_DRAW);
                 }
             }
             print_gl_errors(&format!("after pushing vertex buffer #{}", i));
 
             if legacy {
-                let vertex_count = call.attributes.vbo_data_legacy.len() as i32 * 6;
+                // 12 floats (3 for pos + 2 tex + 4 col + 3 rot) per vertex
+                let vertex_count = call.attributes.vbo_data.len() as i32 / 12;
                 unsafe {
                     enable_vertex_attribs(&[
-                        (call.program.position_attrib_location, 3, gl::FLOAT),
-                        (call.program.texcoord_attrib_location, 2, gl::FLOAT),
-                        (call.program.color_attrib_location, 4, gl::UNSIGNED_BYTE),
-                        (call.program.rotation_attrib_location, 3, gl::FLOAT),
+                        (call.program.position_attrib_location, 3),
+                        (call.program.texcoord_attrib_location, 2),
+                        (call.program.color_attrib_location, 4),
+                        (call.program.rotation_attrib_location, 3),
                     ]);
                     gl::DrawArrays(gl::TRIANGLES, 0, vertex_count);
                     disable_vertex_attribs(&[
@@ -448,7 +423,8 @@ impl Renderer {
                 }
                 print_gl_errors(&format!("[legacy] after drawing buffer #{}", i));
             } else {
-                let instance_count = call.attributes.vbo_data.len() as i32;
+                // 16 floats (4 for x,y,w,h + 4 tex xywh + 4 col + 3 rot + 1 z) per vertex
+                let instance_count = call.attributes.vbo_data.len() as i32 / 16;
                 unsafe {
                     gl::DrawElementsInstanced(
                         gl::TRIANGLES,
@@ -461,7 +437,6 @@ impl Renderer {
                 print_gl_errors(&format!("after drawing buffer #{}", i));
             }
 
-            call.attributes.vbo_data_legacy.clear();
             call.attributes.vbo_data.clear();
 
             print_gl_errors(&*format!("after render #{}", i));
@@ -711,8 +686,8 @@ fn create_attributes(opengl21: bool, program: ShaderProgram) -> Attributes {
             gl::GenBuffers(1, &mut vbo_static);
             gl::BindBuffer(gl::ARRAY_BUFFER, vbo_static);
             enable_vertex_attribs(&[
-                (program.shared_position_attrib_location, 2, gl::FLOAT),
-                (program.shared_texcoord_attrib_location, 2, gl::FLOAT),
+                (program.shared_position_attrib_location, 2),
+                (program.shared_texcoord_attrib_location, 2),
             ]);
             // This is the vertices of two triangles that form a quad,
             // interleaved in a (pos x, pos y, tex x, tex y)
@@ -742,11 +717,11 @@ fn create_attributes(opengl21: bool, program: ShaderProgram) -> Attributes {
     if !opengl21 {
         unsafe {
             enable_vertex_attribs(&[
-                (program.position_attrib_location, 4, gl::FLOAT),
-                (program.texcoord_attrib_location, 4, gl::FLOAT),
-                (program.color_attrib_location, 4, gl::FLOAT),
-                (program.rotation_attrib_location, 3, gl::FLOAT),
-                (program.depth_attrib_location, 1, gl::FLOAT),
+                (program.position_attrib_location, 4),
+                (program.texcoord_attrib_location, 4),
+                (program.color_attrib_location, 4),
+                (program.rotation_attrib_location, 3),
+                (program.depth_attrib_location, 1),
             ]);
             gl::VertexAttribDivisor(program.position_attrib_location, 1);
             gl::VertexAttribDivisor(program.texcoord_attrib_location, 1);
@@ -763,35 +738,26 @@ fn create_attributes(opengl21: bool, program: ShaderProgram) -> Attributes {
         vbo_static,
         element_buffer,
         vbo_data: Vec::new(),
-        vbo_data_legacy: Vec::new(),
         allocated_vbo_data_size: 0,
     }
 }
 
-// (location, component_count, type)
-type AttribArray = (GLuint, GLint, GLuint);
+// (location, component_count)
+type AttribArray = (GLuint, GLint);
 unsafe fn enable_vertex_attribs(attribs: &[AttribArray]) {
-    let get_component_size = |attrib: &AttribArray| match attrib.2 {
-        gl::FLOAT => 4 * attrib.1,
-        _ => attrib.1,
-    };
-    let total_components = attribs.iter().map(get_component_size).sum();
+    let total_components = attribs.iter().map(|attrib| attrib.1 * 4).sum();
     let mut offset = 0;
     for attrib in attribs {
-        let normalize = match attrib.2 {
-            gl::FLOAT => gl::FALSE,
-            _ => gl::TRUE,
-        };
         gl::VertexAttribPointer(
             attrib.0,           /* Attrib location */
             attrib.1,           /* Components */
-            attrib.2,           /* Type */
-            normalize,          /* Normalize */
+            gl::FLOAT,          /* Type */
+            gl::FALSE,          /* Normalize */
             total_components,   /* Stride */
             offset as *const _, /* Offset */
         );
         gl::EnableVertexAttribArray(attrib.0);
-        let component_size = get_component_size(&attrib);
+        let component_size = attrib.1 * 4;
         offset += component_size;
     }
 
