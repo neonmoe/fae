@@ -18,7 +18,7 @@ use std::time::{Duration, Instant};
 fn main() -> Result<(), Box<dyn Error>> {
     let program_start = Instant::now();
     // Create the window
-    let mut window = Window::create(WindowSettings {
+    let mut window = Window::create(&WindowSettings {
         is_dialog: true,
         vsync: false,
         ..Default::default()

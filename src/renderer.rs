@@ -60,6 +60,7 @@ struct ShaderProgram {
 struct Attributes {
     vbo: VertexBufferObject,
     vbo_static: VertexBufferObject,
+    element_buffer: VertexBufferObject,
     vao: VertexArrayObject,
     vbo_data: Vec<TexQuad>,
     vbo_data_legacy: Vec<LegacyTexQuad>,
@@ -88,6 +89,7 @@ struct OpenGLState {
     vao: GLint,
     texture: GLint,
     vbo: GLint,
+    element_buffer: GLint,
 }
 
 /// Contains the data and functionality needed to draw rectangles with
@@ -138,6 +140,7 @@ impl Renderer {
                 vao: 0,
                 texture: 0,
                 vbo: 0,
+                element_buffer: 0,
             },
         })
     }
@@ -389,6 +392,7 @@ impl Renderer {
                 );
                 if !legacy {
                     gl::BindVertexArray(call.attributes.vao);
+                    gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, call.attributes.element_buffer);
                 }
                 gl::BindTexture(gl::TEXTURE_2D, call.texture);
                 gl::BindBuffer(gl::ARRAY_BUFFER, call.attributes.vbo);
@@ -446,7 +450,13 @@ impl Renderer {
             } else {
                 let instance_count = call.attributes.vbo_data.len() as i32;
                 unsafe {
-                    gl::DrawArraysInstanced(gl::TRIANGLES, 0, 6, instance_count);
+                    gl::DrawElementsInstanced(
+                        gl::TRIANGLES,
+                        6,
+                        gl::UNSIGNED_BYTE,
+                        ptr::null(),
+                        instance_count,
+                    );
                 }
                 print_gl_errors(&format!("after drawing buffer #{}", i));
             }
@@ -484,6 +494,10 @@ impl Renderer {
                 }
                 gl::GetIntegerv(gl::TEXTURE_BINDING_2D, &mut self.gl_state.texture);
                 gl::GetIntegerv(gl::ARRAY_BUFFER_BINDING, &mut self.gl_state.vbo);
+                gl::GetIntegerv(
+                    gl::ELEMENT_ARRAY_BUFFER_BINDING,
+                    &mut self.gl_state.element_buffer,
+                );
             }
 
             unsafe {
@@ -517,6 +531,10 @@ impl Renderer {
                 }
                 gl::BindTexture(gl::TEXTURE_2D, self.gl_state.texture as GLuint);
                 gl::BindBuffer(gl::ARRAY_BUFFER, self.gl_state.vbo as GLuint);
+                gl::BindBuffer(
+                    gl::ELEMENT_ARRAY_BUFFER,
+                    self.gl_state.element_buffer as GLuint,
+                );
             }
             self.gl_state.pushed = false;
             print_gl_errors("after restoring OpenGL state");
@@ -537,6 +555,7 @@ impl Drop for Renderer {
             let Attributes {
                 vbo,
                 vbo_static,
+                element_buffer,
                 vao,
                 ..
             } = call.attributes;
@@ -547,7 +566,7 @@ impl Drop for Renderer {
                 gl::DeleteTextures(1, [call.texture].as_ptr());
                 gl::DeleteBuffers(1, [vbo].as_ptr());
                 if !legacy {
-                    gl::DeleteBuffers(1, [vbo_static].as_ptr());
+                    gl::DeleteBuffers(2, [vbo_static, element_buffer].as_ptr());
                     gl::DeleteVertexArrays(1, [vao].as_ptr());
                 }
             }
@@ -686,6 +705,7 @@ fn create_attributes(opengl21: bool, program: ShaderProgram) -> Attributes {
     }
 
     let mut vbo_static = 0;
+    let mut element_buffer = 0;
     if !opengl21 {
         unsafe {
             gl::GenBuffers(1, &mut vbo_static);
@@ -697,13 +717,19 @@ fn create_attributes(opengl21: bool, program: ShaderProgram) -> Attributes {
             // This is the vertices of two triangles that form a quad,
             // interleaved in a (pos x, pos y, tex x, tex y)
             // arrangement.
-            let static_quad_vertices: [f32; 24] = [
-                0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0,
-                1.0, 1.0, 1.0, 1.0, 0.0, 1.0, 0.0, 1.0,
+            let static_quad_vertices: [f32; 16] = [
+                0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0, 1.0, 0.0, 1.0,
             ];
             let len = (mem::size_of::<f32>() * static_quad_vertices.len()) as isize;
             let ptr = static_quad_vertices.as_ptr() as *const _;
             gl::BufferData(gl::ARRAY_BUFFER, len, ptr, gl::STATIC_DRAW);
+
+            gl::GenBuffers(1, &mut element_buffer);
+            gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, element_buffer);
+            let elements: [u8; 6] = [0, 1, 2, 0, 2, 3];
+            let len = (mem::size_of::<f32>() * elements.len()) as isize;
+            let ptr = elements.as_ptr() as *const _;
+            gl::BufferData(gl::ELEMENT_ARRAY_BUFFER, len, ptr, gl::STATIC_DRAW);
         }
     }
 
@@ -735,6 +761,7 @@ fn create_attributes(opengl21: bool, program: ShaderProgram) -> Attributes {
         vao,
         vbo,
         vbo_static,
+        element_buffer,
         vbo_data: Vec::new(),
         vbo_data_legacy: Vec::new(),
         allocated_vbo_data_size: 0,

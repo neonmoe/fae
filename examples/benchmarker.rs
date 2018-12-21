@@ -16,7 +16,7 @@ use std::fs;
 
 fn main() -> Result<(), Box<dyn Error>> {
     // Create the window
-    let mut window = Window::create(WindowSettings::default()).unwrap();
+    let mut window = Window::create(&WindowSettings::default()).unwrap();
     // Create the OpenGL renderer
     let mut renderer = Renderer::create(window.opengl21)?;
     // Create the text renderer
