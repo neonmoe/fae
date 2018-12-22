@@ -3,7 +3,6 @@
 use crate::gl;
 use crate::gl::types::*;
 use crate::image::Image;
-use std::error::Error;
 use std::mem;
 use std::ptr;
 
@@ -113,8 +112,8 @@ impl Renderer {
     /// VAOs. Ideally this should be `false` in all cases where the OpenGL
     /// version is >=3.0 (or OpenGL ES >=3) to allow for more optimized
     /// rendering.
-    pub fn create(opengl21: bool) -> Result<Renderer, Box<Error>> {
-        Ok(Renderer {
+    pub fn create(opengl21: bool) -> Renderer {
+        Renderer {
             calls: Vec::with_capacity(2),
             gl_state: OpenGLState {
                 legacy: opengl21,
@@ -128,7 +127,7 @@ impl Renderer {
                 vbo: 0,
                 element_buffer: 0,
             },
-        })
+        }
     }
 
     /// Creates a new draw call in the pipeline, and returns its
@@ -175,6 +174,36 @@ impl Renderer {
         }
 
         self.gl_pop();
+        index
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn create_dummy_draw_call(&mut self) -> usize {
+        let index = self.calls.len();
+        self.calls.push(DrawCall {
+            texture: 0,
+            program: ShaderProgram {
+                program: 0,
+                vertex_shader: 0,
+                fragment_shader: 0,
+                projection_matrix_location: 0,
+                position_attrib_location: 0,
+                texcoord_attrib_location: 0,
+                color_attrib_location: 0,
+                rotation_attrib_location: 0,
+                depth_attrib_location: 0,
+                shared_position_attrib_location: 0,
+                shared_texcoord_attrib_location: 0,
+            },
+            attributes: Attributes {
+                vbo: 0,
+                vbo_static: 0,
+                element_buffer: 0,
+                vao: 0,
+                vbo_data: Vec::new(),
+                allocated_vbo_data_size: 0,
+            },
+        });
         index
     }
 
@@ -542,6 +571,11 @@ impl Renderer {
 
 impl Drop for Renderer {
     fn drop(&mut self) {
+        if !gl::Viewport::is_loaded() {
+            // Probably running benchmarks (without a gl context)
+            // TODO: Remove this when headless testing is done
+            return;
+        }
         let legacy = self.gl_state.legacy;
         for call in self.calls.iter() {
             let ShaderProgram {

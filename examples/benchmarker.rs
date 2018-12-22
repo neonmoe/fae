@@ -18,7 +18,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Create the window
     let mut window = Window::create(&WindowSettings::default()).unwrap();
     // Create the OpenGL renderer
-    let mut renderer = Renderer::create(window.opengl21)?;
+    let mut renderer = Renderer::create(window.opengl21);
     // Create the text renderer
     let mut text = TextRenderer::create(fs::read("examples/res/FiraSans.ttf")?, &mut renderer)?;
     // Create the draw call for the sprite
