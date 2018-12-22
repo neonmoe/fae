@@ -73,9 +73,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         let start_quads = Instant::now();
         renderer.draw_quad(
             (0.0, 0.0, 640.0, 480.0),
-            Some((0.0, 0.0, 1.0, 1.0)),
-            None,
-            None,
+            (0.0, 0.0, 1.0, 1.0),
+            (1.0, 1.0, 1.0, 1.0),
+            (0.0, 0.0, 0.0),
             0.6,
             call,
         );
@@ -86,9 +86,9 @@ fn main() -> Result<(), Box<dyn Error>> {
             let y = (f * 3.1415 * 8.0 + time).sin() * 150.0 * f.max(0.3) + 190.0;
             renderer.draw_quad(
                 (x, y, x + 100.0, y + 100.0),
-                Some((0.0, 0.0, 1.0, 1.0)),
-                Some((1.0, 0.7, 0.9, 1.0)),
-                Some((-time * 1.5, 0.5, 0.5)),
+                (0.0, 0.0, 1.0, 1.0),
+                (1.0, 0.7, 0.9, 1.0),
+                (-time * 1.5, 0.5, 0.5),
                 0.5,
                 call,
             );
