@@ -21,6 +21,10 @@ void main(void) {
                        sin(rot_radians) * vertex_pos.x + cos(rot_radians) * vertex_pos.y);
   vertex_pos.xy += position.xy + rotation.yz * position.zw;
   gl_Position = vertex_pos * projection_matrix;
-  frag_texcoord = texcoord.xy + shared_texcoord.xy * texcoord.zw;
+  if (texcoord == vec4(-1.0, -1.0, -2.0, -2.0)) {
+    frag_texcoord = vec2(-1.0, -1.0);
+  } else {
+    frag_texcoord = texcoord.xy + shared_texcoord.xy * texcoord.zw;
+  }
   frag_color = color;
 }

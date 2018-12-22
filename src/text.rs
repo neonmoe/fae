@@ -277,9 +277,9 @@ impl TextRenderer {
                     if clipped {
                         renderer.draw_quad_clipped(
                             coords,
-                            Some(texcoords),
-                            Some((0.0, 0.0, 0.0, 1.0)),
-                            None,
+                            texcoords,
+                            (0.0, 0.0, 0.0, 1.0),
+                            (0.0, 0.0, 0.0),
                             z,
                             draw_call,
                             clip_coords,
@@ -287,9 +287,9 @@ impl TextRenderer {
                     } else {
                         renderer.draw_quad(
                             coords,
-                            Some(texcoords),
-                            Some((0.0, 0.0, 0.0, 1.0)),
-                            None,
+                            texcoords,
+                            (0.0, 0.0, 0.0, 1.0),
+                            (0.0, 0.0, 0.0),
                             z,
                             draw_call,
                         );

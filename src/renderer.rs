@@ -198,14 +198,14 @@ impl Renderer {
         &mut self,
         ninepatch_dimensions: ((f32, f32, f32), (f32, f32, f32)),
         coords: (f32, f32, f32, f32),
-        texcoords: Option<(f32, f32, f32, f32)>,
-        color: Option<(f32, f32, f32, f32)>,
+        texcoords: (f32, f32, f32, f32),
+        color: (f32, f32, f32, f32),
         z: f32,
         call_index: usize,
     ) {
         let ((w0, w1, w2), (h0, h1, h2)) = ninepatch_dimensions;
         let (x0, y0, x1, y1) = coords;
-        let (tx0, ty0, tx1, ty1) = texcoords.unwrap_or((-1.0, -1.0, -1.0, -1.0));
+        let (tx0, ty0, tx1, ty1) = texcoords;
         let (tex_w, tex_h) = (tx1 - tx0, ty1 - ty0);
         let (total_w, total_h) = (w0 + w1 + w2, h0 + h1 + h2);
         let ((tw0, th0), (tw2, th2)) = (
@@ -228,9 +228,9 @@ impl Renderer {
             let yi = i / 3;
             self.draw_quad(
                 (x0[xi], y0[yi], x1[xi], y1[yi]),
-                Some((tx0[xi], ty0[yi], tx1[xi], ty1[yi])),
+                (tx0[xi], ty0[yi], tx1[xi], ty1[yi]),
                 color,
-                None,
+                (0.0, 0.0, 0.0),
                 z,
                 call_index,
             );
@@ -249,9 +249,9 @@ impl Renderer {
     pub fn draw_quad_clipped(
         &mut self,
         coords: (f32, f32, f32, f32),
-        texcoords: Option<(f32, f32, f32, f32)>,
-        color: Option<(f32, f32, f32, f32)>,
-        rotation: Option<(f32, f32, f32)>,
+        texcoords: (f32, f32, f32, f32),
+        color: (f32, f32, f32, f32),
+        rotation: (f32, f32, f32),
         z: f32,
         call_index: usize,
         clip_area: (f32, f32, f32, f32),
@@ -269,16 +269,39 @@ impl Renderer {
             ox1.max(cx0).min(cx1),
             oy1.max(cy0).min(cy1),
         );
-        let (tx0, ty0, tx1, ty1) = texcoords.unwrap_or((-1.0, -1.0, -1.0, -1.0));
+        let (tx0, ty0, tx1, ty1) = texcoords;
         let (tw, th) = (tx1 - tx0, ty1 - ty0);
-        let texcoords = Some((
+        let texcoords = (
             tx0.max(tx0 + tw * (x0 - ox0) / ow),
             ty0.max(ty0 + th * (y0 - oy0) / oh),
             tx1.min(tx1 + tw * (x1 - ox1) / ow),
             ty1.min(ty1 + th * (y1 - oy1) / oh),
-        ));
+        );
 
         self.draw_quad((x0, y0, x1, y1), texcoords, color, rotation, z, call_index);
+    }
+
+    /// Draws a tinted rectangle on the screen, without any texturing.
+    ///
+    /// Basically a shorthand for [`Renderer::draw_quad`] with the
+    /// `texcoords` set to (-1.0, -1.0, -1.0, -1.0) which are a
+    /// symbolic value for "don't use the texture".
+    pub fn draw_quad_tinted(
+        &mut self,
+        coords: (f32, f32, f32, f32),
+        color: (f32, f32, f32, f32),
+        rotation: (f32, f32, f32),
+        z: f32,
+        call_index: usize,
+    ) {
+        self.draw_quad(
+            coords,
+            (-1.0, -1.0, -1.0, -1.0),
+            color,
+            rotation,
+            z,
+            call_index,
+        );
     }
 
     /// Draws a textured rectangle on the screen.
@@ -305,26 +328,25 @@ impl Renderer {
     pub fn draw_quad(
         &mut self,
         coords: (f32, f32, f32, f32),
-        texcoords: Option<(f32, f32, f32, f32)>,
-        color: Option<(f32, f32, f32, f32)>,
-        rotation: Option<(f32, f32, f32)>,
+        texcoords: (f32, f32, f32, f32),
+        color: (f32, f32, f32, f32),
+        rotation: (f32, f32, f32),
         depth: f32,
         call_index: usize,
     ) {
         let (x0, y0, x1, y1) = coords;
-        // TODO: Replace the option with glVertexAttrib'ing the
-        // default values and instead not including the attribute when
-        // making the draw call
-        let (tx0, ty0, tx1, ty1) = texcoords.unwrap_or((-1.0, -1.0, -1.0, -1.0));
-        let (red, green, blue, alpha) = color.unwrap_or((1.0, 1.0, 1.0, 1.0));
-        let (rads, pivot_x, pivot_y) = rotation.unwrap_or((0.0, 0.0, 0.0));
+        let (tx0, ty0, tx1, ty1) = texcoords;
+        let (red, green, blue, alpha) = color;
+        let (rads, pivot_x, pivot_y) = rotation;
 
-        // I apologize for this mess.
         if self.gl_state.legacy {
             let (pivot_x, pivot_y) = (pivot_x * (x1 - x0) + x0, pivot_y * (y1 - y0) + y0);
+
             // 6 vertices, each of which consist of: position (x, y,
             // z), texcoord (x, y), colors (r, g, b, a), rotation
             // rads, rotation pivot (x, y)
+            //
+            // I apologize for this mess.
             let quad = [
                 x0, y0, depth, tx0, ty0, red, green, blue, alpha, rads, pivot_x, pivot_y, x1, y0,
                 depth, tx1, ty0, red, green, blue, alpha, rads, pivot_x, pivot_y, x1, y1, depth,
@@ -333,6 +355,7 @@ impl Renderer {
                 green, blue, alpha, rads, pivot_x, pivot_y, x0, y1, depth, tx0, ty1, red, green,
                 blue, alpha, rads, pivot_x, pivot_y,
             ];
+
             self.calls[call_index]
                 .attributes
                 .vbo_data
