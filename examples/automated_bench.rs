@@ -70,11 +70,11 @@ fn main() -> Result<(), Box<dyn Error>> {
             let f = i as f32 / quad_count as f32;
             let x = (f * 3.1415 * 8.0 + time).cos() * 150.0 * f.max(0.3) + 270.0;
             let y = (f * 3.1415 * 8.0 + time).sin() * 150.0 * f.max(0.3) + 190.0;
-            renderer.draw_quad_tinted(
+            renderer.draw_quad(
                 (x, y, x + 100.0, y + 100.0),
-                //(0.0, 0.0, 1.0, 1.0),
+                (0.0, 0.0, 1.0, 1.0),
                 (1.0, 0.7, 0.9, 1.0),
-                (-time * 1.5, 0.5, 0.5),
+                (-time * 1.5, 50.0, 50.0),
                 0.5,
                 call,
             );

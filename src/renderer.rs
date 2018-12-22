@@ -316,8 +316,8 @@ impl Renderer {
     /// 0-255. Arrangement: (red, green, blue, alpha)
     ///
     /// - `rotation`: The rotation of the quad, in radians, and the
-    /// point around which the sprite pivots. Arrangement: (radians,
-    /// x, y)
+    /// point (relative to `coords` x and y, in logical pixels as well)
+    /// around which the sprite pivots. Arrangement: (radians, x, y)
     ///
     /// - `z`: Used for ordering sprites on screen, in the range -1.0 -
     /// 1.0. Positive values are in front.
@@ -340,7 +340,7 @@ impl Renderer {
         let (rads, pivot_x, pivot_y) = rotation;
 
         if self.gl_state.legacy {
-            let (pivot_x, pivot_y) = (pivot_x * (x1 - x0) + x0, pivot_y * (y1 - y0) + y0);
+            let (pivot_x, pivot_y) = (pivot_x + x0, pivot_y + y0);
 
             // 6 vertices, each of which consist of: position (x, y,
             // z), texcoord (x, y), colors (r, g, b, a), rotation
