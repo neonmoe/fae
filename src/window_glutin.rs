@@ -6,6 +6,7 @@ use std::error::Error;
 
 pub use crate::window_settings::WindowSettings;
 pub use glutin;
+pub use scancode::Scancode;
 
 /// Manages the window and propagates events to the UI system.
 pub struct Window {
@@ -19,6 +20,12 @@ pub struct Window {
     events_loop: EventsLoop,
     /// The opengl legacy status for Renderer.
     pub opengl21: bool,
+    /// The keys which are currently held down.
+    pub pressed_keys: Vec<Scancode>,
+    /// The keys which were pressed this frame.
+    pub just_pressed_keys: Vec<Scancode>,
+    /// The keys which were released this frame.
+    pub released_keys: Vec<Scancode>,
 }
 
 impl Window {
@@ -112,6 +119,9 @@ impl Window {
             gl_window,
             events_loop,
             opengl21,
+            pressed_keys: Vec::new(),
+            just_pressed_keys: Vec::new(),
+            released_keys: Vec::new(),
         })
     }
 
@@ -124,15 +134,32 @@ impl Window {
         let _ = self.gl_window.swap_buffers();
         let mut running = true;
         let mut resized_logical_size = None;
+        let mut key_input = None;
         self.events_loop.poll_events(|event| {
             if let Event::WindowEvent { event, .. } = event {
                 match event {
                     WindowEvent::CloseRequested => running = false,
                     WindowEvent::Resized(logical_size) => resized_logical_size = Some(logical_size),
+                    WindowEvent::KeyboardInput { input, .. } => key_input = Some(input),
                     _ => {}
                 }
             }
         });
+
+        /* Keyboard event handling */
+        if let Some(input) = key_input {
+            match input.state {
+                ElementState::Pressed => {
+                    if input.scancode < 0xFF {
+                        if let Some(code) = Scancode::new(input.scancode as u8) {
+                            self.just_pressed_keys.push(code);
+                            self.pressed_keys.push(code);
+                        }
+                    }
+                }
+                ElementState::Released => {}
+            }
+        }
 
         /* Resize event handling */
         if let Some(logical_size) = resized_logical_size {

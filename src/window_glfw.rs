@@ -6,6 +6,7 @@ use std::sync::mpsc::Receiver;
 
 pub use crate::window_settings::WindowSettings;
 pub use glfw;
+pub use scancode::Scancode;
 
 /// Manages the window and propagates events to the UI system.
 pub struct Window {
@@ -22,6 +23,12 @@ pub struct Window {
     fb_height: f32,
     /// The opengl legacy status for Renderer.
     pub opengl21: bool,
+    /// The keys which are currently held down.
+    pub pressed_keys: Vec<Scancode>,
+    /// The keys which were pressed this frame.
+    pub just_pressed_keys: Vec<Scancode>,
+    /// The keys which were released this frame.
+    pub released_keys: Vec<Scancode>,
 }
 
 impl Window {
@@ -129,6 +136,9 @@ impl Window {
             fb_width: settings.width,
             fb_height: settings.height,
             opengl21,
+            pressed_keys: Vec::new(),
+            just_pressed_keys: Vec::new(),
+            released_keys: Vec::new(),
         })
     }
 
@@ -139,36 +149,49 @@ impl Window {
     /// for a while (usually 16ms at max).
     pub fn refresh(&mut self) -> bool {
         self.glfw_window.swap_buffers();
-        let mut resized_logical_size = None;
-        let mut resized_framebuffer_size = None;
+        let mut resize = false;
 
+        self.just_pressed_keys.clear();
+        self.released_keys.clear();
         self.glfw.poll_events();
         for (_, event) in glfw::flush_messages(&self.events) {
             match event {
                 WindowEvent::Key(Key::Escape, _, Action::Press, _) => {
                     self.glfw_window.set_should_close(true)
                 }
+                WindowEvent::Key(_, scancode, Action::Press, _) if scancode < 0xFF => {
+                    if let Some(code) = Scancode::new(scancode as u8) {
+                        self.just_pressed_keys.push(code);
+                        self.pressed_keys.push(code);
+                    }
+                }
+                WindowEvent::Key(_, scancode, Action::Release, _) if scancode < 0xFF => {
+                    if let Some(code) = Scancode::new(scancode as u8) {
+                        self.released_keys.push(code);
+                        for (i, key) in self.pressed_keys.iter().enumerate() {
+                            if key == &code {
+                                self.pressed_keys.remove(i);
+                                break;
+                            }
+                        }
+                    }
+                }
                 WindowEvent::Size(width, height) => {
-                    resized_logical_size = Some((width, height));
+                    self.width = width as f32;
+                    self.height = height as f32;
+                    resize = true;
                 }
                 WindowEvent::FramebufferSize(width, height) => {
-                    resized_framebuffer_size = Some((width, height));
+                    self.fb_width = width as f32;
+                    self.fb_height = height as f32;
+                    resize = true;
                 }
                 _ => {}
             }
         }
 
         /* Resize event handling */
-        if let Some((w, h)) = resized_framebuffer_size {
-            self.fb_width = w as f32;
-            self.fb_height = h as f32;
-        }
-        if let Some((w, h)) = resized_logical_size {
-            self.width = w as f32;
-            self.height = h as f32;
-        }
-
-        if resized_framebuffer_size.is_some() || resized_logical_size.is_some() {
+        if resize {
             let dpi_factor_horizontal = self.fb_width / self.width;
             let dpi_factor_vertical = self.fb_height / self.height;
             self.dpi_factor = dpi_factor_horizontal.max(dpi_factor_vertical);

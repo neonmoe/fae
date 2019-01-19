@@ -1,6 +1,7 @@
 use std::error::Error;
 
 pub use crate::window_settings::WindowSettings;
+pub use scancode::Scancode;
 
 /// Manages the window and propagates events to the UI system.
 pub struct Window {
@@ -12,6 +13,12 @@ pub struct Window {
     pub dpi_factor: f32,
     /// The opengl legacy status for Renderer.
     pub opengl21: bool,
+    /// The keys which are currently held down.
+    pub pressed_keys: Vec<Scancode>,
+    /// The keys which were pressed this frame.
+    pub just_pressed_keys: Vec<Scancode>,
+    /// The keys which were released this frame.
+    pub released_keys: Vec<Scancode>,
 }
 
 impl Window {
