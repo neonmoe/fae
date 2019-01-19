@@ -16,12 +16,13 @@ maintenance = { status = "experimental" }
 
 [dependencies]
 glutin = { version = "0.19", optional = true }
+glfw = { version = "0.26", optional = true }
 rusttype = { version = "0.7", optional = true, features = ["gpu_cache"] }
 unicode-normalization = { version = "0.1", optional = true }
 png = { version = "0.13", optional = true }
 
 [features]
-default = ["glutin", "text", "png"]
+default = ["text", "png"]
 text = ["rusttype", "unicode-normalization"]
 
 [build-dependencies]

@@ -1,49 +1,11 @@
 use crate::gl;
 use glutin::dpi::*;
 use glutin::*;
-use std::default::Default;
 use std::env;
 use std::error::Error;
 
+pub use crate::window_settings::WindowSettings;
 pub use glutin;
-
-/// Defines a window.
-pub struct WindowSettings {
-    /// Title of the window. Default value: Name of the executable file
-    pub title: String,
-    /// Width of the window in logical pixels. Default value: `640.0`
-    pub width: f32,
-    /// Height of the window in logical pixels. Default value: `480.0`
-    pub height: f32,
-    /// Whether or not the application is a dialog. Default value: `true`
-    ///
-    /// This only affects x11 environments, where it sets the window
-    /// type to dialog. In [tiling
-    /// environments](https://en.wikipedia.org/wiki/Tiling_window_manager),
-    /// like i3 and sway, this can cause the window to pop up as a
-    /// floating window, not a tiled one. This is useful for
-    /// applications that are supposed to be opened for very short
-    /// amounts of time.
-    pub is_dialog: bool,
-    /// This should always be true for everything except benchmarks.
-    pub vsync: bool,
-}
-
-impl Default for WindowSettings {
-    fn default() -> WindowSettings {
-        WindowSettings {
-            title: env::current_exe()
-                .ok()
-                .and_then(|p| p.file_name().map(|s| s.to_os_string()))
-                .and_then(|s| s.into_string().ok())
-                .unwrap_or_default(),
-            width: 640.0,
-            height: 480.0,
-            is_dialog: false,
-            vsync: true,
-        }
-    }
-}
 
 /// Manages the window and propagates events to the UI system.
 pub struct Window {
@@ -158,12 +120,11 @@ impl Window {
     /// `background_*` colors, which consist of 0.0 - 1.0
     /// values. **Note**: Because of vsync, this function will hang
     /// for a while (usually 16ms at max).
-    pub fn refresh<F: FnMut(&Event)>(&mut self, mut event_handler: F) -> bool {
+    pub fn refresh(&mut self) -> bool {
         let _ = self.gl_window.swap_buffers();
         let mut running = true;
         let mut resized_logical_size = None;
         self.events_loop.poll_events(|event| {
-            event_handler(&event);
             if let Event::WindowEvent { event, .. } = event {
                 match event {
                     WindowEvent::CloseRequested => running = false,

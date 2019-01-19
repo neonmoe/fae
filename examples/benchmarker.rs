@@ -37,35 +37,26 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Loop until we `should_quit` or refresh returns false, ie. the
     // user pressed the "close window" button.
-    while window.refresh(|event| {
-        // Handle events, as they are currently handled. This system
-        // should really be revamped.
-        if let glutin::Event::WindowEvent { event, .. } = event {
-            match event {
-                glutin::WindowEvent::KeyboardInput { input, .. } => {
-                    if let Some(keycode) = input.virtual_keycode {
-                        if input.state == glutin::ElementState::Pressed {
-                            match keycode {
-                                glutin::VirtualKeyCode::Escape => should_quit = true,
-                                glutin::VirtualKeyCode::Up => quad_count *= 2,
-                                glutin::VirtualKeyCode::Down => {
-                                    if quad_count > 1 {
-                                        quad_count /= 2;
-                                    }
-                                }
-                                _ => {}
-                            }
-                        }
-                    }
-                }
-                _ => {}
-            }
-        }
-    }) && !should_quit
-    {
+    while window.refresh() && !should_quit {
         // Update the text renderer's dpi settings, in case refresh
         // changed them
         text.update_dpi_factor(window.dpi_factor);
+
+        // TODO: Implement keyboard api
+
+        if false
+        /* esc pressed */
+        {
+            should_quit = true;
+        }
+        if false
+        /* up pressed */
+        {
+            quad_count *= 2;
+        }
+        if false /* down pressed */ && quad_count > 1 {
+            quad_count /= 2;
+        }
 
         let time = Instant::now() - start;
         let time = time.as_secs() as f32 + time.subsec_millis() as f32 / 1000.0;

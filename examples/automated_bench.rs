@@ -47,7 +47,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let test_duration = Duration::from_secs(2);
     let mut frame_count = 0;
     let loop_start = Instant::now();
-    while window.refresh(|_| {}) && Instant::now() - loop_start < test_duration {
+    while window.refresh() && Instant::now() - loop_start < test_duration {
         // Update the text renderer's dpi settings, in case refresh
         // changed them
         text.update_dpi_factor(window.dpi_factor);
