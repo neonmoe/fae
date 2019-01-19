@@ -6,7 +6,6 @@ use std::sync::mpsc::Receiver;
 
 pub use crate::window_settings::WindowSettings;
 pub use glfw;
-pub use scancode::Scancode;
 
 /// Manages the window and propagates events to the UI system.
 pub struct Window {
@@ -23,12 +22,18 @@ pub struct Window {
     fb_height: f32,
     /// The opengl legacy status for Renderer.
     pub opengl21: bool,
-    /// The keys which are currently held down.
-    pub pressed_keys: Vec<Scancode>,
-    /// The keys which were pressed this frame.
-    pub just_pressed_keys: Vec<Scancode>,
-    /// The keys which were released this frame.
-    pub released_keys: Vec<Scancode>,
+    /// The keys which are currently held down. Different type for
+    /// each window backend, because there's no unified way of
+    /// speaking in keycodes!
+    pub pressed_keys: Vec<Key>,
+    /// The keys which were pressed this frame. Different type for
+    /// each window backend, because there's no unified way of
+    /// speaking in keycodes!
+    pub just_pressed_keys: Vec<Key>,
+    /// The keys which were released this frame. Different type for
+    /// each window backend, because there's no unified way of
+    /// speaking in keycodes!
+    pub released_keys: Vec<Key>,
 }
 
 impl Window {
@@ -159,20 +164,16 @@ impl Window {
                 WindowEvent::Key(Key::Escape, _, Action::Press, _) => {
                     self.glfw_window.set_should_close(true)
                 }
-                WindowEvent::Key(_, scancode, Action::Press, _) if scancode < 0xFF => {
-                    if let Some(code) = Scancode::new(scancode as u8) {
-                        self.just_pressed_keys.push(code);
-                        self.pressed_keys.push(code);
-                    }
+                WindowEvent::Key(key, _, Action::Press, _) => {
+                    self.just_pressed_keys.push(key);
+                    self.pressed_keys.push(key);
                 }
-                WindowEvent::Key(_, scancode, Action::Release, _) if scancode < 0xFF => {
-                    if let Some(code) = Scancode::new(scancode as u8) {
-                        self.released_keys.push(code);
-                        for (i, key) in self.pressed_keys.iter().enumerate() {
-                            if key == &code {
-                                self.pressed_keys.remove(i);
-                                break;
-                            }
+                WindowEvent::Key(key, _, Action::Release, _) => {
+                    self.released_keys.push(key);
+                    for (i, pressed_key) in self.pressed_keys.iter().enumerate() {
+                        if pressed_key == &key {
+                            self.pressed_keys.remove(i);
+                            break;
                         }
                     }
                 }

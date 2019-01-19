@@ -6,7 +6,6 @@ use std::error::Error;
 
 pub use crate::window_settings::WindowSettings;
 pub use glutin;
-pub use scancode::Scancode;
 
 /// Manages the window and propagates events to the UI system.
 pub struct Window {
@@ -20,12 +19,18 @@ pub struct Window {
     events_loop: EventsLoop,
     /// The opengl legacy status for Renderer.
     pub opengl21: bool,
-    /// The keys which are currently held down.
-    pub pressed_keys: Vec<Scancode>,
-    /// The keys which were pressed this frame.
-    pub just_pressed_keys: Vec<Scancode>,
-    /// The keys which were released this frame.
-    pub released_keys: Vec<Scancode>,
+    /// The keys which are currently held down. Different type for
+    /// each window backend, because there's no unified way of
+    /// speaking in keycodes!
+    pub pressed_keys: Vec<VirtualKeyCode>,
+    /// The keys which were pressed this frame. Different type for
+    /// each window backend, because there's no unified way of
+    /// speaking in keycodes!
+    pub just_pressed_keys: Vec<VirtualKeyCode>,
+    /// The keys which were released this frame. Different type for
+    /// each window backend, because there's no unified way of
+    /// speaking in keycodes!
+    pub released_keys: Vec<VirtualKeyCode>,
 }
 
 impl Window {
@@ -134,30 +139,49 @@ impl Window {
         let _ = self.gl_window.swap_buffers();
         let mut running = true;
         let mut resized_logical_size = None;
-        let mut key_input = None;
+        let mut key_inputs = Vec::new();
         self.events_loop.poll_events(|event| {
             if let Event::WindowEvent { event, .. } = event {
                 match event {
                     WindowEvent::CloseRequested => running = false,
                     WindowEvent::Resized(logical_size) => resized_logical_size = Some(logical_size),
-                    WindowEvent::KeyboardInput { input, .. } => key_input = Some(input),
+                    WindowEvent::KeyboardInput { input, .. } => {
+                        let state = input.state;
+                        if let Some(key) = input.virtual_keycode {
+                            key_inputs.push((key, state));
+                        }
+                    }
                     _ => {}
                 }
             }
         });
 
         /* Keyboard event handling */
-        if let Some(input) = key_input {
-            match input.state {
+        for (key, state) in key_inputs {
+            match state {
                 ElementState::Pressed => {
-                    if input.scancode < 0xFF {
-                        if let Some(code) = Scancode::new(input.scancode as u8) {
-                            self.just_pressed_keys.push(code);
-                            self.pressed_keys.push(code);
+                    let mut already_pressed = false;
+                    for previously_pressed_key in &self.pressed_keys {
+                        if previously_pressed_key == &key {
+                            already_pressed = true;
+                            break;
+                        }
+                    }
+
+                    if !already_pressed {
+                        self.just_pressed_keys.push(key);
+                        self.pressed_keys.push(key);
+                    }
+                }
+                ElementState::Released => {
+                    self.released_keys.push(key);
+                    for (i, pressed_key) in self.pressed_keys.iter().enumerate() {
+                        if pressed_key == &key {
+                            self.pressed_keys.remove(i);
+                            break;
                         }
                     }
                 }
-                ElementState::Released => {}
             }
         }
 
