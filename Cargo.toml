@@ -21,6 +21,8 @@ rusttype = { version = "0.7", optional = true, features = ["gpu_cache"] }
 unicode-normalization = { version = "0.1", optional = true }
 png = { version = "0.13", optional = true }
 
+flame = { version = "*", optional = true } # Used by the renderer, for benchmarking
+
 [features]
 default = ["text", "png"]
 text = ["rusttype", "unicode-normalization"]

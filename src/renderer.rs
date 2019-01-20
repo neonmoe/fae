@@ -83,6 +83,8 @@ struct OpenGLState {
 pub struct Renderer {
     calls: Vec<DrawCall>,
     gl_state: OpenGLState,
+    profiler: Profiler,
+    preserve_gl_state: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -127,7 +129,17 @@ impl Renderer {
                 vbo: 0,
                 element_buffer: 0,
             },
+            profiler: Profiler::new(),
+            preserve_gl_state: true,
         }
+    }
+
+    pub fn set_preserve_gl_state(&mut self, preserve_gl_state: bool) {
+        self.preserve_gl_state = preserve_gl_state;
+    }
+
+    pub fn set_profiling(&mut self, should_profile: bool) {
+        self.profiler.should_profile = should_profile;
     }
 
     /// Creates a new draw call in the pipeline, and returns its
@@ -403,27 +415,33 @@ impl Renderer {
     }
 
     pub fn render(&mut self, width: f32, height: f32) {
+        self.profiler.start("render");
         let m00 = 2.0 / width;
         let m11 = -2.0 / height;
         let matrix = [
             m00, 0.0, 0.0, -1.0, 0.0, m11, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
         ];
 
+        self.profiler.start("clear");
         unsafe {
             gl::ClearColor(1.0, 1.0, 1.0, 1.0);
             gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
         }
+        self.profiler.end("clear");
 
         self.gl_push();
         let legacy = self.gl_state.legacy;
 
         // The call order is reversed so that the text layer draws
         // last, for optimal text rendering quality.
+        let profiler = &self.profiler;
         for (i, call) in self.calls.iter_mut().enumerate().rev() {
+            profiler.start(format!("call {}", i));
             if call.attributes.vbo_data.is_empty() {
                 continue;
             }
 
+            profiler.start("setting state");
             unsafe {
                 gl::UseProgram(call.program.program);
                 gl::UniformMatrix4fv(
@@ -439,18 +457,23 @@ impl Renderer {
                 gl::BindTexture(gl::TEXTURE_2D, call.texture);
                 gl::BindBuffer(gl::ARRAY_BUFFER, call.attributes.vbo);
             }
+            profiler.end("setting state");
             print_gl_errors(&format!("after initializing draw call #{}", i));
 
             let len = (mem::size_of::<f32>() * call.attributes.vbo_data.len()) as isize;
             let ptr = call.attributes.vbo_data.as_ptr() as *const _;
             if len <= call.attributes.allocated_vbo_data_size {
                 unsafe {
+                    profiler.start("bufferSubData");
                     gl::BufferSubData(gl::ARRAY_BUFFER, 0, len, ptr);
+                    profiler.end("bufferSubData");
                 }
             } else {
                 call.attributes.allocated_vbo_data_size = len;
                 unsafe {
+                    profiler.start("bufferData");
                     gl::BufferData(gl::ARRAY_BUFFER, len, ptr, gl::STREAM_DRAW);
+                    profiler.end("bufferData");
                 }
             }
             print_gl_errors(&format!("after pushing vertex buffer #{}", i));
@@ -459,24 +482,31 @@ impl Renderer {
                 // 12 floats (3 for pos + 2 tex + 4 col + 3 rot) per vertex
                 let vertex_count = call.attributes.vbo_data.len() as i32 / 12;
                 unsafe {
+                    profiler.start("enable vertex attribs");
                     enable_vertex_attribs(&[
                         (call.program.position_attrib_location, 3),
                         (call.program.texcoord_attrib_location, 2),
                         (call.program.color_attrib_location, 4),
                         (call.program.rotation_attrib_location, 3),
                     ]);
+                    profiler.end("enable vertex attribs");
+                    profiler.start("drawArrays");
                     gl::DrawArrays(gl::TRIANGLES, 0, vertex_count);
+                    profiler.end("drawArrays");
+                    profiler.start("disable vertex attribs");
                     disable_vertex_attribs(&[
                         call.program.position_attrib_location,
                         call.program.texcoord_attrib_location,
                         call.program.color_attrib_location,
                         call.program.rotation_attrib_location,
                     ]);
+                    profiler.end("disable vertex attribs");
                 }
                 print_gl_errors(&format!("[legacy] after drawing buffer #{}", i));
             } else {
                 // 16 floats (4 for x,y,w,h + 4 tex xywh + 4 col + 3 rot + 1 z) per vertex
                 let instance_count = call.attributes.vbo_data.len() as i32 / 16;
+                profiler.start("drawElementsInstanced");
                 unsafe {
                     gl::DrawElementsInstanced(
                         gl::TRIANGLES,
@@ -486,14 +516,18 @@ impl Renderer {
                         instance_count,
                     );
                 }
+                profiler.end("drawElementsInstanced");
                 print_gl_errors(&format!("after drawing buffer #{}", i));
             }
 
             call.attributes.vbo_data.clear();
 
             print_gl_errors(&*format!("after render #{}", i));
+            profiler.end(format!("call {}", i));
         }
+
         self.gl_pop();
+        self.profiler.end("render");
     }
 
     /// Returns the OpenGL texture handle for the texture used by draw
@@ -506,6 +540,16 @@ impl Renderer {
     /// Saves the current OpenGL state for [`Renderer::gl_pop`] and
     /// then sets some defaults used by this crate.
     fn gl_push(&mut self) {
+        if !self.preserve_gl_state {
+            unsafe {
+                gl::Enable(gl::DEPTH_TEST);
+                gl::Enable(gl::BLEND);
+                gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
+            }
+            return;
+        }
+
+        self.profiler.start("gl state push");
         if !self.gl_state.pushed {
             unsafe {
                 self.gl_state.depth_test = gl::IsEnabled(gl::DEPTH_TEST) != 0;
@@ -536,10 +580,16 @@ impl Renderer {
             self.gl_state.pushed = true;
             print_gl_errors("after glEnables");
         }
+        self.profiler.end("gl state push");
     }
 
     /// Restores the OpenGL state saved in [`Renderer::gl_push`].
     fn gl_pop(&mut self) {
+        if !self.preserve_gl_state {
+            return;
+        }
+
+        self.profiler.start("gl state pop");
         if self.gl_state.pushed {
             unsafe {
                 if !self.gl_state.depth_test {
@@ -566,6 +616,7 @@ impl Renderer {
             self.gl_state.pushed = false;
             print_gl_errors("after restoring OpenGL state");
         }
+        self.profiler.end("gl state pop");
     }
 }
 
@@ -887,4 +938,39 @@ fn gl_error_to_string(error: GLuint) -> String {
         0x0531 => "GL_TABLE_TOO_LARGE (0x0531)".to_owned(),
         _ => format!("unknown error ({:#06x})", error),
     }
+}
+
+use std::borrow::Cow;
+
+#[derive(Clone, Copy, Debug)]
+struct Profiler {
+    should_profile: bool,
+}
+
+impl Profiler {
+    fn new() -> Profiler {
+        Profiler {
+            should_profile: false,
+        }
+    }
+
+    #[cfg(feature = "flame")]
+    fn start<S: Into<Cow<'static, str>>>(&self, name: S) {
+        if self.should_profile {
+            flame::start(name);
+        }
+    }
+
+    #[cfg(feature = "flame")]
+    fn end<S: Into<Cow<'static, str>>>(&self, name: S) {
+        if self.should_profile {
+            flame::end(name);
+        }
+    }
+
+    #[cfg(not(feature = "flame"))]
+    fn start<S: Into<Cow<'static, str>>>(&self, _name: S) {}
+
+    #[cfg(not(feature = "flame"))]
+    fn end<S: Into<Cow<'static, str>>>(&self, _name: S) {}
 }

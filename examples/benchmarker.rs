@@ -21,6 +21,7 @@ mod keys {
     pub const CLOSE: glfw::Key = glfw::Key::Escape;
     pub const UP: glfw::Key = glfw::Key::Up;
     pub const DOWN: glfw::Key = glfw::Key::Down;
+    pub const PROFILE: glfw::Key = glfw::Key::R;
 }
 
 #[cfg(feature = "glutin")]
@@ -28,6 +29,7 @@ mod keys {
     pub const CLOSE: glutin::VirtualKeyCode = glutin::VirtualKeyCode::Escape;
     pub const UP: glutin::VirtualKeyCode = glutin::VirtualKeyCode::Up;
     pub const DOWN: glutin::VirtualKeyCode = glutin::VirtualKeyCode::Down;
+    pub const PROFILE: glutin::VirtualKeyCode = glutin::VirtualKeyCode::R;
 }
 
 #[cfg(not(any(feature = "glutin", feature = "glfw")))]
@@ -35,13 +37,17 @@ mod keys {
     pub const CLOSE: u32 = 27;
     pub const UP: u32 = 43;
     pub const DOWN: u32 = 45;
+    pub const PROFILE: u32 = 82;
 }
+
+static mut PROFILING: bool = false;
 
 fn main() -> Result<(), Box<dyn Error>> {
     // Create the window
     let mut window = Window::create(&WindowSettings::default()).unwrap();
     // Create the OpenGL renderer
     let mut renderer = Renderer::create(window.opengl21);
+    renderer.set_preserve_gl_state(false);
     // Create the text renderer
     let mut text = TextRenderer::create(fs::read("examples/res/FiraSans.ttf")?, &mut renderer)?;
     // Create the draw call for the sprite
@@ -57,9 +63,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let timer_names = [
         "whole frame",
         "application frame",
-        "rendering",
+        "opengl",
         "swap buffers",
-        "glyph drawing",
+        "glyph rendering",
         "quad calls",
         "text calls",
     ];
@@ -67,7 +73,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let max_timers = 60;
     let mut timers: HashMap<&'static str, Vec<Timer>> = HashMap::new();
     for name in &timer_names {
-        timers.insert(name, vec![Timer::new(); max_timers]);
+        timers.insert(name, vec![Timer::new(name.to_string()); max_timers]);
     }
 
     let get_avg_timer_mcs = |name: &str| {
@@ -83,12 +89,17 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Loop until we `should_quit` or refresh returns false, ie. the
     // user pressed the "close window" button.
+    timers["whole frame"][timer_index].start();
     while window.refresh() && !should_quit {
         timers["whole frame"][timer_index].end();
 
         timer_index += 1;
         if timer_index >= max_timers {
             timer_index = 0;
+        }
+
+        unsafe {
+            PROFILING = window.just_pressed_keys.contains(&keys::PROFILE);
         }
 
         timers["whole frame"][timer_index].start();
@@ -106,6 +117,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         if window.just_pressed_keys.contains(&keys::DOWN) && quad_count > 1 {
             quad_count /= 2;
         }
+
+        renderer.set_profiling(window.just_pressed_keys.contains(&keys::PROFILE));
 
         let time = Instant::now() - start;
         let time = time.as_secs() as f32 + time.subsec_millis() as f32 / 1000.0;
@@ -137,9 +150,21 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         timers["text calls"][timer_index].start();
         // Draw some text describing the frame timings
-        let mut y = 20.0;
+        let mut y = 5.0;
+
+        if cfg!(feature = "flame") {
+            text.draw_text(
+                "Press R to record a frame with flame, see results in flame-graph.html after exiting the application",
+                (20.0, y, -0.5),
+                16.0,
+                Alignment::Left,
+                None,
+                None,
+            );
+        }
 
         for duration_name in &timer_names {
+            y += 20.0;
             text.draw_text(
                 &format!(
                     "{}: {:4.1} μs",
@@ -152,7 +177,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                 None,
                 None,
             );
-            y += 20.0;
         }
 
         y += 20.0;
@@ -184,16 +208,17 @@ fn main() -> Result<(), Box<dyn Error>> {
             None,
             None,
         );
+
         timers["text calls"][timer_index].end();
 
         // Render the glyphs into the draw call
-        timers["glyph drawing"][timer_index].start();
+        timers["glyph rendering"][timer_index].start();
         text.compose_draw_call(&mut renderer);
-        timers["glyph drawing"][timer_index].end();
+        timers["glyph rendering"][timer_index].end();
         // Render the OpenGL draw calls
-        timers["rendering"][timer_index].start();
+        timers["opengl"][timer_index].start();
         renderer.render(window.width, window.height);
-        timers["rendering"][timer_index].end();
+        timers["opengl"][timer_index].end();
         timers["swap buffers"][timer_index].start();
         window.swap_buffers();
         timers["swap buffers"][timer_index].end();
@@ -201,8 +226,19 @@ fn main() -> Result<(), Box<dyn Error>> {
         timers["application frame"][timer_index].end();
     }
 
+    dump_profiling_data();
+
     Ok(())
 }
+
+#[cfg(feature = "flame")]
+fn dump_profiling_data() {
+    use std::fs::File;
+    flame::dump_html(&mut File::create("flame-graph.html").unwrap()).unwrap();
+}
+
+#[cfg(not(feature = "flame"))]
+fn dump_profiling_data() {}
 
 use std::cell::Cell;
 
@@ -210,20 +246,40 @@ use std::cell::Cell;
 struct Timer {
     start: Cell<Instant>,
     duration: Cell<Duration>,
+    name: String,
 }
 
 impl Timer {
-    pub fn new() -> Timer {
+    pub fn new(name: String) -> Timer {
         Timer {
             start: Cell::new(Instant::now()),
             duration: Cell::new(Duration::from_secs(0)),
+            name,
         }
     }
 
+    #[cfg(feature = "flame")]
+    pub fn start(&self) {
+        self.start.set(Instant::now());
+        if unsafe { PROFILING } {
+            flame::start(self.name.clone());
+        }
+    }
+
+    #[cfg(feature = "flame")]
+    pub fn end(&self) {
+        if unsafe { PROFILING } {
+            flame::end(self.name.clone());
+        }
+        self.duration.set(Instant::now() - self.start.get());
+    }
+
+    #[cfg(not(feature = "flame"))]
     pub fn start(&self) {
         self.start.set(Instant::now());
     }
 
+    #[cfg(not(feature = "flame"))]
     pub fn end(&self) {
         self.duration.set(Instant::now() - self.start.get());
     }
