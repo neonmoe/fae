@@ -11,8 +11,8 @@ pub struct WindowSettings {
     pub height: f32,
     /// Whether or not the application is a dialog. Default value: `true`
     ///
-    /// This only affects x11 environments, where it sets the window
-    /// type to dialog. In [tiling
+    /// This only affects x11 environments with the `glutin` backend,
+    /// where it sets the window type to dialog. In [tiling
     /// environments](https://en.wikipedia.org/wiki/Tiling_window_manager),
     /// like i3 and sway, this can cause the window to pop up as a
     /// floating window, not a tiled one. This is useful for

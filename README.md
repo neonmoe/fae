@@ -27,9 +27,14 @@ mostly so I don't have to come up with another name :)
   GLFW builds do seem to be slightly heavier on the performance side
   though. Do your own benchmarks and use the one that fits your
   project. **Important notes**:
-  - Glutin and GLFW handle DPI differently in x11 contexts.
-  - The `is_dialog` variable of `WindowSettings` only works in x11
-    contexts with Glutin.
+  - Glutin does some scaling (the DPI factor) based on your monitor's
+    physical size [citation needed]. GLFW does not do any HiDPI
+    scaling on Linux by itself, so when using GLFW, this crate sets
+    the scaling factor to the first non-0 of these env variables:
+    - `QT_AUTO_SCREEN_SCALE_FACTOR`
+    - `QT_SCALE_FACTOR`
+    - `GDK_SCALE`
+    - `ELM_SCALE`
 - The **text** feature implements the `text` mod, which has
   functionality for drawing strings. Fonts are provided in the form of
   .ttf files shipped with your application. The glyph rendering is
@@ -52,6 +57,10 @@ mostly so I don't have to come up with another name :)
   ```sh
   FAE_OPENGL_LEGACY=1 cargo run
   ```
+
+## Issues
+I keep a to-do list in [[ISSUES.md]], but if your concern isn't
+listed, feel free to open GitHub issues.
 
 ## License
 The `fae` crate is distributed under the MIT license.

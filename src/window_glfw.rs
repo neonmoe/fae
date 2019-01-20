@@ -7,6 +7,8 @@ use std::sync::mpsc::Receiver;
 pub use crate::window_settings::WindowSettings;
 pub use glfw;
 
+const HIDPI_AUTO: bool = cfg!(any(target_os = "windows", target_os = "macos"));
+
 /// Manages the window and propagates events to the UI system.
 pub struct Window {
     /// The width of the window.
@@ -44,6 +46,17 @@ impl Window {
     pub fn create(settings: &WindowSettings) -> Result<Window, Box<Error>> {
         let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS)?;
 
+        let mut width = settings.width;
+        let mut height = settings.height;
+        let dpi_factor;
+        if !HIDPI_AUTO {
+            dpi_factor = get_env_dpi();
+            width /= dpi_factor;
+            height /= dpi_factor;
+        } else {
+            dpi_factor = 1.0;
+        }
+
         let opengl21 = false;
         let (mut glfw_window, events) = {
             // Forward compatibility flag needed for mac:
@@ -53,8 +66,8 @@ impl Window {
             }
             glfw.window_hint(WindowHint::SRgbCapable(true));
 
-            let width = settings.width as u32;
-            let height = settings.height as u32;
+            let width = width as u32;
+            let height = height as u32;
             let title = &settings.title;
             let window_mode = glfw::WindowMode::Windowed;
 
@@ -132,14 +145,14 @@ impl Window {
         glfw_window.set_all_polling(true);
 
         Ok(Window {
-            width: settings.width,
-            height: settings.height,
-            dpi_factor: 1.0,
+            width: width,
+            height: height,
+            dpi_factor,
             glfw,
             glfw_window,
             events,
-            fb_width: settings.width,
-            fb_height: settings.height,
+            fb_width: width,
+            fb_height: height,
             opengl21,
             pressed_keys: Vec::new(),
             just_pressed_keys: Vec::new(),
@@ -178,8 +191,13 @@ impl Window {
                     }
                 }
                 WindowEvent::Size(width, height) => {
-                    self.width = width as f32;
-                    self.height = height as f32;
+                    if HIDPI_AUTO {
+                        self.width = width as f32;
+                        self.height = height as f32;
+                    } else {
+                        self.width = width as f32 / self.dpi_factor;
+                        self.height = height as f32 / self.dpi_factor;
+                    }
                     resize = true;
                 }
                 WindowEvent::FramebufferSize(width, height) => {
@@ -191,19 +209,43 @@ impl Window {
             }
         }
 
-        /* Resize event handling */
         if resize {
-            let dpi_factor_horizontal = self.fb_width / self.width;
-            let dpi_factor_vertical = self.fb_height / self.height;
-            self.dpi_factor = dpi_factor_horizontal.max(dpi_factor_vertical);
-
             unsafe {
                 gl::Viewport(0, 0, self.fb_width as i32, self.fb_height as i32);
+            }
+
+            // GLFW framebuffer and screen space sizes only differ on windows and macos
+            if HIDPI_AUTO {
+                let dpi_factor_horizontal = self.fb_width / self.width;
+                let dpi_factor_vertical = self.fb_height / self.height;
+                self.dpi_factor = dpi_factor_horizontal.max(dpi_factor_vertical);
             }
         }
 
         !self.glfw_window.should_close()
     }
+}
+
+fn get_env_dpi() -> f32 {
+    let get_var = |name: &str| {
+        env::var(name)
+            .ok()
+            .and_then(|var| var.parse::<f32>().ok())
+            .filter(|f| *f > 0.0)
+    };
+    if let Some(dpi_factor) = get_var("QT_AUTO_SCREEN_SCALE_FACTOR") {
+        return dpi_factor;
+    }
+    if let Some(dpi_factor) = get_var("QT_SCALE_FACTOR") {
+        return dpi_factor;
+    }
+    if let Some(dpi_factor) = get_var("GDK_SCALE") {
+        return dpi_factor;
+    }
+    if let Some(dpi_factor) = get_var("ELM_SCALE") {
+        return dpi_factor;
+    }
+    return 1.0;
 }
 
 #[derive(Debug, Clone)]

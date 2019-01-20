@@ -143,6 +143,16 @@ fn main() -> Result<(), Box<dyn Error>> {
             None,
         );
 
+        y += 20.0;
+        text.draw_text(
+            &format!("Scaling factor: {:.1}", window.dpi_factor),
+            (10.0, y, -0.5),
+            16.0,
+            Alignment::Left,
+            None,
+            None,
+        );
+
         // Render the glyphs into the draw call
         text.compose_draw_call(&mut renderer);
         // Render the OpenGL draw calls
