@@ -36,11 +36,12 @@ impl Window {
         Err(Box::new(WindowCreationError))
     }
 
-    /// Re-renders the window, polls for new events and passes them on
-    /// to the UI system, and clears the screen with the
-    /// `background_*` colors, which consist of 0.0 - 1.0
-    /// values. **Note**: Because of vsync, this function will hang
-    /// for a while (usually 16ms at max).
+    /// Updates the window (swaps the front and back buffers)
+    pub fn swap_buffers(&mut self) {}
+
+    /// Polls for new events. Returns whether the user has requested
+    /// the window to be closed. **Note**: Because of vsync, this
+    /// function will hang for a while (usually 16ms at max).
     pub fn refresh(&mut self) -> bool {
         false
     }
