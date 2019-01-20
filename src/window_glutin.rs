@@ -157,6 +157,7 @@ impl Window {
         });
 
         /* Keyboard event handling */
+        self.just_pressed_keys.clear();
         for (key, state) in key_inputs {
             match state {
                 ElementState::Pressed => {

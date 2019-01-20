@@ -14,6 +14,20 @@ use fae::{
 use std::error::Error;
 use std::fs;
 
+#[cfg(feature = "glfw")]
+mod keys {
+    pub const CLOSE: glfw::Key = glfw::Key::Escape;
+    pub const UP: glfw::Key = glfw::Key::Up;
+    pub const DOWN: glfw::Key = glfw::Key::Down;
+}
+
+#[cfg(feature = "glutin")]
+mod keys {
+    pub const CLOSE: glutin::VirtualKeyCode = glutin::VirtualKeyCode::Escape;
+    pub const UP: glutin::VirtualKeyCode = glutin::VirtualKeyCode::Up;
+    pub const DOWN: glutin::VirtualKeyCode = glutin::VirtualKeyCode::Down;
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     // Create the window
     let mut window = Window::create(&WindowSettings::default()).unwrap();
@@ -42,19 +56,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         // changed them
         text.update_dpi_factor(window.dpi_factor);
 
-        // TODO: Implement keyboard api
-
-        if false
-        /* esc pressed */
-        {
+        if window.just_pressed_keys.contains(&keys::CLOSE) {
             should_quit = true;
         }
-        if false
-        /* up pressed */
-        {
+        if window.just_pressed_keys.contains(&keys::UP) {
             quad_count *= 2;
         }
-        if false /* down pressed */ && quad_count > 1 {
+        if window.just_pressed_keys.contains(&keys::DOWN) && quad_count > 1 {
             quad_count /= 2;
         }
 

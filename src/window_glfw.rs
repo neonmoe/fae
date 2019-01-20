@@ -174,9 +174,6 @@ impl Window {
         self.glfw.poll_events();
         for (_, event) in glfw::flush_messages(&self.events) {
             match event {
-                WindowEvent::Key(Key::Escape, _, Action::Press, _) => {
-                    self.glfw_window.set_should_close(true)
-                }
                 WindowEvent::Key(key, _, Action::Press, _) => {
                     self.just_pressed_keys.push(key);
                     self.pressed_keys.push(key);
@@ -190,6 +187,7 @@ impl Window {
                         }
                     }
                 }
+
                 WindowEvent::Size(width, height) => {
                     if HIDPI_AUTO {
                         self.width = width as f32;
@@ -205,6 +203,7 @@ impl Window {
                     self.fb_height = height as f32;
                     resize = true;
                 }
+
                 _ => {}
             }
         }
