@@ -134,8 +134,6 @@ impl Window {
     pub fn swap_buffers(&mut self) {
         let _ = self.gl_window.swap_buffers();
         unsafe {
-            // TODO: Move this to renderer, write a proper procedure
-            // to wait and check instead of hanging forever
             gl::Finish();
         }
     }

@@ -527,6 +527,10 @@ impl Renderer {
         }
 
         self.gl_pop();
+        unsafe {
+            gl::Finish();
+        }
+
         self.profiler.end("render");
     }
 
