@@ -133,9 +133,6 @@ impl Window {
     /// Updates the window (swaps the front and back buffers)
     pub fn swap_buffers(&mut self) {
         let _ = self.gl_window.swap_buffers();
-        unsafe {
-            gl::Finish();
-        }
     }
 
     /// Polls for new events. Returns whether the user has requested

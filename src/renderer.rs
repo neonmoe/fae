@@ -438,6 +438,7 @@ impl Renderer {
         for (i, call) in self.calls.iter_mut().enumerate().rev() {
             profiler.start(format!("call {}", i));
             if call.attributes.vbo_data.is_empty() {
+                profiler.end(format!("call {}", i));
                 continue;
             }
 
@@ -527,9 +528,6 @@ impl Renderer {
         }
 
         self.gl_pop();
-        unsafe {
-            gl::Finish();
-        }
 
         self.profiler.end("render");
     }
