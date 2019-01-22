@@ -360,8 +360,17 @@ impl Renderer {
     /// point (relative to `coords` x and y, in logical pixels as well)
     /// around which the sprite pivots. Arrangement: (radians, x, y)
     ///
-    /// - `z`: Used for ordering sprites on screen, in the range -1.0 -
-    /// 1.0. Positive values are in front.
+    /// - `z`: Used for ordering sprites on screen, in the range `-1.0
+    /// - 1.0`. Positive values are in front. TIP: If you're drawing
+    /// *lots* of quads on top of each other, ensure that their z
+    /// coordinates are set properly to layer them as you want,
+    /// instead of trusting the drawing order. This has two benefits:
+    /// explicitly stating the z coordinate is overall more robust,
+    /// and you might get very big performance gains because OpenGL
+    /// can detect that some of the pixels can't be seen! Case in
+    /// point: there's a commented bit in the `benchmarker` example
+    /// that does exactly this, and it bumps up the maximum amount of
+    /// quads @144Hz from 2048 to 32768.
     ///
     /// - `call_index`: The index of the draw call to draw the quad
     /// in. This is the returned value from [`Renderer::create_draw_call`].

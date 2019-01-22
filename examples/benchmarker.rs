@@ -142,7 +142,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 (0.0, 0.0, 1.0, 1.0),
                 (1.0, 0.7, 0.9, 1.0),
                 (-time * 1.5, 50.0, 50.0),
-                0.5,
+                0.5, // f - 0.5, // Use the commented one for great optimizations! :)
                 call,
             );
         }
@@ -206,6 +206,15 @@ fn main() -> Result<(), Box<dyn Error>> {
             16.0,
             Alignment::Left,
             None,
+            None,
+        );
+
+        text.draw_text(
+            "Note: The rendered spinny thing is a pretty worst-case scenario, as it both fills the screen and doesn't use the depth buffer to avoid redrawing the same pixels. Just setting the Z coordinate properly for them increases performance by a factor of 16!",
+            (10.0, 455.0, -0.5),
+            12.0,
+            Alignment::Center,
+            Some(610.00),
             None,
         );
 

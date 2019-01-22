@@ -11,7 +11,6 @@ discussion though, and I do check them, so consider this list a to-do.
   - Scroll
   - Cursor left / entered
   - File drop
-- Render while resizing on GLFW+Windows
 
 ### 0.4
 - Design a more pleasant API

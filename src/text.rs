@@ -189,7 +189,7 @@ impl TextRenderer {
                 caret.x += self.font.pair_kerning(scale, id, glyph.id());
             }
 
-            if width.is_some() && caret.x > x + width.unwrap() {
+            if width.is_some() && caret.x > (x + width.unwrap()) * dpi {
                 if let Some(ref mut last_row) = rows.last_mut() {
                     let len = last_row.len();
                     if current_word_length < len {
