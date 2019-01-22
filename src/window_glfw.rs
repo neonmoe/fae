@@ -1,4 +1,5 @@
 use crate::gl;
+use crate::renderer::Renderer;
 use glfw::{Action, ClientApiHint, Context, Key, WindowEvent, WindowHint};
 use std::env;
 use std::error::Error;
@@ -161,8 +162,9 @@ impl Window {
     }
 
     /// Updates the window (swaps the front and back buffers)
-    pub fn swap_buffers(&mut self) {
+    pub fn swap_buffers(&mut self, renderer: &Renderer) {
         self.glfw_window.swap_buffers();
+        renderer.synchronize();
     }
 
     /// Polls for new events. Returns whether the user has requested

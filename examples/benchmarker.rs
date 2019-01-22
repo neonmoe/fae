@@ -220,7 +220,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         renderer.render(window.width, window.height);
         timers["opengl"][timer_index].end();
         timers["swap buffers"][timer_index].start();
-        window.swap_buffers();
+        window.swap_buffers(&renderer);
         timers["swap buffers"][timer_index].end();
 
         timers["application frame"][timer_index].end();

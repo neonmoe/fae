@@ -1,3 +1,4 @@
+use crate::renderer::Renderer;
 use std::error::Error;
 
 pub use crate::window_settings::WindowSettings;
@@ -37,7 +38,7 @@ impl Window {
     }
 
     /// Updates the window (swaps the front and back buffers)
-    pub fn swap_buffers(&mut self) {}
+    pub fn swap_buffers(&mut self, renderer: &Renderer) {}
 
     /// Polls for new events. Returns whether the user has requested
     /// the window to be closed. **Note**: Because of vsync, this

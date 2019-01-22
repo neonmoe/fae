@@ -532,6 +532,39 @@ impl Renderer {
         self.profiler.end("render");
     }
 
+    pub fn synchronize(&self) {
+        use std::thread::sleep;
+        use std::time::Duration;
+
+        let mut synchronized = false;
+
+        if !self.gl_state.legacy {
+            let fence = unsafe { gl::FenceSync(gl::SYNC_GPU_COMMANDS_COMPLETE, 0) };
+            while {
+                let status = unsafe { gl::ClientWaitSync(fence, gl::SYNC_FLUSH_COMMANDS_BIT, 0) };
+                match status {
+                    gl::ALREADY_SIGNALED | gl::CONDITION_SATISFIED => {
+                        synchronized = true;
+                        false
+                    }
+                    gl::WAIT_FAILED => {
+                        print_gl_errors("glClientWaitSync");
+                        false
+                    }
+                    _ => true,
+                }
+            } {
+                sleep(Duration::from_micros(2000));
+            }
+        }
+
+        if !synchronized {
+            unsafe {
+                gl::Finish();
+            }
+        }
+    }
+
     /// Returns the OpenGL texture handle for the texture used by draw
     /// call `index`.
     #[cfg(feature = "text")]

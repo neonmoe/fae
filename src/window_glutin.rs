@@ -1,4 +1,5 @@
 use crate::gl;
+use crate::renderer::Renderer;
 use glutin::dpi::*;
 use glutin::*;
 use std::env;
@@ -131,8 +132,9 @@ impl Window {
     }
 
     /// Updates the window (swaps the front and back buffers)
-    pub fn swap_buffers(&mut self) {
+    pub fn swap_buffers(&mut self, renderer: &Renderer) {
         let _ = self.gl_window.swap_buffers();
+        renderer.synchronize();
     }
 
     /// Polls for new events. Returns whether the user has requested
