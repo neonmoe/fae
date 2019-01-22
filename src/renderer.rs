@@ -556,6 +556,10 @@ impl Renderer {
             } {
                 sleep(Duration::from_micros(2000));
             }
+
+            unsafe {
+                gl::DeleteSync(fence);
+            }
         }
 
         if !synchronized {
