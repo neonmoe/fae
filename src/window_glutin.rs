@@ -32,6 +32,8 @@ pub struct Window {
     /// each window backend, because there's no unified way of
     /// speaking in keycodes!
     pub released_keys: Vec<VirtualKeyCode>,
+    /// The characters typed this frame, in chronological order.
+    pub typed_chars: Vec<char>,
 }
 
 impl Window {
@@ -128,6 +130,7 @@ impl Window {
             pressed_keys: Vec::new(),
             just_pressed_keys: Vec::new(),
             released_keys: Vec::new(),
+            typed_chars: Vec::new(),
         })
     }
 
@@ -144,6 +147,9 @@ impl Window {
         let mut running = true;
         let mut resized_logical_size = None;
         let mut key_inputs = Vec::new();
+        let typed_chars = &mut self.typed_chars;
+        typed_chars.clear();
+
         self.events_loop.poll_events(|event| {
             if let Event::WindowEvent { event, .. } = event {
                 match event {
@@ -155,6 +161,7 @@ impl Window {
                             key_inputs.push((key, state));
                         }
                     }
+                    WindowEvent::ReceivedCharacter(c) => typed_chars.push(c),
                     _ => {}
                 }
             }
@@ -162,6 +169,7 @@ impl Window {
 
         /* Keyboard event handling */
         self.just_pressed_keys.clear();
+        self.released_keys.clear();
         for (key, state) in key_inputs {
             match state {
                 ElementState::Pressed => {

@@ -5,7 +5,6 @@ discussion though, and I do check them, so consider this list a to-do.
 
 ### 0.3
 - Interface for events:
-  - Typed characters
   - Mouse position
   - Mouse clicks
   - Scroll

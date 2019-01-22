@@ -85,7 +85,10 @@ fn main() -> Result<(), Box<dyn Error>> {
             * 1_000_000.0
     };
 
+    // For animations
     let start = Instant::now();
+    // For testing text input
+    let mut customizable_text = String::new();
 
     // Loop until we `should_quit` or refresh returns false, ie. the
     // user pressed the "close window" button.
@@ -116,6 +119,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
         if window.just_pressed_keys.contains(&keys::DOWN) && quad_count > 1 {
             quad_count /= 2;
+        }
+
+        for c in &window.typed_chars {
+            if !c.is_control() {
+                customizable_text.push(*c);
+            }
         }
 
         renderer.set_profiling(window.just_pressed_keys.contains(&keys::PROFILE));
@@ -202,6 +211,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         y += 20.0;
         text.draw_text(
             &format!("Scaling factor: {:.1}", window.dpi_factor),
+            (10.0, y, -0.5),
+            16.0,
+            Alignment::Left,
+            None,
+            None,
+        );
+
+        y += 20.0;
+        text.draw_text(
+            &format!("Type some text: {}", customizable_text),
             (10.0, y, -0.5),
             16.0,
             Alignment::Left,

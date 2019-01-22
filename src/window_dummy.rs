@@ -25,6 +25,8 @@ pub struct Window {
     /// each window backend, because there's no unified way of
     /// speaking in keycodes!
     pub released_keys: Vec<u32>,
+    /// The characters typed this frame, in chronological order.
+    pub typed_chars: Vec<char>,
 }
 
 impl Window {
@@ -38,6 +40,7 @@ impl Window {
     }
 
     /// Updates the window (swaps the front and back buffers)
+    #[allow(unused_variables)]
     pub fn swap_buffers(&mut self, renderer: &Renderer) {}
 
     /// Polls for new events. Returns whether the user has requested

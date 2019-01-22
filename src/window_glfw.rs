@@ -37,6 +37,8 @@ pub struct Window {
     /// each window backend, because there's no unified way of
     /// speaking in keycodes!
     pub released_keys: Vec<Key>,
+    /// The characters typed this frame, in chronological order.
+    pub typed_chars: Vec<char>,
 }
 
 impl Window {
@@ -158,6 +160,7 @@ impl Window {
             pressed_keys: Vec::new(),
             just_pressed_keys: Vec::new(),
             released_keys: Vec::new(),
+            typed_chars: Vec::new(),
         })
     }
 
@@ -175,6 +178,8 @@ impl Window {
 
         self.just_pressed_keys.clear();
         self.released_keys.clear();
+        self.typed_chars.clear();
+
         self.glfw.poll_events();
         for (_, event) in glfw::flush_messages(&self.events) {
             match event {
@@ -191,6 +196,8 @@ impl Window {
                         }
                     }
                 }
+
+                WindowEvent::Char(c) => self.typed_chars.push(c),
 
                 WindowEvent::Size(width, height) => {
                     if HIDPI_AUTO {
