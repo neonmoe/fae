@@ -102,7 +102,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
 
         unsafe {
-            PROFILING = window.just_pressed_keys.contains(&keys::PROFILE);
+            PROFILING = window.pressed_keys.contains(&keys::PROFILE);
         }
 
         timers["whole frame"][timer_index].start();
@@ -111,13 +111,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         // changed them
         text.update_dpi_factor(window.dpi_factor);
 
-        if window.just_pressed_keys.contains(&keys::CLOSE) {
+        if window.pressed_keys.contains(&keys::CLOSE) {
             should_quit = true;
         }
-        if window.just_pressed_keys.contains(&keys::UP) {
+        if window.pressed_keys.contains(&keys::UP) {
             quad_count *= 2;
         }
-        if window.just_pressed_keys.contains(&keys::DOWN) && quad_count > 1 {
+        if window.pressed_keys.contains(&keys::DOWN) && quad_count > 1 {
             quad_count /= 2;
         }
 
@@ -127,7 +127,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
         }
 
-        renderer.set_profiling(window.just_pressed_keys.contains(&keys::PROFILE));
+        renderer.set_profiling(window.pressed_keys.contains(&keys::PROFILE));
 
         let time = Instant::now() - start;
         let time = time.as_secs() as f32 + time.subsec_millis() as f32 / 1000.0;
@@ -200,7 +200,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         y += 20.0;
         text.draw_text(
-            &format!("Pressed keys: {:?}", window.pressed_keys),
+            &format!("Pressed keys: {:?}", window.held_keys),
             (10.0, y, -0.5),
             16.0,
             Alignment::Left,
@@ -218,10 +218,43 @@ fn main() -> Result<(), Box<dyn Error>> {
             None,
         );
 
+        y = 5.0;
+
         y += 20.0;
         text.draw_text(
             &format!("Type some text: {}", customizable_text),
-            (10.0, y, -0.5),
+            (200.0, y, -0.5),
+            16.0,
+            Alignment::Left,
+            None,
+            None,
+        );
+
+        y += 20.0;
+        text.draw_text(
+            &format!("Mouse held: {:?}", window.mouse_held),
+            (200.0, y, -0.5),
+            16.0,
+            Alignment::Left,
+            None,
+            None,
+        );
+
+        y += 20.0;
+        let (mouse_x, mouse_y) = window.mouse_coords;
+        text.draw_text(
+            &format!("Mouse position: {}, {}", mouse_x, mouse_y),
+            (200.0, y, -0.5),
+            16.0,
+            Alignment::Left,
+            None,
+            None,
+        );
+
+        y += 20.0;
+        text.draw_text(
+            &format!("Mouse in window: {}", window.mouse_inside),
+            (200.0, y, -0.5),
             16.0,
             Alignment::Left,
             None,

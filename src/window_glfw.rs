@@ -1,6 +1,7 @@
 use crate::gl;
+use crate::mouse::Mouse;
 use crate::renderer::Renderer;
-use glfw::{Action, ClientApiHint, Context, Key, WindowEvent, WindowHint};
+use glfw::{Action, ClientApiHint, Context, Key, MouseButton, WindowEvent, WindowHint};
 use std::env;
 use std::error::Error;
 use std::sync::mpsc::Receiver;
@@ -28,17 +29,28 @@ pub struct Window {
     /// The keys which are currently held down. Different type for
     /// each window backend, because there's no unified way of
     /// speaking in keycodes!
-    pub pressed_keys: Vec<Key>,
+    pub held_keys: Vec<Key>,
     /// The keys which were pressed this frame. Different type for
     /// each window backend, because there's no unified way of
     /// speaking in keycodes!
-    pub just_pressed_keys: Vec<Key>,
+    pub pressed_keys: Vec<Key>,
     /// The keys which were released this frame. Different type for
     /// each window backend, because there's no unified way of
     /// speaking in keycodes!
     pub released_keys: Vec<Key>,
     /// The characters typed this frame, in chronological order.
     pub typed_chars: Vec<char>,
+
+    /// Whether the mouse is inside the window.
+    pub mouse_inside: bool,
+    /// The mouse position inside the window. Arrangement: (x, y)
+    pub mouse_coords: (f32, f32),
+    /// The mouse buttons which are currently held down.
+    pub mouse_held: Vec<Mouse>,
+    /// The mouse buttons which were pressed down this frame.
+    pub mouse_pressed: Vec<Mouse>,
+    /// The mouse buttons which were released this frame.
+    pub mouse_released: Vec<Mouse>,
 }
 
 impl Window {
@@ -157,10 +169,17 @@ impl Window {
             fb_width: width,
             fb_height: height,
             opengl21,
+
+            held_keys: Vec::new(),
             pressed_keys: Vec::new(),
-            just_pressed_keys: Vec::new(),
             released_keys: Vec::new(),
             typed_chars: Vec::new(),
+
+            mouse_inside: false,
+            mouse_coords: (0.0, 0.0),
+            mouse_held: Vec::new(),
+            mouse_pressed: Vec::new(),
+            mouse_released: Vec::new(),
         })
     }
 
@@ -176,7 +195,7 @@ impl Window {
     pub fn refresh(&mut self) -> bool {
         let mut resize = false;
 
-        self.just_pressed_keys.clear();
+        self.pressed_keys.clear();
         self.released_keys.clear();
         self.typed_chars.clear();
 
@@ -184,20 +203,56 @@ impl Window {
         for (_, event) in glfw::flush_messages(&self.events) {
             match event {
                 WindowEvent::Key(key, _, Action::Press, _) => {
-                    self.just_pressed_keys.push(key);
                     self.pressed_keys.push(key);
+                    self.held_keys.push(key);
                 }
                 WindowEvent::Key(key, _, Action::Release, _) => {
                     self.released_keys.push(key);
-                    for (i, pressed_key) in self.pressed_keys.iter().enumerate() {
-                        if pressed_key == &key {
-                            self.pressed_keys.remove(i);
+                    for (i, held_key) in self.held_keys.iter().enumerate() {
+                        if held_key == &key {
+                            self.held_keys.remove(i);
                             break;
                         }
                     }
                 }
 
                 WindowEvent::Char(c) => self.typed_chars.push(c),
+
+                WindowEvent::MouseButton(button, action, _) => {
+                    let button = match button {
+                        MouseButton::Button1 => Mouse::Left,
+                        MouseButton::Button2 => Mouse::Right,
+                        MouseButton::Button3 => Mouse::Middle,
+                        MouseButton::Button4 => Mouse::Other(4),
+                        MouseButton::Button5 => Mouse::Other(5),
+                        MouseButton::Button6 => Mouse::Other(6),
+                        MouseButton::Button7 => Mouse::Other(7),
+                        MouseButton::Button8 => Mouse::Other(8),
+                    };
+
+                    match action {
+                        Action::Press => {
+                            self.mouse_pressed.push(button);
+                            self.mouse_held.push(button);
+                        }
+                        Action::Release => {
+                            self.mouse_released.push(button);
+                            for (i, held_button) in self.mouse_held.iter().enumerate() {
+                                if held_button == &button {
+                                    self.mouse_held.remove(i);
+                                    break;
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+
+                WindowEvent::CursorPos(x, y) => {
+                    self.mouse_coords = (x as f32 / self.dpi_factor, y as f32 / self.dpi_factor);
+                }
+
+                WindowEvent::CursorEnter(entered) => self.mouse_inside = entered,
 
                 WindowEvent::Size(width, height) => {
                     if HIDPI_AUTO {

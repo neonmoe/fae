@@ -1,3 +1,4 @@
+use crate::mouse::MouseButton;
 use crate::renderer::Renderer;
 use std::error::Error;
 
@@ -13,20 +14,32 @@ pub struct Window {
     pub dpi_factor: f32,
     /// The opengl legacy status for Renderer.
     pub opengl21: bool,
+
     /// The keys which are currently held down. Different type for
     /// each window backend, because there's no unified way of
     /// speaking in keycodes!
-    pub pressed_keys: Vec<u32>,
+    pub held_keys: Vec<u32>,
     /// The keys which were pressed this frame. Different type for
     /// each window backend, because there's no unified way of
     /// speaking in keycodes!
-    pub just_pressed_keys: Vec<u32>,
+    pub pressed_keys: Vec<u32>,
     /// The keys which were released this frame. Different type for
     /// each window backend, because there's no unified way of
     /// speaking in keycodes!
     pub released_keys: Vec<u32>,
     /// The characters typed this frame, in chronological order.
     pub typed_chars: Vec<char>,
+
+    /// Whether the mouse is inside the window.
+    pub mouse_inside: bool,
+    /// The mouse position inside the window. Arrangement: (x, y)
+    pub mouse_coords: (f32, f32),
+    /// The mouse buttons which are currently held down.
+    pub mouse_held: Vec<MouseButton>,
+    /// The mouse buttons which were pressed down this frame.
+    pub mouse_pressed: Vec<MouseButton>,
+    /// The mouse buttons which were released this frame.
+    pub mouse_released: Vec<MouseButton>,
 }
 
 impl Window {

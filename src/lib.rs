@@ -19,6 +19,7 @@ pub use crate::image::Image;
 #[cfg(feature = "text")]
 pub mod text;
 
+mod mouse;
 mod window_settings;
 
 #[cfg(feature = "glfw")]

@@ -1,4 +1,5 @@
 use crate::gl;
+use crate::mouse::Mouse;
 use crate::renderer::Renderer;
 use glutin::dpi::*;
 use glutin::*;
@@ -23,17 +24,28 @@ pub struct Window {
     /// The keys which are currently held down. Different type for
     /// each window backend, because there's no unified way of
     /// speaking in keycodes!
-    pub pressed_keys: Vec<VirtualKeyCode>,
+    pub held_keys: Vec<VirtualKeyCode>,
     /// The keys which were pressed this frame. Different type for
     /// each window backend, because there's no unified way of
     /// speaking in keycodes!
-    pub just_pressed_keys: Vec<VirtualKeyCode>,
+    pub pressed_keys: Vec<VirtualKeyCode>,
     /// The keys which were released this frame. Different type for
     /// each window backend, because there's no unified way of
     /// speaking in keycodes!
     pub released_keys: Vec<VirtualKeyCode>,
     /// The characters typed this frame, in chronological order.
     pub typed_chars: Vec<char>,
+
+    /// Whether the mouse is inside the window.
+    pub mouse_inside: bool,
+    /// The mouse position inside the window. Arrangement: (x, y)
+    pub mouse_coords: (f32, f32),
+    /// The mouse buttons which are currently held down.
+    pub mouse_held: Vec<Mouse>,
+    /// The mouse buttons which were pressed down this frame.
+    pub mouse_pressed: Vec<Mouse>,
+    /// The mouse buttons which were released this frame.
+    pub mouse_released: Vec<Mouse>,
 }
 
 impl Window {
@@ -127,10 +139,17 @@ impl Window {
             gl_window,
             events_loop,
             opengl21,
+
+            held_keys: Vec::new(),
             pressed_keys: Vec::new(),
-            just_pressed_keys: Vec::new(),
             released_keys: Vec::new(),
             typed_chars: Vec::new(),
+
+            mouse_inside: false,
+            mouse_coords: (0.0, 0.0),
+            mouse_held: Vec::new(),
+            mouse_pressed: Vec::new(),
+            mouse_released: Vec::new(),
         })
     }
 
@@ -147,7 +166,10 @@ impl Window {
         let mut running = true;
         let mut resized_logical_size = None;
         let mut key_inputs = Vec::new();
+        let mut mouse_inputs = Vec::new();
         let typed_chars = &mut self.typed_chars;
+        let mouse_coords = &mut self.mouse_coords;
+        let mouse_inside = &mut self.mouse_inside;
         typed_chars.clear();
 
         self.events_loop.poll_events(|event| {
@@ -162,19 +184,30 @@ impl Window {
                         }
                     }
                     WindowEvent::ReceivedCharacter(c) => typed_chars.push(c),
+                    WindowEvent::MouseInput { state, button, .. } => match button {
+                        MouseButton::Left => mouse_inputs.push((Mouse::Left, state)),
+                        MouseButton::Right => mouse_inputs.push((Mouse::Right, state)),
+                        MouseButton::Middle => mouse_inputs.push((Mouse::Middle, state)),
+                        MouseButton::Other(n) => mouse_inputs.push((Mouse::Other(n + 3), state)),
+                    },
+                    WindowEvent::CursorMoved { position, .. } => {
+                        *mouse_coords = (position.x as f32, position.y as f32);
+                    }
+                    WindowEvent::CursorEntered { .. } => *mouse_inside = true,
+                    WindowEvent::CursorLeft { .. } => *mouse_inside = false,
                     _ => {}
                 }
             }
         });
 
         /* Keyboard event handling */
-        self.just_pressed_keys.clear();
+        self.pressed_keys.clear();
         self.released_keys.clear();
         for (key, state) in key_inputs {
             match state {
                 ElementState::Pressed => {
                     let mut already_pressed = false;
-                    for previously_pressed_key in &self.pressed_keys {
+                    for previously_pressed_key in &self.held_keys {
                         if previously_pressed_key == &key {
                             already_pressed = true;
                             break;
@@ -182,15 +215,36 @@ impl Window {
                     }
 
                     if !already_pressed {
-                        self.just_pressed_keys.push(key);
                         self.pressed_keys.push(key);
+                        self.held_keys.push(key);
                     }
                 }
                 ElementState::Released => {
                     self.released_keys.push(key);
-                    for (i, pressed_key) in self.pressed_keys.iter().enumerate() {
-                        if pressed_key == &key {
-                            self.pressed_keys.remove(i);
+                    for (i, held_key) in self.held_keys.iter().enumerate() {
+                        if held_key == &key {
+                            self.held_keys.remove(i);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        /* Mouse event handling */
+        self.mouse_pressed.clear();
+        self.mouse_released.clear();
+        for (button, state) in mouse_inputs {
+            match state {
+                ElementState::Pressed => {
+                    self.mouse_pressed.push(button);
+                    self.mouse_held.push(button);
+                }
+                ElementState::Released => {
+                    self.mouse_released.push(button);
+                    for (i, held_button) in self.mouse_held.iter().enumerate() {
+                        if held_button == &button {
+                            self.mouse_held.remove(i);
                             break;
                         }
                     }
