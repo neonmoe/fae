@@ -51,7 +51,22 @@ pub struct TextRenderer {
 }
 
 impl TextRenderer {
-    pub fn create(font_data: Vec<u8>, renderer: &mut Renderer) -> Result<TextRenderer, Box<Error>> {
+    /// Creates a new text renderer.
+    ///
+    /// - `font_data`: The bytes that consist a .ttf file. See the `rusttype` crate's documentation for what kinds of fonts are supported.
+    ///
+    /// - `subpixel_accurate`: If true, glyphs will be rendered if
+    /// their subpixel position differs by very small amounts, to
+    /// render the font more accurately for that position. In
+    /// practice, I haven't seen any difference, so I'd recommend
+    /// setting this to false. (Internally this maps to `rusttype`'s
+    /// `CacheBuilder`'s position tolerance value, true = 0.1, false =
+    /// 1.0).
+    pub fn create(
+        font_data: Vec<u8>,
+        subpixel_accurate: bool,
+        renderer: &mut Renderer,
+    ) -> Result<TextRenderer, Box<Error>> {
         let glyph_cache_image =
             Image::from_color(GLYPH_CACHE_WIDTH as i32, GLYPH_CACHE_HEIGHT as i32, &[0])
                 .format(gl::RED);
@@ -61,12 +76,14 @@ impl TextRenderer {
             ..Default::default()
         };
         let draw_call = renderer.create_draw_call(params);
+        let position_tolerance = if subpixel_accurate { 0.1 } else { 1.0 };
 
         Ok(TextRenderer {
             font: Font::from_bytes(font_data)?,
             cache: RefCell::new(
                 Cache::builder()
                     .dimensions(GLYPH_CACHE_WIDTH, GLYPH_CACHE_HEIGHT)
+                    .position_tolerance(position_tolerance)
                     .build(),
             ),
             cached_text: Vec::new(),

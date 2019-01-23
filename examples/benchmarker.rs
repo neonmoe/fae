@@ -49,7 +49,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut renderer = Renderer::create(window.opengl21);
     renderer.set_preserve_gl_state(false);
     // Create the text renderer
-    let mut text = TextRenderer::create(fs::read("examples/res/FiraSans.ttf")?, &mut renderer)?;
+    let mut text =
+        TextRenderer::create(fs::read("examples/res/FiraSans.ttf")?, false, &mut renderer)?;
     // Create the draw call for the sprite
     let params = DrawCallParameters {
         image: Some(Image::from_png(&fs::read("examples/res/sprite.png")?)?),
