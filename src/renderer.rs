@@ -423,6 +423,13 @@ impl Renderer {
         }
     }
 
+    /// Clears all queued draws.
+    pub fn flush(&mut self) {
+        for call in self.calls.iter_mut() {
+            call.attributes.vbo_data.clear();
+        }
+    }
+
     pub fn render(&mut self, width: f32, height: f32) {
         self.profiler.start("render");
         let m00 = 2.0 / width;

@@ -1,4 +1,4 @@
-use crate::mouse::MouseButton;
+use crate::mouse::Mouse;
 use crate::renderer::Renderer;
 use std::error::Error;
 
@@ -35,11 +35,11 @@ pub struct Window {
     /// The mouse position inside the window. Arrangement: (x, y)
     pub mouse_coords: (f32, f32),
     /// The mouse buttons which are currently held down.
-    pub mouse_held: Vec<MouseButton>,
+    pub mouse_held: Vec<Mouse>,
     /// The mouse buttons which were pressed down this frame.
-    pub mouse_pressed: Vec<MouseButton>,
+    pub mouse_pressed: Vec<Mouse>,
     /// The mouse buttons which were released this frame.
-    pub mouse_released: Vec<MouseButton>,
+    pub mouse_released: Vec<Mouse>,
 }
 
 impl Window {
