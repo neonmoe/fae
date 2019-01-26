@@ -21,18 +21,8 @@ mostly so I don't have to come up with another name :)
   easy window creation using glutin, with all the required OpenGL
   context wrangling done for you.
 - The **glfw** feature is an alternative to the **glutin** feature,
-  implementing the same API. **Important notes**:
-  - Linux executables based on **glfw** are considerably smaller than
-    **glutin** ones (1.1MB vs 2.5MB, stripped and built with
-    `--release`). This is the motivation for why this feature exists.
-  - With a small amount of testing, it seems that GLFW is consumes
-    slightly more CPU time.
-  - All that said, the HiDPI support in GLFW is overall very spotty
-    (doesn't seem to work on Windows 8.1, and there's an issue about
-    mouse coordinates not being scaled), so I'd recommend Glutin in
-    all cases except the most space-constrained environments. On
-    Windows (and most probably on macOS as well) Glutin isn't even
-    that much bigger executable-size-wise.
+  implementing the same API. Please see the *Glfw notes* section
+  before using.
 - The **text** feature implements the `text` mod, which has
   functionality for drawing strings. Fonts are provided in the form of
   .ttf files shipped with your application. The glyph rendering is
