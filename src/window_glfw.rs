@@ -45,6 +45,17 @@ pub struct Window {
     pub mouse_inside: bool,
     /// The mouse position inside the window. Arrangement: (x, y)
     pub mouse_coords: (f32, f32),
+    /// The mouse scroll amount during this frame, in pixels. If the
+    /// user supports pixel-perfect scrolling, this will be equal to
+    /// those pixel-perfect deltas. Otherwise, the polled scrolling
+    /// amounts will be multiplied with `mouse_scroll_length`. With
+    /// the default settings, this will usually result in bursts of
+    /// (0, -36) and (0, 36) during normal scrolling. Arrangement: (x,
+    /// y)
+    pub mouse_scroll: (f32, f32),
+    /// How many pixels one "notch" on the mouse scroll wheel should
+    /// scroll. (36 by default)
+    pub mouse_scroll_length: f32,
     /// The mouse buttons which are currently held down.
     pub mouse_held: Vec<Mouse>,
     /// The mouse buttons which were pressed down this frame.
@@ -177,6 +188,8 @@ impl Window {
 
             mouse_inside: false,
             mouse_coords: (0.0, 0.0),
+            mouse_scroll: (0.0, 0.0),
+            mouse_scroll_length: 36.0,
             mouse_held: Vec::new(),
             mouse_pressed: Vec::new(),
             mouse_released: Vec::new(),
@@ -198,6 +211,7 @@ impl Window {
         self.pressed_keys.clear();
         self.released_keys.clear();
         self.typed_chars.clear();
+        self.mouse_scroll = (0.0, 0.0);
 
         self.glfw.poll_events();
         for (_, event) in glfw::flush_messages(&self.events) {
@@ -251,8 +265,14 @@ impl Window {
                 WindowEvent::CursorPos(x, y) => {
                     self.mouse_coords = (x as f32 / self.dpi_factor, y as f32 / self.dpi_factor);
                 }
-
                 WindowEvent::CursorEnter(entered) => self.mouse_inside = entered,
+
+                WindowEvent::Scroll(x, y) => {
+                    self.mouse_scroll = (
+                        self.mouse_scroll_length * x as f32,
+                        self.mouse_scroll_length * y as f32,
+                    )
+                }
 
                 WindowEvent::Size(width, height) => {
                     if HIDPI_AUTO {

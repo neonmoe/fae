@@ -5,7 +5,6 @@ discussion though, and I do check them, so consider this list a to-do.
 
 ### 0.3
 - Interface for events:
-  - Scroll
   - File drop
 - Mouse mode switching (ie. hovering, loading, etc.)
 
@@ -15,4 +14,5 @@ discussion though, and I do check them, so consider this list a to-do.
 - Write examples
 
 ### 0.5
+- Optimize rusttype based text rendering
 - Non-rusttype based fonts

@@ -40,6 +40,17 @@ pub struct Window {
     pub mouse_inside: bool,
     /// The mouse position inside the window. Arrangement: (x, y)
     pub mouse_coords: (f32, f32),
+    /// The mouse scroll amount during this frame, in pixels. If the
+    /// user supports pixel-perfect scrolling, this will be equal to
+    /// those pixel-perfect deltas. Otherwise, the polled scrolling
+    /// amounts will be multiplied with `mouse_scroll_length`. With
+    /// the default settings, this will usually result in bursts of
+    /// (0, -36) and (0, 36) during normal scrolling. Arrangement: (x,
+    /// y)
+    pub mouse_scroll: (f32, f32),
+    /// How many pixels one "notch" on the mouse scroll wheel should
+    /// scroll. (36 by default)
+    pub mouse_scroll_length: f32,
     /// The mouse buttons which are currently held down.
     pub mouse_held: Vec<Mouse>,
     /// The mouse buttons which were pressed down this frame.
@@ -147,6 +158,8 @@ impl Window {
 
             mouse_inside: false,
             mouse_coords: (0.0, 0.0),
+            mouse_scroll: (0.0, 0.0),
+            mouse_scroll_length: 36.0,
             mouse_held: Vec::new(),
             mouse_pressed: Vec::new(),
             mouse_released: Vec::new(),
@@ -170,13 +183,18 @@ impl Window {
         let typed_chars = &mut self.typed_chars;
         let mouse_coords = &mut self.mouse_coords;
         let mouse_inside = &mut self.mouse_inside;
+        let scroll = &mut self.mouse_scroll;
+        let scroll_length = self.mouse_scroll_length;
+
+        *scroll = (0.0, 0.0);
         typed_chars.clear();
 
         self.events_loop.poll_events(|event| {
             if let Event::WindowEvent { event, .. } = event {
                 match event {
-                    WindowEvent::CloseRequested => running = false,
+                    WindowEvent::CloseRequested | WindowEvent::Destroyed => running = false,
                     WindowEvent::Resized(logical_size) => resized_logical_size = Some(logical_size),
+
                     WindowEvent::KeyboardInput { input, .. } => {
                         let state = input.state;
                         if let Some(key) = input.virtual_keycode {
@@ -184,6 +202,7 @@ impl Window {
                         }
                     }
                     WindowEvent::ReceivedCharacter(c) => typed_chars.push(c),
+
                     WindowEvent::MouseInput { state, button, .. } => match button {
                         MouseButton::Left => mouse_inputs.push((Mouse::Left, state)),
                         MouseButton::Right => mouse_inputs.push((Mouse::Right, state)),
@@ -195,6 +214,12 @@ impl Window {
                     }
                     WindowEvent::CursorEntered { .. } => *mouse_inside = true,
                     WindowEvent::CursorLeft { .. } => *mouse_inside = false,
+                    WindowEvent::MouseWheel { delta, .. } => match delta {
+                        MouseScrollDelta::LineDelta(x, y) => {
+                            *scroll = (scroll_length * x, scroll_length * y)
+                        }
+                        MouseScrollDelta::PixelDelta(pos) => *scroll = (pos.x as f32, pos.y as f32),
+                    },
                     _ => {}
                 }
             }

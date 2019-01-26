@@ -34,6 +34,17 @@ pub struct Window {
     pub mouse_inside: bool,
     /// The mouse position inside the window. Arrangement: (x, y)
     pub mouse_coords: (f32, f32),
+    /// The mouse scroll amount during this frame, in pixels. If the
+    /// user supports pixel-perfect scrolling, this will be equal to
+    /// those pixel-perfect deltas. Otherwise, the polled scrolling
+    /// amounts will be multiplied with `mouse_scroll_length`. With
+    /// the default settings, this will usually result in bursts of
+    /// (0, -36) and (0, 36) during normal scrolling. Arrangement: (x,
+    /// y)
+    pub mouse_scroll: (f32, f32),
+    /// How many pixels one "notch" on the mouse scroll wheel should
+    /// scroll. (36 by default)
+    pub mouse_scroll_length: f32,
     /// The mouse buttons which are currently held down.
     pub mouse_held: Vec<Mouse>,
     /// The mouse buttons which were pressed down this frame.
