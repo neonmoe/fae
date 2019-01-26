@@ -1,6 +1,7 @@
 use crate::mouse::Mouse;
 use crate::renderer::Renderer;
 use std::error::Error;
+use std::path::PathBuf;
 
 pub use crate::window_settings::WindowSettings;
 
@@ -51,6 +52,12 @@ pub struct Window {
     pub mouse_pressed: Vec<Mouse>,
     /// The mouse buttons which were released this frame.
     pub mouse_released: Vec<Mouse>,
+
+    /// A list of files dropped on the window during this frame.
+    pub dropped_files: Vec<PathBuf>,
+    /// A list of files being currently hovered on the window. Does
+    /// not work if using the GLFW backend.
+    pub hovered_files: Vec<PathBuf>,
 }
 
 impl Window {

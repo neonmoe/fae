@@ -5,6 +5,7 @@ use glutin::dpi::*;
 use glutin::*;
 use std::env;
 use std::error::Error;
+use std::path::PathBuf;
 
 pub use crate::window_settings::WindowSettings;
 pub use glutin;
@@ -57,6 +58,12 @@ pub struct Window {
     pub mouse_pressed: Vec<Mouse>,
     /// The mouse buttons which were released this frame.
     pub mouse_released: Vec<Mouse>,
+
+    /// A list of files dropped on the window during this frame.
+    pub dropped_files: Vec<PathBuf>,
+    /// A list of files being currently hovered on the window. Does
+    /// not work if using the GLFW backend.
+    pub hovered_files: Vec<PathBuf>,
 }
 
 impl Window {
@@ -163,6 +170,9 @@ impl Window {
             mouse_held: Vec::new(),
             mouse_pressed: Vec::new(),
             mouse_released: Vec::new(),
+
+            dropped_files: Vec::new(),
+            hovered_files: Vec::new(),
         })
     }
 
@@ -185,9 +195,12 @@ impl Window {
         let mouse_inside = &mut self.mouse_inside;
         let scroll = &mut self.mouse_scroll;
         let scroll_length = self.mouse_scroll_length;
+        let dropped_files = &mut self.dropped_files;
+        let hovered_files = &mut self.hovered_files;
 
         *scroll = (0.0, 0.0);
         typed_chars.clear();
+        dropped_files.clear();
 
         self.events_loop.poll_events(|event| {
             if let Event::WindowEvent { event, .. } = event {
@@ -220,6 +233,23 @@ impl Window {
                         }
                         MouseScrollDelta::PixelDelta(pos) => *scroll = (pos.x as f32, pos.y as f32),
                     },
+
+                    WindowEvent::DroppedFile(path) => {
+                        for (i, hovered_path) in hovered_files.iter().enumerate() {
+                            if hovered_path == &path {
+                                hovered_files.remove(i);
+                                break;
+                            }
+                        }
+                        dropped_files.push(path);
+                    }
+                    WindowEvent::HoveredFile(path) => {
+                        hovered_files.push(path);
+                    }
+                    WindowEvent::HoveredFileCancelled => {
+                        hovered_files.clear();
+                    }
+
                     _ => {}
                 }
             }

@@ -4,6 +4,7 @@ use crate::renderer::Renderer;
 use glfw::{Action, ClientApiHint, Context, Key, MouseButton, WindowEvent, WindowHint};
 use std::env;
 use std::error::Error;
+use std::path::PathBuf;
 use std::sync::mpsc::Receiver;
 
 pub use crate::window_settings::WindowSettings;
@@ -62,6 +63,12 @@ pub struct Window {
     pub mouse_pressed: Vec<Mouse>,
     /// The mouse buttons which were released this frame.
     pub mouse_released: Vec<Mouse>,
+
+    /// A list of files dropped on the window during this frame.
+    pub dropped_files: Vec<PathBuf>,
+    /// A list of files being currently hovered on the window. Does
+    /// not work if using the GLFW backend.
+    pub hovered_files: Vec<PathBuf>,
 }
 
 impl Window {
@@ -193,6 +200,9 @@ impl Window {
             mouse_held: Vec::new(),
             mouse_pressed: Vec::new(),
             mouse_released: Vec::new(),
+
+            dropped_files: Vec::new(),
+            hovered_files: Vec::new(),
         })
     }
 
@@ -212,6 +222,7 @@ impl Window {
         self.released_keys.clear();
         self.typed_chars.clear();
         self.mouse_scroll = (0.0, 0.0);
+        self.dropped_files.clear();
 
         self.glfw.poll_events();
         for (_, event) in glfw::flush_messages(&self.events) {
@@ -273,6 +284,8 @@ impl Window {
                         self.mouse_scroll_length * y as f32,
                     )
                 }
+
+                WindowEvent::FileDrop(paths) => self.dropped_files = paths,
 
                 WindowEvent::Size(width, height) => {
                     if HIDPI_AUTO {

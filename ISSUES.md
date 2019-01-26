@@ -4,8 +4,6 @@ Gitea), and it's easier for me to modify. GitHub issues are good for
 discussion though, and I do check them, so consider this list a to-do.
 
 ### 0.3
-- Interface for events:
-  - File drop
 - Mouse mode switching (ie. hovering, loading, etc.)
 
 ### 0.4
