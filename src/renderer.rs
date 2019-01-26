@@ -733,7 +733,9 @@ fn create_program(vert_source: &str, frag_source: &str, legacy: bool) -> ShaderP
                 shader_type,
                 String::from_utf8_lossy(&mem::transmute::<[i8; 1024], [u8; 1024]>(info)[..])
             );
-            debug_assert!(false, "{}", error_msg);
+            if cfg!(debug_assertions) {
+                panic!("{}", error_msg);
+            }
             eprintln!("{}", error_msg);
         }
     };
@@ -778,7 +780,9 @@ fn create_program(vert_source: &str, frag_source: &str, legacy: bool) -> ShaderP
                 "Program linking failed:\n{}",
                 String::from_utf8_lossy(&mem::transmute::<[i8; 1024], [u8; 1024]>(info)[..])
             );
-            debug_assert!(false, "{}", error_msg);
+            if cfg!(debug_assertions) {
+                panic!("{}", error_msg);
+            }
             eprintln!("{}", error_msg);
         }
         print_gl_errors("after shader program creation");
@@ -974,7 +978,9 @@ fn print_gl_errors(context: &str) {
     let mut error = unsafe { gl::GetError() };
     while error != gl::NO_ERROR {
         let error_msg = format!("GL error {}: {}", context, gl_error_to_string(error));
-        debug_assert!(false, "{}", error_msg);
+        if cfg!(debug_assertions) {
+            panic!("{}", error_msg);
+        }
         eprintln!("{}", error_msg);
         error = unsafe { gl::GetError() };
     }
@@ -997,7 +1003,7 @@ fn gl_error_to_string(error: GLuint) -> String {
 
 use std::borrow::Cow;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 struct Profiler {
     should_profile: bool,
 }

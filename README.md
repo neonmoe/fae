@@ -25,14 +25,6 @@ mostly so I don't have to come up with another name :)
   - Linux executables based on **glfw** are considerably smaller than
     **glutin** ones (1.1MB vs 2.5MB, stripped and built with
     `--release`). This is the motivation for why this feature exists.
-  - Glutin does some scaling (the DPI factor) based on your monitor's
-    physical size [citation needed]. GLFW does not do any HiDPI
-    scaling on Linux by itself, so when using GLFW, this crate sets
-    the scaling factor to the first non-0 of these env variables:
-    - `QT_AUTO_SCREEN_SCALE_FACTOR`
-    - `QT_SCALE_FACTOR`
-    - `GDK_SCALE`
-    - `ELM_SCALE`
   - With a small amount of testing, it seems that GLFW is consumes
     slightly more CPU time.
   - All that said, the HiDPI support in GLFW is overall very spotty
@@ -52,6 +44,22 @@ mostly so I don't have to come up with another name :)
   allows you to load images from PNG data. This is a very convenient
   feature, but not necessarily a requirement for using the crate, so
   it's optional.
+
+## Glfw notes
+The GLFW feature exists as an option since the examples built with it
+are about 0.5x the size of the executables built with glutin (on
+Linux, Windows has no benefit and I don't think macOS has either), but
+I wouldn't recommend it. Glutin is better in almost all ways: better
+HiDPI support, less CPU utilization, and it's written in Rust.
+
+Since GLFW does not do any HiDPI scaling on Linux by itself, this
+crate sets the scaling factor to the first non-0 of these env
+variables:
+- `QT_AUTO_SCREEN_SCALE_FACTOR`
+- `QT_SCALE_FACTOR`
+- `GDK_SCALE`
+- `ELM_SCALE`
+
 
 ## Notes
 - You can force the crate to use an OpenGL 2.1 context by setting the
