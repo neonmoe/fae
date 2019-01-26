@@ -1,7 +1,7 @@
 use crate::gl;
 use crate::mouse::Mouse;
 use crate::renderer::Renderer;
-use glfw::{Action, ClientApiHint, Context, Key, MouseButton, WindowEvent, WindowHint};
+use glfw::*;
 use std::env;
 use std::error::Error;
 use std::path::PathBuf;
@@ -204,6 +204,13 @@ impl Window {
             dropped_files: Vec::new(),
             hovered_files: Vec::new(),
         })
+    }
+
+    /// Sets the cursor graphic to the provided one. NOTE: This
+    /// function has a different signature in Glutin and Glfw, so take
+    /// that into account when using this.
+    pub fn set_cursor(&mut self, cursor: StandardCursor) {
+        self.glfw_window.set_cursor(Some(Cursor::standard(cursor)));
     }
 
     /// Updates the window (swaps the front and back buffers)

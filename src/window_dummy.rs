@@ -70,6 +70,14 @@ impl Window {
         Err(Box::new(WindowCreationError))
     }
 
+    /// Sets the cursor graphic to the provided one. NOTE: This
+    /// function has a different signature in Glutin and Glfw, so take
+    /// that into account when using this. `cursor`'s type is
+    /// glutin::MouseCursor or glfw::StandardCursor depending on your
+    /// features.
+    #[allow(unused_variables)]
+    pub fn set_cursor(&mut self, cursor: u32) {}
+
     /// Updates the window (swaps the front and back buffers)
     #[allow(unused_variables)]
     pub fn swap_buffers(&mut self, renderer: &Renderer) {}

@@ -176,6 +176,13 @@ impl Window {
         })
     }
 
+    /// Sets the cursor graphic to the provided one. NOTE: This
+    /// function has a different signature in Glutin and Glfw, so take
+    /// that into account when using this.
+    pub fn set_cursor(&self, cursor: MouseCursor) {
+        self.gl_window.set_cursor(cursor);
+    }
+
     /// Updates the window (swaps the front and back buffers)
     pub fn swap_buffers(&mut self, renderer: &Renderer) {
         let _ = self.gl_window.swap_buffers();

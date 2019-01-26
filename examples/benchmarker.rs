@@ -128,6 +128,10 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
         }
 
+        let (mx, my) = window.mouse_coords;
+        let over_text = mx > 200.0 && mx < 340.0 && my > 25.0 && my < 100.0;
+        set_cursor_over_text(&mut window, over_text);
+
         renderer.set_profiling(window.pressed_keys.contains(&keys::PROFILE));
 
         let time = Instant::now() - start;
@@ -292,6 +296,29 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     Ok(())
 }
+
+#[cfg(feature = "glutin")]
+fn set_cursor_over_text(window: &Window, over_text: bool) {
+    use fae::window::glutin::MouseCursor;
+    window.set_cursor(if over_text {
+        MouseCursor::Text
+    } else {
+        MouseCursor::Default
+    });
+}
+
+#[cfg(feature = "glfw")]
+fn set_cursor_over_text(window: &mut Window, over_text: bool) {
+    use fae::window::glfw::StandardCursor;
+    window.set_cursor(if over_text {
+        StandardCursor::IBeam
+    } else {
+        StandardCursor::Arrow
+    });
+}
+
+#[cfg(not(any(feature = "glutin", feature = "glfw")))]
+fn set_cursor_over_text(_window: &Window, _over_text: bool) {}
 
 #[cfg(feature = "flame")]
 fn dump_profiling_data() {
