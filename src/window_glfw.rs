@@ -1,3 +1,42 @@
+//! This is mostly just explaining what's happening behind the scenes (in
+//! case you need to know to debug something), if you use the `window`
+//! mod, your programs should be automatically HiDPI aware and work
+//! without any additional work. Just remember that the pixels you're
+//! working in while using this crate are *logical pixels*, not physical
+//! pixels. That means that a 640x480 window is actually 1280x960 physical
+//! pixels if you're running on a Retina/HiDPI monitor with 2x scaling,
+//! and all your rendering is scaled accordingly.
+//!
+//! On Windows and macOS, window scaling is done as you'd expect out of a
+//! HiDPI aware program. On Linux, it's different for x11 and
+//! wayland. Here's how glutin and glfw handle the situations:
+//! - Glutin + x11: Glutin will scale the window according to the screen's
+//!   actual DPI, resulting in pretty good results across low- and
+//!   high-dpi screens.
+//! - Glfw + x11: Glfw does not scale anything, but fae manually applies
+//!   the multiplier mentioned below.
+//! - Glutin + wayland: Glutin will scale the window according to the
+//!   scale factor reported by the Wayland environment. But because
+//!   Xwayland windows look bad when scaled (they're just stretched), my
+//!   Wayland setup has the scale set to 1. Because of this, fae applies
+//!   the multiplier below as well. So if your Wayland environment has
+//!   scale set to 2, and your GDK_SCALE is 2, your fae application will
+//!   render at 4x. This behavior seems the most consistent with other
+//!   applications I happen to use, if you have other suggestions, I'm
+//!   open to discussion.
+//! - Glfw + wayland: Glfw will run in Xwayland, and so it'll very
+//!   probably be scaled by your WM as well as the environment variables
+//!   below. This should be consistent with Glutin+wayland behavior,
+//!   except that the wayland scaling factor is applied by the WM, so the
+//!   result will be blurry for scaling factors greater than 1.
+//!
+//! Environment variables that will be considered multipliers for the dpi
+//! factor on Glfw and Glutin+wayland (the first non-0 is used):
+//! - `QT_AUTO_SCREEN_SCALE_FACTOR`
+//! - `QT_SCALE_FACTOR`
+//! - `GDK_SCALE`
+//! - `ELM_SCALE`
+
 use crate::gl;
 use crate::mouse::Mouse;
 use crate::renderer::Renderer;
@@ -7,7 +46,7 @@ use std::error::Error;
 use std::path::PathBuf;
 use std::sync::mpsc::Receiver;
 
-pub use crate::window_settings::WindowSettings;
+pub use crate::window_util::*;
 pub use glfw;
 
 const HIDPI_AUTO: bool = cfg!(any(target_os = "windows", target_os = "macos"));
@@ -329,28 +368,6 @@ impl Window {
 
         !self.glfw_window.should_close()
     }
-}
-
-fn get_env_dpi() -> f32 {
-    let get_var = |name: &str| {
-        env::var(name)
-            .ok()
-            .and_then(|var| var.parse::<f32>().ok())
-            .filter(|f| *f > 0.0)
-    };
-    if let Some(dpi_factor) = get_var("QT_AUTO_SCREEN_SCALE_FACTOR") {
-        return dpi_factor;
-    }
-    if let Some(dpi_factor) = get_var("QT_SCALE_FACTOR") {
-        return dpi_factor;
-    }
-    if let Some(dpi_factor) = get_var("GDK_SCALE") {
-        return dpi_factor;
-    }
-    if let Some(dpi_factor) = get_var("ELM_SCALE") {
-        return dpi_factor;
-    }
-    return 1.0;
 }
 
 #[derive(Debug, Clone)]

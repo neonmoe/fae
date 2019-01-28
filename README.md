@@ -42,15 +42,6 @@ Linux, Windows has no benefit and I don't think macOS has either), but
 I wouldn't recommend it. Glutin is better in almost all ways: better
 HiDPI support, less CPU utilization, and it's written in Rust.
 
-Since GLFW does not do any HiDPI scaling on Linux by itself, this
-crate sets the scaling factor to the first non-0 of these env
-variables:
-- `QT_AUTO_SCREEN_SCALE_FACTOR`
-- `QT_SCALE_FACTOR`
-- `GDK_SCALE`
-- `ELM_SCALE`
-
-
 ## Notes
 - You can force the crate to use an OpenGL 2.1 context by setting the
   `FAE_OPENGL_LEGACY` environment variable. This is intended for

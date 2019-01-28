@@ -20,7 +20,7 @@ pub use crate::image::Image;
 pub mod text;
 
 mod mouse;
-mod window_settings;
+mod window_util;
 
 #[cfg(feature = "glfw")]
 mod window_glfw;

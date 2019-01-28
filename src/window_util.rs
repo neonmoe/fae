@@ -1,6 +1,29 @@
 use std::default::Default;
 use std::env;
 
+#[allow(dead_code)]
+pub(crate) fn get_env_dpi() -> f32 {
+    let get_var = |name: &str| {
+        env::var(name)
+            .ok()
+            .and_then(|var| var.parse::<f32>().ok())
+            .filter(|f| *f > 0.0)
+    };
+    if let Some(dpi_factor) = get_var("QT_AUTO_SCREEN_SCALE_FACTOR") {
+        return dpi_factor;
+    }
+    if let Some(dpi_factor) = get_var("QT_SCALE_FACTOR") {
+        return dpi_factor;
+    }
+    if let Some(dpi_factor) = get_var("GDK_SCALE") {
+        return dpi_factor;
+    }
+    if let Some(dpi_factor) = get_var("ELM_SCALE") {
+        return dpi_factor;
+    }
+    return 1.0;
+}
+
 /// Defines a window.
 pub struct WindowSettings {
     /// Title of the window. Default value: Name of the executable file
