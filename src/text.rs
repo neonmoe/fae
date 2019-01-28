@@ -1,7 +1,8 @@
+// TODO: Move text processing from draw_text to compose_draw_call
 use crate::gl;
 use crate::gl::types::*;
 use crate::image::Image;
-use crate::renderer::{DrawCallParameters, Renderer, Shaders};
+use crate::renderer::{DrawCallHandle, DrawCallParameters, Renderer, Shaders};
 use rusttype::gpu_cache::Cache;
 use rusttype::*;
 use std::cell::RefCell;
@@ -47,7 +48,7 @@ pub struct TextRenderer {
     cache: RefCell<Cache<'static>>,
     cached_text: Vec<TextRender>,
     dpi_factor: f32,
-    draw_call: usize,
+    draw_call: DrawCallHandle,
 }
 
 impl TextRenderer {
@@ -238,7 +239,7 @@ impl TextRenderer {
     pub fn compose_draw_call(&mut self, renderer: &mut Renderer) {
         let &mut TextRenderer {
             dpi_factor,
-            draw_call,
+            ref draw_call,
             ..
         } = self;
         let mut cache = self.cache.borrow_mut();
@@ -293,13 +294,13 @@ impl TextRenderer {
                     let texcoords = (uv_rect.min.x, uv_rect.min.y, uv_rect.max.x, uv_rect.max.y);
                     if clipped {
                         renderer.draw_quad_clipped(
+                            clip_coords,
                             coords,
                             texcoords,
                             (0.0, 0.0, 0.0, 1.0),
                             (0.0, 0.0, 0.0),
                             z,
                             draw_call,
-                            clip_coords,
                         );
                     } else {
                         renderer.draw_quad(

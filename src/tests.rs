@@ -13,7 +13,7 @@ fn bench_draw_100k_quads(b: &mut Bencher) {
                 (1.0, 1.0, 0.5, 1.0),
                 (28.0, 5.0, 5.0),
                 0.0,
-                draw_call,
+                &draw_call,
             );
         }
         renderer.flush();
@@ -31,7 +31,7 @@ fn bench_draw_quad(b: &mut Bencher) {
             (1.0, 1.0, 0.5, 1.0),
             (28.0, 5.0, 5.0),
             0.0,
-            draw_call,
+            &draw_call,
         );
         renderer.flush();
     });
@@ -48,7 +48,7 @@ fn bench_draw_quad_legacy(b: &mut Bencher) {
             (1.0, 1.0, 0.5, 1.0),
             (28.0, 5.0, 5.0),
             0.0,
-            draw_call,
+            &draw_call,
         );
         renderer.flush();
     });
@@ -66,7 +66,7 @@ fn bench_draw_quad_ninepatch(b: &mut Bencher) {
             (1.0, 1.0, 0.5, 1.0),
             (28.0, 5.0, 5.0),
             0.0,
-            draw_call,
+            &draw_call,
         );
         renderer.flush();
     });

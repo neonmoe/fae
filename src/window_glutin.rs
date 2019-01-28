@@ -49,7 +49,7 @@ use std::path::PathBuf;
 pub use crate::window_util::*;
 pub use glutin;
 
-/// Manages the window and propagates events to the UI system.
+/// Wrapper for a Glutin/Glfw window.
 pub struct Window {
     /// The width of the window.
     pub width: f32,
@@ -226,15 +226,19 @@ impl Window {
         self.gl_window.set_cursor(cursor);
     }
 
-    /// Updates the window (swaps the front and back buffers)
-    pub fn swap_buffers(&mut self, renderer: &Renderer) {
+    /// Updates the window (swaps the front and back buffers). The
+    /// renderer handle is used for a CPU/GPU synchronization call, so
+    /// while it is optional, it's definitely recommended. If vsync is
+    /// enabled, this function will hang until the next frame.
+    pub fn swap_buffers(&mut self, renderer: Option<&Renderer>) {
         let _ = self.gl_window.swap_buffers();
-        renderer.synchronize();
+        if let Some(renderer) = renderer {
+            renderer.synchronize();
+        }
     }
 
     /// Polls for new events. Returns whether the user has requested
-    /// the window to be closed. **Note**: Because of vsync, this
-    /// function will hang for a while (usually 16ms at max).
+    /// the window to be closed.
     pub fn refresh(&mut self) -> bool {
         let mut running = true;
         let mut resized_logical_size = None;

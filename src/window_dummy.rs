@@ -44,7 +44,7 @@ use std::path::PathBuf;
 
 pub use crate::window_util::WindowSettings;
 
-/// Manages the window and propagates events to the UI system.
+/// Wrapper for a Glutin/Glfw window.
 pub struct Window {
     /// The width of the window.
     pub width: f32,
@@ -112,18 +112,20 @@ impl Window {
     /// Sets the cursor graphic to the provided one. NOTE: This
     /// function has a different signature in Glutin and Glfw, so take
     /// that into account when using this. `cursor`'s type is
-    /// glutin::MouseCursor or glfw::StandardCursor depending on your
-    /// features.
+    /// `glutin::MouseCursor` or `glfw::StandardCursor` depending on
+    /// your features.
     #[allow(unused_variables)]
     pub fn set_cursor(&mut self, cursor: u32) {}
 
-    /// Updates the window (swaps the front and back buffers)
+    /// Updates the window (swaps the front and back buffers). The
+    /// renderer handle is used for a CPU/GPU synchronization call, so
+    /// while it is optional, it's definitely recommended. If vsync is
+    /// enabled, this function will hang until the next frame.
     #[allow(unused_variables)]
-    pub fn swap_buffers(&mut self, renderer: &Renderer) {}
+    pub fn swap_buffers(&mut self, renderer: Option<&Renderer>) {}
 
     /// Polls for new events. Returns whether the user has requested
-    /// the window to be closed. **Note**: Because of vsync, this
-    /// function will hang for a while (usually 16ms at max).
+    /// the window to be closed.
     pub fn refresh(&mut self) -> bool {
         false
     }

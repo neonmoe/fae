@@ -145,7 +145,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             (1.0, 1.0, 1.0, 1.0),
             (0.0, 0.0, 0.0),
             0.6,
-            call,
+            &call,
         );
         // Draw a tinted sprite
         for i in 0..quad_count {
@@ -158,7 +158,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 (1.0, 0.7, 0.9, 1.0),
                 (-time * 1.5, 50.0, 50.0),
                 f - 0.5,
-                call,
+                &call,
             );
         }
         timers["quad calls"][timer_index].end();
@@ -278,7 +278,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         renderer.render(window.width, window.height);
         timers["opengl"][timer_index].end();
         timers["swap buffers"][timer_index].start();
-        window.swap_buffers(&renderer);
+        window.swap_buffers(Some(&renderer));
         timers["swap buffers"][timer_index].end();
 
         timers["application frame"][timer_index].end();

@@ -31,6 +31,11 @@ type TextureHandle = GLuint;
 type VBOHandle = GLuint;
 type VAOHandle = GLuint;
 
+/// A handle with which you can draw during a specific draw
+/// call. Created during [`Renderer::create_draw_call`], used during
+/// [`Renderer::draw_quad`] and its variations.
+pub struct DrawCallHandle(usize);
+
 /// Represents the shader code for a shader. Used in
 /// [`Renderer::create_draw_call`].
 #[derive(Clone, Copy, Debug)]
@@ -203,7 +208,7 @@ impl Renderer {
     /// with the `shaders` parameter. Use `None` for defaults. Make
     /// sure to study the uniform variables and attributes of the
     /// default shaders before making your own.
-    pub fn create_draw_call(&mut self, params: DrawCallParameters) -> usize {
+    pub fn create_draw_call(&mut self, params: DrawCallParameters) -> DrawCallHandle {
         self.gl_push();
 
         let shaders = params.shaders.unwrap_or(DEFAULT_QUAD_SHADERS);
@@ -240,11 +245,11 @@ impl Renderer {
         }
 
         self.gl_pop();
-        index
+        DrawCallHandle(index)
     }
 
     #[allow(dead_code)]
-    pub(crate) fn create_dummy_draw_call(&mut self) -> usize {
+    pub(crate) fn create_dummy_draw_call(&mut self) -> DrawCallHandle {
         let index = self.calls.len();
         self.calls.push(DrawCall {
             texture: 0,
@@ -272,7 +277,7 @@ impl Renderer {
             blend: false,
             lowest_depth: 1.0,
         });
-        index
+        DrawCallHandle(index)
     }
 
     /// Draws a rectangle with a ninepatch texture on the screen. This
@@ -298,7 +303,7 @@ impl Renderer {
         color: (f32, f32, f32, f32),
         rotation: (f32, f32, f32),
         z: f32,
-        call_index: usize,
+        call_handle: &DrawCallHandle,
     ) {
         let ((w0, w1, w2), (h0, h1, h2)) = ninepatch_dimensions;
         let (x0, y0, x1, y1) = coords;
@@ -331,7 +336,7 @@ impl Renderer {
                 color,
                 (rads, rx - x0[xi], ry - y0[yi]),
                 z,
-                call_index,
+                call_handle,
             );
         }
     }
@@ -347,13 +352,13 @@ impl Renderer {
     #[allow(clippy::too_many_arguments)]
     pub fn draw_quad_clipped(
         &mut self,
+        clip_area: (f32, f32, f32, f32),
         coords: (f32, f32, f32, f32),
         texcoords: (f32, f32, f32, f32),
         color: (f32, f32, f32, f32),
         rotation: (f32, f32, f32),
         z: f32,
-        call_index: usize,
-        clip_area: (f32, f32, f32, f32),
+        call_handle: &DrawCallHandle,
     ) {
         let (cx0, cy0, cx1, cy1) = clip_area; // Clip coords
         let (ox0, oy0, ox1, oy1) = coords; // Original coords
@@ -377,7 +382,7 @@ impl Renderer {
             ty1.min(ty1 + th * (y1 - oy1) / oh),
         );
 
-        self.draw_quad((x0, y0, x1, y1), texcoords, color, rotation, z, call_index);
+        self.draw_quad((x0, y0, x1, y1), texcoords, color, rotation, z, call_handle);
     }
 
     /// Draws a tinted rectangle on the screen, without any texturing.
@@ -391,7 +396,7 @@ impl Renderer {
         color: (f32, f32, f32, f32),
         rotation: (f32, f32, f32),
         z: f32,
-        call_index: usize,
+        call_handle: &DrawCallHandle,
     ) {
         self.draw_quad(
             coords,
@@ -399,7 +404,7 @@ impl Renderer {
             color,
             rotation,
             z,
-            call_index,
+            call_handle,
         );
     }
 
@@ -423,7 +428,7 @@ impl Renderer {
     /// - `depth`: Used for ordering sprites on screen, in the range
     /// `-1.0 - 1.0`. Negative values are in front.
     ///
-    /// - `call_index`: The index of the draw call to draw the quad
+    /// - `call_handle`: The index of the draw call to draw the quad
     /// in. This is the returned value from [`Renderer::create_draw_call`].
     #[inline]
     pub fn draw_quad(
@@ -433,14 +438,14 @@ impl Renderer {
         color: (f32, f32, f32, f32),
         rotation: (f32, f32, f32),
         depth: f32,
-        call_index: usize,
+        call_handle: &DrawCallHandle,
     ) {
         let (x0, y0, x1, y1) = coords;
         let (tx0, ty0, tx1, ty1) = texcoords;
         let (red, green, blue, alpha) = color;
         let (rads, pivot_x, pivot_y) = rotation;
 
-        self.calls[call_index].lowest_depth = self.calls[call_index].lowest_depth.min(depth);
+        self.calls[call_handle.0].lowest_depth = self.calls[call_handle.0].lowest_depth.min(depth);
         if self.gl_state.legacy {
             let (pivot_x, pivot_y) = (pivot_x + x0, pivot_y + y0);
 
@@ -458,7 +463,7 @@ impl Renderer {
                 blue, alpha, rads, pivot_x, pivot_y,
             ];
 
-            self.calls[call_index]
+            self.calls[call_handle.0]
                 .attributes
                 .vbo_data
                 .extend_from_slice(&quad);
@@ -468,7 +473,7 @@ impl Renderer {
                 x0, y0, width, height, tx0, ty0, tw, th, red, green, blue, alpha, rads, pivot_x,
                 pivot_y, depth,
             ];
-            self.calls[call_index]
+            self.calls[call_handle.0]
                 .attributes
                 .vbo_data
                 .extend_from_slice(&quad);
@@ -678,11 +683,11 @@ impl Renderer {
         }
     }
 
-    /// Returns the OpenGL texture handle for the texture used by draw
-    /// call `index`.
+    /// Returns the OpenGL texture handle for the texture used by the
+    /// draw call.
     #[cfg(feature = "text")]
-    pub(crate) fn get_texture(&self, index: usize) -> GLuint {
-        self.calls[index].texture
+    pub(crate) fn get_texture(&self, call_handle: &DrawCallHandle) -> GLuint {
+        self.calls[call_handle.0].texture
     }
 
     /// Saves the current OpenGL state for [`Renderer::gl_pop`] and

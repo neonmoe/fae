@@ -4,7 +4,6 @@ Gitea), and it's easier for me to modify. GitHub issues are good for
 discussion though, and I do check them, so consider this list a to-do.
 
 ### 0.4
-- Design a more pleasant API
 - Write documentation
 - Write examples
 
