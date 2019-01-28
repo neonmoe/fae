@@ -1,4 +1,25 @@
-//! This module does the OpenGL stuff.
+//! The rendering module.
+//!
+//! This module is responsible for the actual drawing procedures,
+//! written in OpenGL. Usage in general terms:
+//! - Create a window and load the OpenGL functions with
+//!   `gl::load_with`.
+//! - Create draw calls for each texture you want to use.
+//! - Draw with [`Renderer::draw_quad`](struct.Renderer.html#method.draw_quad)
+//!   and similar functions using the draw call index to use specific
+//!   textures.
+//!
+//! ## Optimization tips
+//! - Try to define different Z coordinates for your elements, and
+//!   draw the ones in front first. This way you'll avoid rendering
+//!   over already drawn pixels. If you're rendering *lots* of sprites,
+//!   this is a good place to start optimizing.
+//! - If possible, make your textures without using alpha values
+//!   between 1 and 0 (ie. use only 100% and 0% opacity), and disable
+//!   `alpha_blending` in your draw call.
+//! - If this crate is the only place where OpenGL calls are made, or
+//!   if you're handling OpenGL state properly yourself, set your
+//!   [`Renderer`](struct.Renderer.html)'s `preserve_gl_state` to false.
 
 use crate::gl;
 use crate::gl::types::*;
@@ -10,7 +31,8 @@ type TextureHandle = GLuint;
 type VBOHandle = GLuint;
 type VAOHandle = GLuint;
 
-/// Represents the shader code for a shader. Used in [`Renderer::create_draw_call`].
+/// Represents the shader code for a shader. Used in
+/// [`Renderer::create_draw_call`].
 #[derive(Clone, Copy, Debug)]
 pub struct Shaders {
     /// The GLSL 3.30 version of the vertex shader. Ensure that the
@@ -57,6 +79,8 @@ struct DrawCall {
     texture: TextureHandle,
     program: ShaderProgram,
     attributes: Attributes,
+    blend: bool,
+    lowest_depth: f32,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -68,6 +92,7 @@ struct OpenGLState {
     // alongside it.
     pushed: bool,
     depth_test: bool,
+    depth_func: GLint,
     blend: bool,
     blend_func: (GLint, GLint),
     program: GLint,
@@ -84,14 +109,32 @@ pub struct Renderer {
     calls: Vec<DrawCall>,
     gl_state: OpenGLState,
     profiler: Profiler,
-    preserve_gl_state: bool,
+    /// Whether the Renderer should try to preserve the OpenGL
+    /// state. If you're not using OpenGL yourself, set this to
+    /// `false` for less overhead.
+    pub preserve_gl_state: bool,
 }
 
+/// Options which set capabilities, restrictions and resources for
+/// draw calls. Used in [`Renderer::create_draw_call`].
 #[derive(Debug, Clone)]
 pub struct DrawCallParameters {
+    /// The texture used when drawing with this draw call.
     pub image: Option<Image>,
+    /// The shaders used when drawing with this draw call.
     pub shaders: Option<Shaders>,
+    /// Whether to blend with previously drawn pixels when drawing
+    /// over them, or just replace the color. (In OpenGL terms:
+    /// whether GL_BLEND is enabled.)
+    pub alpha_blending: bool,
+    /// When drawing quads that are smaller than the texture provided,
+    /// use linear (true) or nearest neighbor (false) smoothing when
+    /// scaling? (Linear is probably always better.)
     pub minification_smoothing: bool,
+    /// When drawing quads that are larger than the texture provided,
+    /// use linear (true) or nearest neighbor (false) smoothing when
+    /// scaling? (Tip: for pixel art or other textures that don't
+    /// suffer from jaggies, set this to false for the intended look.)
     pub magnification_smoothing: bool,
 }
 
@@ -100,6 +143,7 @@ impl Default for DrawCallParameters {
         DrawCallParameters {
             image: None,
             shaders: None,
+            alpha_blending: true,
             minification_smoothing: true,
             magnification_smoothing: false,
         }
@@ -107,20 +151,21 @@ impl Default for DrawCallParameters {
 }
 
 impl Renderer {
-    /// Create a new UI rendering system. This must be done after window
-    /// and context creation, but before any drawing calls.
+    /// Creates a new Renderer.
     ///
     /// `opengl21` disables some post-OpenGL 2.1 functionality, like
-    /// VAOs. Ideally this should be `false` in all cases where the OpenGL
-    /// version is >=3.0 (or OpenGL ES >=3) to allow for more optimized
+    /// VAOs, instanced rendering, and indexed rendering. Ideally this
+    /// should be `false` in all cases where the OpenGL version is
+    /// \>=3.3 (or OpenGL ES >=3) to allow for more optimized
     /// rendering.
-    pub fn create(opengl21: bool) -> Renderer {
+    pub fn new(opengl21: bool) -> Renderer {
         Renderer {
             calls: Vec::with_capacity(2),
             gl_state: OpenGLState {
                 legacy: opengl21,
                 pushed: false,
                 depth_test: false,
+                depth_func: 0,
                 blend: false,
                 blend_func: (0, 0),
                 program: 0,
@@ -134,18 +179,25 @@ impl Renderer {
         }
     }
 
-    pub fn set_preserve_gl_state(&mut self, preserve_gl_state: bool) {
-        self.preserve_gl_state = preserve_gl_state;
-    }
-
+    /// Toggles whether profiling is enabled.
+    ///
+    /// Profiling is done using the optional `flame` crate, if it
+    /// isn't enabled, this does nothing. If it is, when profiling is
+    /// enabled, the renderer will notify `flame` of specific regions
+    /// of code to quickly see where time is going during
+    /// rendering. Because flame doesn't fold sections with similar
+    /// names together (at the time of writing), it's recommended to
+    /// only enable profiling for singular frames at a time.
     pub fn set_profiling(&mut self, should_profile: bool) {
         self.profiler.should_profile = should_profile;
     }
 
     /// Creates a new draw call in the pipeline, and returns its
-    /// index. Using the index, you can call [`Renderer::draw_quad`]
-    /// to draw sprites from your image. As a rule of thumb, try to
-    /// minimize the amount of draw calls.
+    /// index.
+    ///
+    /// Using the index, you can call [`Renderer::draw_quad`] to draw
+    /// sprites from your image. As a rule of thumb, try to minimize
+    /// the amount of draw calls.
     ///
     /// If you want to use your own GLSL shaders, you can provide them
     /// with the `shaders` parameter. Use `None` for defaults. Make
@@ -173,6 +225,8 @@ impl Renderer {
             texture,
             program,
             attributes,
+            blend: params.alpha_blending,
+            lowest_depth: 1.0,
         });
 
         if let Some(image) = params.image {
@@ -215,6 +269,8 @@ impl Renderer {
                 vbo_data: Vec::new(),
                 allocated_vbo_data_size: 0,
             },
+            blend: false,
+            lowest_depth: 1.0,
         });
         index
     }
@@ -234,18 +290,20 @@ impl Renderer {
     ///
     /// See [`Renderer::draw_quad`] for the rest of the parameters'
     /// docs.
-    // TODO: Add rotation parameter
     pub fn draw_quad_ninepatch(
         &mut self,
         ninepatch_dimensions: ((f32, f32, f32), (f32, f32, f32)),
         coords: (f32, f32, f32, f32),
         texcoords: (f32, f32, f32, f32),
         color: (f32, f32, f32, f32),
+        rotation: (f32, f32, f32),
         z: f32,
         call_index: usize,
     ) {
         let ((w0, w1, w2), (h0, h1, h2)) = ninepatch_dimensions;
         let (x0, y0, x1, y1) = coords;
+        let (rads, rx, ry) = rotation;
+        let (rx, ry) = (rx + x0, ry + y0);
         let (tx0, ty0, tx1, ty1) = texcoords;
         let (tex_w, tex_h) = (tx1 - tx0, ty1 - ty0);
         let (total_w, total_h) = (w0 + w1 + w2, h0 + h1 + h2);
@@ -271,7 +329,7 @@ impl Renderer {
                 (x0[xi], y0[yi], x1[xi], y1[yi]),
                 (tx0[xi], ty0[yi], tx1[xi], ty1[yi]),
                 color,
-                (0.0, 0.0, 0.0),
+                (rads, rx - x0[xi], ry - y0[yi]),
                 z,
                 call_index,
             );
@@ -350,27 +408,20 @@ impl Renderer {
     /// - `coords`: The coordinates of the corners of the quad, in
     /// (logical) pixels. Arrangement: (left, top, right, bottom)
     ///
-    /// - `texcoords`: The texture coordinates (UVs) of the quad, in the
-    /// range 0.0 - 1.0. Same arrangement as `coords`.
+    /// - `texcoords`: The texture coordinates (UVs) of the quad, in
+    /// the range `0.0 - 1.0`. The shaders will not use the texture at
+    /// all if the texcoords are all `-1.0`. Same arrangement as
+    /// `coords`.
     ///
     /// - `color`: The color tint of the quad, in the range
-    /// 0-255. Arrangement: (red, green, blue, alpha)
+    /// `0-255`. Arrangement: (red, green, blue, alpha)
     ///
     /// - `rotation`: The rotation of the quad, in radians, and the
     /// point (relative to `coords` x and y, in logical pixels as well)
     /// around which the sprite pivots. Arrangement: (radians, x, y)
     ///
-    /// - `z`: Used for ordering sprites on screen, in the range `-1.0
-    /// - 1.0`. Positive values are in front. TIP: If you're drawing
-    /// *lots* of quads on top of each other, ensure that their z
-    /// coordinates are set properly to layer them as you want,
-    /// instead of trusting the drawing order. This has two benefits:
-    /// explicitly stating the z coordinate is overall more robust,
-    /// and you might get very big performance gains because OpenGL
-    /// can detect that some of the pixels can't be seen! Case in
-    /// point: there's a commented bit in the `benchmarker` example
-    /// that does exactly this, and it bumps up the maximum amount of
-    /// quads @144Hz from 2048 to 32768.
+    /// - `depth`: Used for ordering sprites on screen, in the range
+    /// `-1.0 - 1.0`. Negative values are in front.
     ///
     /// - `call_index`: The index of the draw call to draw the quad
     /// in. This is the returned value from [`Renderer::create_draw_call`].
@@ -389,6 +440,7 @@ impl Renderer {
         let (red, green, blue, alpha) = color;
         let (rads, pivot_x, pivot_y) = rotation;
 
+        self.calls[call_index].lowest_depth = self.calls[call_index].lowest_depth.min(depth);
         if self.gl_state.legacy {
             let (pivot_x, pivot_y) = (pivot_x + x0, pivot_y + y0);
 
@@ -423,13 +475,19 @@ impl Renderer {
         }
     }
 
-    /// Clears all queued draws.
+    /// Clears all queued draws. Like a dummy-version of [`Renderer::render`].
     pub fn flush(&mut self) {
         for call in self.calls.iter_mut() {
             call.attributes.vbo_data.clear();
         }
     }
 
+    /// Renders all currently queued draws.
+    ///
+    /// First the non-alpha-blended calls, front to back, then the
+    /// alpha-blended ones, back to front. Drawing from front to back
+    /// is more efficient, as there is less overdraw because of depth
+    /// testing, but proper blending requires back to front ordering.
     pub fn render(&mut self, width: f32, height: f32) {
         self.profiler.start("render");
         let m00 = 2.0 / width;
@@ -448,10 +506,27 @@ impl Renderer {
         self.gl_push();
         let legacy = self.gl_state.legacy;
 
-        // The call order is reversed so that the text layer draws
-        // last, for optimal text rendering quality.
+        unsafe {
+            gl::Enable(gl::DEPTH_TEST);
+            gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
+        }
+
         let profiler = &self.profiler;
-        for (i, call) in self.calls.iter_mut().enumerate().rev() {
+
+        let mut call_indices: Vec<usize> = (0..self.calls.len()).collect();
+        call_indices.sort_unstable_by(|a, b| {
+            let call_a = &self.calls[*a];
+            let call_b = &self.calls[*b];
+            let a = call_a.lowest_depth;
+            let a = if call_a.blend { a } else { 2.0 - a };
+            let b = call_b.lowest_depth;
+            let b = if call_b.blend { b } else { 2.0 - b };
+            b.partial_cmp(&a).unwrap()
+        });
+
+        for i in call_indices {
+            let call = &mut self.calls[i];
+
             profiler.start(format!("call {}", i));
             if call.attributes.vbo_data.is_empty() {
                 profiler.end(format!("call {}", i));
@@ -460,6 +535,13 @@ impl Renderer {
 
             profiler.start("setting state");
             unsafe {
+                if call.blend {
+                    gl::Enable(gl::BLEND);
+                    gl::DepthFunc(gl::LEQUAL);
+                } else {
+                    gl::Disable(gl::BLEND);
+                    gl::DepthFunc(gl::LESS);
+                }
                 gl::UseProgram(call.program.program);
                 gl::UniformMatrix4fv(
                     call.program.projection_matrix_location,
@@ -538,6 +620,7 @@ impl Renderer {
             }
 
             call.attributes.vbo_data.clear();
+            call.lowest_depth = 1.0;
 
             print_gl_errors(&*format!("after render #{}", i));
             profiler.end(format!("call {}", i));
@@ -548,6 +631,16 @@ impl Renderer {
         self.profiler.end("render");
     }
 
+    /// Synchronizes the GPU and CPU state, ensuring that all OpenGL
+    /// calls made so far have been executed. One use case would be
+    /// after swapping buffers, to sleep until the buffers really have
+    /// been swapped.
+    ///
+    /// If running with modern OpenGL, this is implemented with
+    /// glClientWaitSync calls, 2ms thread::sleeps in between.
+    ///
+    /// If running with legacy (2.1 or 2.0 ES) OpenGL, this is
+    /// equivalent to glFinish.
     pub fn synchronize(&self) {
         use std::thread::sleep;
         use std::time::Duration;
@@ -595,20 +688,12 @@ impl Renderer {
     /// Saves the current OpenGL state for [`Renderer::gl_pop`] and
     /// then sets some defaults used by this crate.
     fn gl_push(&mut self) {
-        if !self.preserve_gl_state {
-            unsafe {
-                gl::Enable(gl::DEPTH_TEST);
-                gl::Enable(gl::BLEND);
-                gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
-            }
-            return;
-        }
-
         self.profiler.start("gl state push");
         if !self.gl_state.pushed {
             unsafe {
                 self.gl_state.depth_test = gl::IsEnabled(gl::DEPTH_TEST) != 0;
                 self.gl_state.blend = gl::IsEnabled(gl::BLEND) != 0;
+                gl::GetIntegerv(gl::DEPTH_FUNC, &mut self.gl_state.depth_func);
                 let mut src = 0;
                 let mut dst = 0;
                 gl::GetIntegerv(gl::BLEND_SRC, &mut src);
@@ -624,12 +709,6 @@ impl Renderer {
                     gl::ELEMENT_ARRAY_BUFFER_BINDING,
                     &mut self.gl_state.element_buffer,
                 );
-            }
-
-            unsafe {
-                gl::Enable(gl::DEPTH_TEST);
-                gl::Enable(gl::BLEND);
-                gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
             }
 
             self.gl_state.pushed = true;
@@ -653,6 +732,7 @@ impl Renderer {
                 if !self.gl_state.blend {
                     gl::Disable(gl::BLEND);
                 }
+                gl::DepthFunc(self.gl_state.depth_func as GLuint);
                 gl::BlendFunc(
                     self.gl_state.blend_func.0 as GLuint,
                     self.gl_state.blend_func.1 as GLuint,
@@ -678,8 +758,8 @@ impl Renderer {
 impl Drop for Renderer {
     fn drop(&mut self) {
         if !gl::Viewport::is_loaded() {
-            // Probably running benchmarks (without a gl context)
-            // TODO: Remove this when headless testing is done
+            // Running without a valid gl context, no need to clean up
+            // gl resources (because they can't have been allocated)
             return;
         }
         let legacy = self.gl_state.legacy;

@@ -46,14 +46,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Create the window
     let mut window = Window::create(&WindowSettings::default()).unwrap();
     // Create the OpenGL renderer
-    let mut renderer = Renderer::create(window.opengl21);
-    renderer.set_preserve_gl_state(false);
+    let mut renderer = Renderer::new(window.opengl21);
+    renderer.preserve_gl_state = false;
     // Create the text renderer
     let mut text =
         TextRenderer::create(fs::read("examples/res/FiraSans.ttf")?, false, &mut renderer)?;
     // Create the draw call for the sprite
     let params = DrawCallParameters {
         image: Some(Image::from_png(&fs::read("examples/res/sprite.png")?)?),
+        alpha_blending: false,
         ..Default::default()
     };
     let call = renderer.create_draw_call(params);
@@ -156,7 +157,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 (0.0, 0.0, 1.0, 1.0),
                 (1.0, 0.7, 0.9, 1.0),
                 (-time * 1.5, 50.0, 50.0),
-                0.5, // f - 0.5, // Use the commented one for great optimizations! :)
+                f - 0.5,
                 call,
             );
         }
@@ -169,7 +170,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         if cfg!(feature = "flame") {
             text.draw_text(
                 "Press R to record a frame with flame, see results in flame-graph.html after exiting the application",
-                (20.0, y, -0.5),
+                (20.0, y, -0.6),
                 16.0,
                 Alignment::Left,
                 None,
@@ -185,7 +186,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     duration_name,
                     get_avg_timer_mcs(duration_name)
                 ),
-                (10.0, y, -0.5),
+                (10.0, y, -0.6),
                 16.0,
                 Alignment::Left,
                 None,
@@ -196,7 +197,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         y += 20.0;
         text.draw_text(
             &format!("Quad count: {}", quad_count),
-            (10.0, y, -0.5),
+            (10.0, y, -0.6),
             16.0,
             Alignment::Left,
             None,
@@ -206,7 +207,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         y += 20.0;
         text.draw_text(
             &format!("Pressed keys: {:?}", window.held_keys),
-            (10.0, y, -0.5),
+            (10.0, y, -0.6),
             16.0,
             Alignment::Left,
             None,
@@ -216,7 +217,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         y += 20.0;
         text.draw_text(
             &format!("Scaling factor: {:.1}", window.dpi_factor),
-            (10.0, y, -0.5),
+            (10.0, y, -0.6),
             16.0,
             Alignment::Left,
             None,
@@ -228,7 +229,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         y += 20.0;
         text.draw_text(
             &format!("Type some text: {}", customizable_text),
-            (200.0, y, -0.5),
+            (200.0, y, -0.6),
             16.0,
             Alignment::Left,
             None,
@@ -238,7 +239,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         y += 20.0;
         text.draw_text(
             &format!("Mouse held: {:?}", window.mouse_held),
-            (200.0, y, -0.5),
+            (200.0, y, -0.6),
             16.0,
             Alignment::Left,
             None,
@@ -249,7 +250,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         let (mouse_x, mouse_y) = window.mouse_coords;
         text.draw_text(
             &format!("Mouse position: {}, {}", mouse_x, mouse_y),
-            (200.0, y, -0.5),
+            (200.0, y, -0.6),
             16.0,
             Alignment::Left,
             None,
@@ -259,19 +260,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         y += 20.0;
         text.draw_text(
             &format!("Mouse in window: {}", window.mouse_inside),
-            (200.0, y, -0.5),
+            (200.0, y, -0.6),
             16.0,
             Alignment::Left,
             None,
-            None,
-        );
-
-        text.draw_text(
-            "Note: The rendered spinny thing is a pretty worst-case scenario, as it both fills the screen and doesn't use the depth buffer to avoid redrawing the same pixels. Just setting the Z coordinate properly for them increases performance by a factor of 16!",
-            (10.0, 455.0, -0.5),
-            12.0,
-            Alignment::Center,
-            Some(610.00),
             None,
         );
 
