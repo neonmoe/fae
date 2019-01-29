@@ -38,15 +38,15 @@
 //! - `ELM_SCALE`
 
 use crate::gl;
-use crate::mouse::Mouse;
 use crate::renderer::Renderer;
+use crate::window::{get_env_dpi, Mouse};
 use glfw::*;
 use std::env;
 use std::error::Error;
 use std::path::PathBuf;
 use std::sync::mpsc::Receiver;
 
-pub use crate::window_util::*;
+pub use crate::window::WindowSettings;
 pub use glfw;
 
 const HIDPI_AUTO: bool = cfg!(any(target_os = "windows", target_os = "macos"));

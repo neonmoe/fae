@@ -38,15 +38,15 @@
 //! - `ELM_SCALE`
 
 use crate::gl;
-use crate::mouse::Mouse;
 use crate::renderer::Renderer;
+use crate::window::{get_env_dpi, Mouse};
 use glutin::dpi::*;
 use glutin::*;
 use std::env;
 use std::error::Error;
 use std::path::PathBuf;
 
-pub use crate::window_util::*;
+pub use crate::window::WindowSettings;
 pub use glutin;
 
 /// Wrapper for a Glutin/Glfw window.
@@ -436,6 +436,6 @@ fn is_wayland(window: &GlWindow) -> bool {
     target_os = "freebsd",
     target_os = "openbsd"
 )))]
-fn is_wayland(window: &GlWindow) -> bool {
+fn is_wayland(_: &GlWindow) -> bool {
     false
 }

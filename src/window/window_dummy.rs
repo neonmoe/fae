@@ -37,12 +37,12 @@
 //! - `GDK_SCALE`
 //! - `ELM_SCALE`
 
-use crate::mouse::Mouse;
 use crate::renderer::Renderer;
+use crate::window::Mouse;
 use std::error::Error;
 use std::path::PathBuf;
 
-pub use crate::window_util::WindowSettings;
+pub use crate::window::WindowSettings;
 
 /// Wrapper for a Glutin/Glfw window.
 pub struct Window {
