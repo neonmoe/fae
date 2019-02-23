@@ -139,6 +139,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         let time = time.as_secs() as f32 + time.subsec_millis() as f32 / 1000.0;
 
         timers["quad calls"][timer_index].start();
+        // Background
         renderer.draw_quad(
             (0.0, 0.0, 640.0, 480.0),
             (0.0, 0.0, 1.0, 1.0),
@@ -147,7 +148,19 @@ fn main() -> Result<(), Box<dyn Error>> {
             0.6,
             &call,
         );
-        // Draw a tinted sprite
+
+        // Bottom right corned (for testing smooth resize)
+        let (w, h) = (window.width, window.height);
+        renderer.draw_quad(
+            (w - 100.0, h - 100.0, w, h),
+            (0.0, 0.0, 1.0, 1.0),
+            (1.0, 1.0, 0.0, 1.0),
+            (0.0, 0.0, 0.0),
+            0.5,
+            &call,
+        );
+
+        // Spinny sprites
         for i in 0..quad_count {
             let f = i as f32 / quad_count as f32;
             let x = (f * 3.1415 * 8.0 + time).cos() * 150.0 * f.max(0.3) + 270.0;

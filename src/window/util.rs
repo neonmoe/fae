@@ -21,7 +21,7 @@ pub(crate) fn get_env_dpi() -> f32 {
     if let Some(dpi_factor) = get_var("ELM_SCALE") {
         return dpi_factor;
     }
-    return 1.0;
+    1.0
 }
 
 /// Defines a window.
@@ -51,7 +51,7 @@ impl Default for WindowSettings {
         WindowSettings {
             title: env::current_exe()
                 .ok()
-                .and_then(|p| p.file_name().map(|s| s.to_os_string()))
+                .and_then(|p| p.file_name().map(std::ffi::OsStr::to_os_string))
                 .and_then(|s| s.into_string().ok())
                 .unwrap_or_default(),
             width: 640.0,
