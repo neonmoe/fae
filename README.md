@@ -53,9 +53,13 @@ HiDPI support, less CPU utilization, and it's written in Rust.
   FAE_OPENGL_LEGACY=1 cargo run
   ```
 
-## Issues
-I keep a to-do list in [[ISSUES.md]], but if your concern isn't
-listed, feel free to open GitHub issues.
+## Issues / contributing
+If you come across bugs, other issues or feature requests, feel free
+to open an issue on
+[GitHub](https://github.com/neonmoe/fae/issues/new). Pull requests are
+welcome as well, though keep in mind that this is supposed to be a
+relatively minimalistic crate, so I probably won't include any
+considerable new functionality. If in doubt, open an issue!
 
 ## License
 The `fae` crate is distributed under the MIT license.

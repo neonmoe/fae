@@ -1,5 +1,10 @@
-//#![warn(missing_docs)]
+//! Fae is a small 2D graphics rendering crate. Its main goals are
+//! simplicity, performance, and compatiblity, and so it is a
+//! relatively thin layer over OpenGL (2.1/3.3), though the API is a
+//! lot simpler. See the `basic` example for a quick overview of the
+//! crate's usage.
 
+#![warn(missing_docs)]
 #![feature(test)]
 #[cfg(test)]
 extern crate test;

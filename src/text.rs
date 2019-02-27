@@ -1,4 +1,7 @@
-// TODO: Move text processing from draw_text to compose_draw_call
+//! Text rendering functionality.
+//!
+//! Mostly just a wrapper/integration layer for rusttype.
+
 use crate::gl;
 use crate::gl::types::*;
 use crate::image::Image;
@@ -43,6 +46,8 @@ struct SizedGlyph {
     width: f32,
 }
 
+/// Holds the state required for text rendering, such as the font, and
+/// a text draw call queue.
 pub struct TextRenderer {
     font: Font<'static>,
     cache: RefCell<Cache<'static>>,
@@ -93,10 +98,25 @@ impl TextRenderer {
         })
     }
 
+    /// Updates the DPI factor that will be taken into account during
+    /// text rendering. If the window DPI changes, this should be
+    /// called with the new factor before new text draw calls.
     pub fn update_dpi_factor(&mut self, dpi_factor: f32) {
         self.dpi_factor = dpi_factor;
     }
 
+    /// Draws text.
+    ///
+    /// - `text`: The rendered text.
+    /// - `(x, y, z)`: The position (top-left) of the rendered text
+    /// area.
+    /// - `font_size`: The size of the font.
+    /// - `max_row_width`: The width at which the text will wrap. An
+    /// effort is made to break lines at word boundaries.
+    /// - `clip_area`: The area which defines where the text will be
+    /// rendered. Text outside the area will be cut off. For an
+    /// example use case, think editable text boxes: the clip area
+    /// would be the text box.
     pub fn draw_text(
         &mut self,
         text: &str,
@@ -236,6 +256,8 @@ impl TextRenderer {
         rows
     }
 
+    /// Makes the `draw_text` calls called before this function
+    /// render. Should be called every frame before rendering.
     pub fn compose_draw_call(&mut self, renderer: &mut Renderer) {
         let &mut TextRenderer {
             dpi_factor,

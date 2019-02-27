@@ -1,3 +1,5 @@
+//! Quick window creation utilities.
+
 mod mouse;
 mod util;
 #[cfg(not(any(feature = "glfw", feature = "glutin")))]
