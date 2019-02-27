@@ -218,7 +218,7 @@ dependencies = [
 
 [[package]]
 name = "fae"
-version = "0.4.0-alpha.0"
+version = "0.4.0"
 dependencies = [
  "flame 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "gl_generator 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
