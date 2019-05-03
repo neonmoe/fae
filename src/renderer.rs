@@ -141,6 +141,13 @@ pub struct DrawCallParameters {
     /// scaling? (Tip: for pixel art or other textures that don't
     /// suffer from jaggies, set this to false for the intended look.)
     pub magnification_smoothing: bool,
+    /// Use this to specify the verticies on a triangle, the order
+    /// doesn't matter. If you supply a value to this then be sure
+    /// to set the `triangles` parameter to true.
+    pub verticies:Option<[(f32,f32);3]>,
+    /// Set this to true if you are using `verticies`, ALWAYS set
+    /// this true if you supply `verticies`
+    pub triangle:bool,
 }
 
 impl Default for DrawCallParameters {
@@ -151,6 +158,8 @@ impl Default for DrawCallParameters {
             alpha_blending: true,
             minification_smoothing: true,
             magnification_smoothing: false,
+            verticies:None,
+            triangle:false,
         }
     }
 }
@@ -220,7 +229,11 @@ impl Renderer {
         let index = self.calls.len();
 
         let program = create_program(&vert, &frag, self.gl_state.legacy);
-        let attributes = create_attributes(self.gl_state.legacy, program);
+        let attributes = if !params.triangle {
+            create_attributes(self.gl_state.legacy, program)
+        } else {
+            create_triangle_attributes(self.gl_state.legacy,program,params.verticies.unwrap())
+        };
         let filter = |smoothed| if smoothed { gl::LINEAR } else { gl::NEAREST } as i32;
         let texture = create_texture(
             filter(params.minification_smoothing),
@@ -468,6 +481,36 @@ impl Renderer {
                 .vbo_data
                 .extend_from_slice(&quad);
         } else {
+            let (width, height, tw, th) = (x1 - x0, y1 - y0, tx1 - tx0, ty1 - ty0);
+            let quad = [
+                x0, y0, width, height, tx0, ty0, tw, th, red, green, blue, alpha, rads, pivot_x,
+                pivot_y, depth,
+            ];
+            self.calls[call_handle.0]
+                .attributes
+                .vbo_data
+                .extend_from_slice(&quad);
+        }
+    }
+
+    /// Does the same as [`Renderer::draw_quad()`] except draws a triangle.
+    // This documentation is just so RLS doesn't warn me about the lack of docs.
+    pub fn draw_triangle(
+        &mut self,
+        coords: (f32, f32, f32, f32),
+        texcoords: (f32, f32, f32, f32),
+        color: (f32, f32, f32, f32),
+        rotation: (f32, f32, f32),
+        depth: f32,
+        call_handle: &DrawCallHandle,
+    ) {
+        let (x0, y0, x1, y1) = coords;
+        let (tx0, ty0, tx1, ty1) = texcoords;
+        let (red, green, blue, alpha) = color;
+        let (rads, pivot_x, pivot_y) = rotation;
+
+        self.calls[call_handle.0].lowest_depth = self.calls[call_handle.0].lowest_depth.min(depth);
+        if !self.gl_state.legacy {
             let (width, height, tw, th) = (x1 - x0, y1 - y0, tx1 - tx0, ty1 - ty0);
             let quad = [
                 x0, y0, width, height, tx0, ty0, tw, th, red, green, blue, alpha, rads, pivot_x,
@@ -949,6 +992,83 @@ fn create_attributes(opengl21: bool, program: ShaderProgram) -> Attributes {
             ];
             let len = (mem::size_of::<f32>() * static_quad_vertices.len()) as isize;
             let ptr = static_quad_vertices.as_ptr() as *const _;
+            gl::BufferData(gl::ARRAY_BUFFER, len, ptr, gl::STATIC_DRAW);
+
+            gl::GenBuffers(1, &mut element_buffer);
+            gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, element_buffer);
+            let elements: [u8; 6] = [0, 1, 2, 0, 2, 3];
+            let len = (mem::size_of::<f32>() * elements.len()) as isize;
+            let ptr = elements.as_ptr() as *const _;
+            gl::BufferData(gl::ELEMENT_ARRAY_BUFFER, len, ptr, gl::STATIC_DRAW);
+        }
+    }
+
+    let mut vbo = 0;
+    unsafe {
+        gl::GenBuffers(1, &mut vbo);
+        gl::BindBuffer(gl::ARRAY_BUFFER, vbo);
+    }
+
+    if !opengl21 {
+        unsafe {
+            enable_vertex_attribs(&[
+                (program.position_attrib_location, 4),
+                (program.texcoord_attrib_location, 4),
+                (program.color_attrib_location, 4),
+                (program.rotation_attrib_location, 3),
+                (program.depth_attrib_location, 1),
+            ]);
+            gl::VertexAttribDivisor(program.position_attrib_location, 1);
+            gl::VertexAttribDivisor(program.texcoord_attrib_location, 1);
+            gl::VertexAttribDivisor(program.color_attrib_location, 1);
+            gl::VertexAttribDivisor(program.rotation_attrib_location, 1);
+            gl::VertexAttribDivisor(program.depth_attrib_location, 1);
+        }
+    }
+    print_gl_errors("after attribute creation");
+
+    Attributes {
+        vao,
+        vbo,
+        vbo_static,
+        element_buffer,
+        vbo_data: Vec::new(),
+        allocated_vbo_data_size: 0,
+    }
+}
+#[inline]
+fn create_triangle_attributes(opengl21: bool, program: ShaderProgram,verticies:[(f32,f32);3]) -> Attributes {
+    let mut vao = 0;
+    if !opengl21 {
+        unsafe {
+            gl::GenVertexArrays(1, &mut vao);
+            gl::BindVertexArray(vao);
+        }
+    }
+
+    let mut vbo_static = 0;
+    let mut element_buffer = 0;
+    if !opengl21 {
+        unsafe {
+            gl::GenBuffers(1, &mut vbo_static);
+            gl::BindBuffer(gl::ARRAY_BUFFER, vbo_static);
+            enable_vertex_attribs(&[
+                (program.shared_position_attrib_location, 2),
+                (program.shared_texcoord_attrib_location, 2),
+            ]);
+            // This is the vertices of two triangles that form a quad,
+            // interleaved in a (pos x, pos y, tex x, tex y)
+            // arrangement.
+            let static_tri_verticies:[f32;12] = [
+                // Pos 1x      Pos y1         Tex x1         Tex y1
+                verticies[0].0,verticies[0].1,verticies[0].0,verticies[0].1,
+                // Pos x2      Pos y2         Tex x2         Tex y2
+                verticies[1].0,verticies[1].1,verticies[1].0,verticies[1].1,
+                // Pos x3      Pos y3         Tex x3         Tex y3
+                verticies[2].0,verticies[2].1,verticies[2].0,verticies[2].1,
+            ];
+            let len = (mem::size_of::<f32>() * static_tri_verticies.len()) as isize;
+            let ptr = static_tri_verticies.as_ptr() as *const _;
             gl::BufferData(gl::ARRAY_BUFFER, len, ptr, gl::STATIC_DRAW);
 
             gl::GenBuffers(1, &mut element_buffer);
