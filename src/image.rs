@@ -59,11 +59,12 @@ impl Image {
         for i in 0..pixels.len() {
             pixels[i] = color[i % color.len()];
         }
+        let format = if color.len() == 3 { gl::RGB } else { gl::RGBA };
         Image {
             pixels,
             width,
             height,
-            format: gl::RGBA,
+            format,
         }
     }
 

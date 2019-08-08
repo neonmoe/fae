@@ -134,33 +134,23 @@ impl Window {
                 GlWindow::new(window, context, &events_loop)
             };
 
+            let gl_req_21 = GlRequest::GlThenGles {
+                opengl_version: (2, 1),
+                opengles_version: (2, 0),
+            };
+            let gl_req_33 = GlRequest::GlThenGles {
+                opengl_version: (3, 3),
+                opengles_version: (3, 0),
+            };
             if env::var_os("FAE_OPENGL_LEGACY").is_some() {
                 opengl21 = true;
-                create_window(
-                    GlRequest::GlThenGles {
-                        opengl_version: (2, 1),
-                        opengles_version: (2, 0),
-                    },
-                    GlProfile::Compatibility,
-                )?
-            } else if let Ok(result) = create_window(
-                GlRequest::GlThenGles {
-                    opengl_version: (3, 3),
-                    opengles_version: (3, 0),
-                },
-                GlProfile::Core,
-            ) {
+                create_window(gl_req_21, GlProfile::Compatibility)?
+            } else if let Ok(result) = create_window(gl_req_33, GlProfile::Core) {
                 opengl21 = false;
                 result
             } else {
                 opengl21 = true;
-                create_window(
-                    GlRequest::GlThenGles {
-                        opengl_version: (2, 1),
-                        opengles_version: (2, 0),
-                    },
-                    GlProfile::Compatibility,
-                )?
+                create_window(gl_req_21, GlProfile::Compatibility)?
             }
         };
 

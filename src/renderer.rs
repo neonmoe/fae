@@ -495,28 +495,28 @@ impl Renderer {
     /// testing, but proper blending requires back to front ordering.
     pub fn render(&mut self, width: f32, height: f32) {
         self.profiler.start("render");
+        self.gl_push();
+
         let m00 = 2.0 / width;
         let m11 = -2.0 / height;
         let matrix = [
             m00, 0.0, 0.0, -1.0, 0.0, m11, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
         ];
 
-        self.profiler.start("clear");
+        let profiler = &self.profiler;
+        profiler.start("clear");
         unsafe {
             gl::ClearColor(1.0, 1.0, 1.0, 1.0);
             gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
         }
-        self.profiler.end("clear");
+        profiler.end("clear");
 
-        self.gl_push();
         let legacy = self.gl_state.legacy;
 
         unsafe {
             gl::Enable(gl::DEPTH_TEST);
             gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
         }
-
-        let profiler = &self.profiler;
 
         let mut call_indices: Vec<usize> = (0..self.calls.len()).collect();
         call_indices.sort_unstable_by(|a, b| {
@@ -609,16 +609,12 @@ impl Renderer {
                 print_gl_errors(&format!("[legacy] after drawing buffer #{}", i));
             } else {
                 // 16 floats (4 for x,y,w,h + 4 tex xywh + 4 col + 3 rot + 1 z) per vertex
-                let instance_count = call.attributes.vbo_data.len() as i32 / 16;
+                let count = call.attributes.vbo_data.len() as i32 / 16;
+                let mode = gl::TRIANGLES;
+                let val_type = gl::UNSIGNED_BYTE;
                 profiler.start("drawElementsInstanced");
                 unsafe {
-                    gl::DrawElementsInstanced(
-                        gl::TRIANGLES,
-                        6,
-                        gl::UNSIGNED_BYTE,
-                        ptr::null(),
-                        instance_count,
-                    );
+                    gl::DrawElementsInstanced(mode, 6, val_type, ptr::null(), count);
                 }
                 profiler.end("drawElementsInstanced");
                 print_gl_errors(&format!("after drawing buffer #{}", i));
@@ -632,7 +628,6 @@ impl Renderer {
         }
 
         self.gl_pop();
-
         self.profiler.end("render");
     }
 

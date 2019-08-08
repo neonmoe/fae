@@ -19,7 +19,7 @@ mostly so I don't have to come up with another name :)
 ## Cargo features
 - The **glutin** feature implements the `window` mod, which allows for
   easy window creation using glutin, with all the required OpenGL
-  context wrangling done for you.
+  context wrangling done for you. This is enabled by default.
 - The **glfw** feature is an alternative to the **glutin** feature,
   implementing the same API. Please see the *Glfw notes* section
   before using.
@@ -29,11 +29,15 @@ mostly so I don't have to come up with another name :)
   done by `rusttype`, which this feature adds as a dependency, as well
   as `unicode-normalization`. A lightweight version of this feature is
   planned, where you can use bitmap fonts to conserve executable size
-  and performance.
+  and performance. This is enabled by default.
 - The **png** feature implements the `Image::from_png` function, which
   allows you to load images from PNG data. This is a very convenient
   feature, but not necessarily a requirement for using the crate, so
-  it's optional.
+  it's optional. This is enabled by default.
+- **flame** is available as an optional dependency, because that's how
+  the renderer is profiled. If you want to use `flame` in your own
+  application that uses `fae`, but *don't* want the `fae` profiling
+  information, use `Renderer::set_profiling(false)`.
 
 ## Glfw notes
 The GLFW feature exists as an option since the examples built with it

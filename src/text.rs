@@ -129,7 +129,7 @@ impl TextRenderer {
         let rows = self.collect_glyphs(x, y, max_row_width, font_size, text);
         let dpi = self.dpi_factor;
 
-        let mut final_glyphs = Vec::with_capacity(text.len());
+        let mut glyphs = Vec::with_capacity(text.len());
 
         // Collect the rows and offset them according to the alignment
         if let Some(width) = max_row_width {
@@ -142,7 +142,7 @@ impl TextRenderer {
                         } else {
                             row
                         };
-                        final_glyphs.extend_from_slice(&row);
+                        glyphs.extend_from_slice(&row);
                     }
                 }
 
@@ -154,24 +154,24 @@ impl TextRenderer {
                         } else {
                             row
                         };
-                        final_glyphs.extend_from_slice(&row);
+                        glyphs.extend_from_slice(&row);
                     }
                 }
 
                 Alignment::Left => {
                     for row in rows {
-                        final_glyphs.extend_from_slice(&row);
+                        glyphs.extend_from_slice(&row);
                     }
                 }
             }
         } else {
             for row in rows {
-                final_glyphs.extend_from_slice(&row);
+                glyphs.extend_from_slice(&row);
             }
         }
 
         self.cached_text.push(TextRender {
-            glyphs: final_glyphs,
+            glyphs,
             clip_area,
             z,
         });

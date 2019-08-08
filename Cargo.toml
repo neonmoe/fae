@@ -24,7 +24,7 @@ png = { version = "0.14", optional = true }
 flame = { version = "0.2", optional = true } # Used by the renderer, for benchmarking
 
 [features]
-default = ["text", "png"]
+default = ["text", "png", "glutin"]
 text = ["rusttype", "unicode-normalization"]
 
 [build-dependencies]
