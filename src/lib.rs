@@ -19,4 +19,5 @@ pub use crate::image::Image;
 #[cfg(feature = "text")]
 pub mod text;
 
+#[cfg(feature = "glutin")]
 pub mod window;

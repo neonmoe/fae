@@ -4,10 +4,10 @@ optional window creation functionality and text rendering. Its main
 design goals are simplicity and performance while supporting
 older/low-end target platforms. The base crate which implements the
 rendering functions only depends on OpenGL and std. Optional features
-exist for ttf rendering and window creation, `rusttype` and
-`glutin`/`glfw` respectively. The crate supports OpenGL 2.1+ and
-OpenGL ES 2.0+ contexts, but will do some optimizations if a 3.3 or ES
-3.0 context is available.
+exist for ttf rendering and window creation, `rusttype` and `glutin`
+respectively. The crate supports OpenGL 2.1+ and OpenGL ES 2.0+
+contexts, but will do some optimizations if a 3.3 or ES 3.0 context is
+available.
 
 ## Important note
 The crate is currently under development, and I wouldn't recommend it
@@ -20,9 +20,6 @@ mostly so I don't have to come up with another name :)
 - The **glutin** feature implements the `window` mod, which allows for
   easy window creation using glutin, with all the required OpenGL
   context wrangling done for you. This is enabled by default.
-- The **glfw** feature is an alternative to the **glutin** feature,
-  implementing the same API. Please see the *Glfw notes* section
-  before using.
 - The **text** feature implements the `text` mod, which has
   functionality for drawing strings. Fonts are provided in the form of
   .ttf files shipped with your application. The glyph rendering is
@@ -38,13 +35,6 @@ mostly so I don't have to come up with another name :)
   the renderer is profiled. If you want to use `flame` in your own
   application that uses `fae`, but *don't* want the `fae` profiling
   information, use `Renderer::set_profiling(false)`.
-
-## Glfw notes
-The GLFW feature exists as an option since the examples built with it
-are about 0.5x the size of the executables built with glutin (on
-Linux, Windows has no benefit and I don't think macOS has either), but
-I wouldn't recommend it. Glutin is better in almost all ways: better
-HiDPI support, less CPU utilization, and it's written in Rust.
 
 ## Notes
 - You can force the crate to use an OpenGL 2.1 context by setting the

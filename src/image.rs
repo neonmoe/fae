@@ -31,7 +31,7 @@ impl Image {
     /// let sprite = Image::from_png(&fs::read("sprite.png").unwrap()).unwrap();
     /// ```
     #[cfg(feature = "png")]
-    pub fn from_png(bytes: &[u8]) -> Result<Image, Box<Error>> {
+    pub fn from_png(bytes: &[u8]) -> Result<Image, Box<dyn Error>> {
         let decoder = png::Decoder::new(bytes);
         let (info, mut reader) = decoder.read_info()?;
         let mut pixels = vec![0; info.buffer_size()];

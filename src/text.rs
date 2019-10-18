@@ -72,7 +72,7 @@ impl TextRenderer {
         font_data: Vec<u8>,
         subpixel_accurate: bool,
         renderer: &mut Renderer,
-    ) -> Result<TextRenderer, Box<Error>> {
+    ) -> Result<TextRenderer, Box<dyn Error>> {
         let glyph_cache_image =
             Image::from_color(GLYPH_CACHE_WIDTH as i32, GLYPH_CACHE_HEIGHT as i32, &[0])
                 .format(gl::RED);

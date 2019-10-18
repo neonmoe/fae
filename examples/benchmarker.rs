@@ -16,28 +16,11 @@ use std::error::Error;
 use std::fs;
 use std::time::{Duration, Instant};
 
-#[cfg(feature = "glfw")]
-mod keys {
-    pub const CLOSE: glfw::Key = glfw::Key::Escape;
-    pub const UP: glfw::Key = glfw::Key::Up;
-    pub const DOWN: glfw::Key = glfw::Key::Down;
-    pub const PROFILE: glfw::Key = glfw::Key::R;
-}
-
-#[cfg(feature = "glutin")]
 mod keys {
     pub const CLOSE: glutin::VirtualKeyCode = glutin::VirtualKeyCode::Escape;
     pub const UP: glutin::VirtualKeyCode = glutin::VirtualKeyCode::Up;
     pub const DOWN: glutin::VirtualKeyCode = glutin::VirtualKeyCode::Down;
     pub const PROFILE: glutin::VirtualKeyCode = glutin::VirtualKeyCode::R;
-}
-
-#[cfg(not(any(feature = "glutin", feature = "glfw")))]
-mod keys {
-    pub const CLOSE: u32 = 27;
-    pub const UP: u32 = 43;
-    pub const DOWN: u32 = 45;
-    pub const PROFILE: u32 = 82;
 }
 
 static mut PROFILING: bool = false;
@@ -302,7 +285,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[cfg(feature = "glutin")]
 fn set_cursor_over_text(window: &Window, over_text: bool) {
     use fae::window::glutin::MouseCursor;
     window.set_cursor(if over_text {
@@ -311,19 +293,6 @@ fn set_cursor_over_text(window: &Window, over_text: bool) {
         MouseCursor::Default
     });
 }
-
-#[cfg(feature = "glfw")]
-fn set_cursor_over_text(window: &mut Window, over_text: bool) {
-    use fae::window::glfw::StandardCursor;
-    window.set_cursor(if over_text {
-        StandardCursor::IBeam
-    } else {
-        StandardCursor::Arrow
-    });
-}
-
-#[cfg(not(any(feature = "glutin", feature = "glfw")))]
-fn set_cursor_over_text(_window: &Window, _over_text: bool) {}
 
 #[cfg(feature = "flame")]
 fn dump_profiling_data() {
