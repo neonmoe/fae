@@ -5,12 +5,8 @@
 //! as they happen to be ordered in the codebase.
 #![windows_subsystem = "windows"]
 
-use fae::{
-    renderer::{DrawCallParameters, Renderer},
-    text::{Alignment, TextRenderer},
-    window::{Window, WindowSettings},
-    Image,
-};
+use fae::text::{Alignment, TextRenderer};
+use fae::{DrawCallParameters, Image, Renderer, Window, WindowSettings};
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs;

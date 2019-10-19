@@ -7,17 +7,18 @@
 #![warn(missing_docs)]
 
 #[allow(missing_docs, unknown_lints, clippy::all)]
+#[allow(bare_trait_objects)] // Only needed until gl_generator update
 pub mod gl {
     include!(concat!(env!("OUT_DIR"), "/gl_bindings.rs"));
 }
 
 mod image;
-pub mod renderer;
+mod renderer;
+mod window;
 
-pub use crate::image::Image;
+pub use image::*;
+pub use renderer::*;
+pub use window::*;
 
 #[cfg(feature = "text")]
 pub mod text;
-
-#[cfg(feature = "glutin")]
-pub mod window;

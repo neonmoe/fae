@@ -1,26 +1,26 @@
 use crate::gl;
 use crate::renderer::Renderer;
+pub use crate::window::WindowSettings;
 use crate::window::{get_env_dpi, Mouse};
+pub use glutin;
 use glutin::dpi::*;
 use glutin::*;
 use std::env;
 use std::error::Error;
 use std::path::PathBuf;
 
-pub use crate::window::WindowSettings;
-pub use glutin;
-
 /// Wrapper for a Glutin window.
 pub struct Window {
+    env_dpi_factor: f32,
+    context: WindowedContext<PossiblyCurrent>,
+    events_loop: EventsLoop,
+
     /// The width of the window.
     pub width: f32,
     /// The height of the window.
     pub height: f32,
     /// The dpi of the window.
     pub dpi_factor: f32,
-    env_dpi_factor: f32,
-    gl_window: GlWindow,
-    events_loop: EventsLoop,
     /// The opengl legacy status for Renderer.
     pub opengl21: bool,
     /// The keys which are currently held down. Different type for
@@ -74,7 +74,7 @@ impl Window {
     pub fn create(settings: &WindowSettings) -> Result<Window, Box<dyn Error>> {
         let events_loop = EventsLoop::new();
         let opengl21;
-        let gl_window = {
+        let context = {
             let create_window = |gl_request, gl_profile| {
                 let mut window = WindowBuilder::new()
                     .with_title(settings.title.clone())
@@ -86,12 +86,12 @@ impl Window {
                 if settings.is_dialog {
                     window = window_as_dialog(window);
                 }
-                let context = ContextBuilder::new()
+                ContextBuilder::new()
                     .with_vsync(settings.vsync)
                     .with_srgb(true)
                     .with_gl(gl_request)
-                    .with_gl_profile(gl_profile);
-                GlWindow::new(window, context, &events_loop)
+                    .with_gl_profile(gl_profile)
+                    .build_windowed(window, &events_loop)
             };
 
             let gl_req_21 = GlRequest::GlThenGles {
@@ -114,20 +114,25 @@ impl Window {
             }
         };
 
-        let env_dpi_factor = if is_wayland(&gl_window) {
+        let env_dpi_factor = if is_wayland(&context.window()) {
             let multiplier = get_env_dpi();
-            if let Some(size) = gl_window.get_inner_size() {
+            if let Some(size) = context.window().get_inner_size() {
                 let (w, h): (f64, f64) = size.into();
-                gl_window.set_inner_size((w * multiplier as f64, h * multiplier as f64).into());
+                context
+                    .window()
+                    .set_inner_size((w * multiplier as f64, h * multiplier as f64).into());
             }
             multiplier
         } else {
             1.0
         };
 
-        unsafe {
-            gl_window.make_current()?;
-            gl::load_with(|symbol| gl_window.get_proc_address(symbol) as *const _);
+        let context = unsafe {
+            let context = match context.make_current() {
+                Ok(current_ctx) => current_ctx,
+                Err((_, err)) => return Err(Box::new(err)),
+            };
+            gl::load_with(|symbol| context.get_proc_address(symbol) as *const _);
             /* use std::ffi::CStr;
 
             Uncomment in case of opengl shenanigans
@@ -138,17 +143,19 @@ impl Window {
             if cfg!(debug_assertions) {
                 println!("OpenGL version: {}", opengl_version_string);
             }*/
-        }
+            context
+        };
 
-        gl_window.show();
+        context.window().show();
 
         Ok(Window {
+            env_dpi_factor,
+            context,
+            events_loop,
+
             width: settings.width,
             height: settings.height,
             dpi_factor: 1.0,
-            env_dpi_factor,
-            gl_window,
-            events_loop,
             opengl21,
 
             held_keys: Vec::new(),
@@ -171,7 +178,7 @@ impl Window {
 
     /// Sets the cursor graphic to the provided one.
     pub fn set_cursor(&self, cursor: MouseCursor) {
-        self.gl_window.set_cursor(cursor);
+        self.context.window().set_cursor(cursor);
     }
 
     /// Updates the window (swaps the front and back buffers). The
@@ -179,7 +186,7 @@ impl Window {
     /// while it is optional, it's definitely recommended. If vsync is
     /// enabled, this function will hang until the next frame.
     pub fn swap_buffers(&mut self, renderer: Option<&Renderer>) {
-        let _ = self.gl_window.swap_buffers();
+        let _ = self.context.swap_buffers();
         if let Some(renderer) = renderer {
             renderer.synchronize();
         }
@@ -189,10 +196,11 @@ impl Window {
     /// the window to be closed.
     pub fn refresh(&mut self) -> bool {
         let mut running = true;
-        let mut resized_logical_size = None;
-        let mut updated_dpi_factor = None;
         let mut key_inputs = Vec::new();
         let mut mouse_inputs = Vec::new();
+        let window_width = &mut self.width;
+        let window_height = &mut self.height;
+        let window_dpi_factor = &mut self.dpi_factor;
         let typed_chars = &mut self.typed_chars;
         let mouse_coords = &mut self.mouse_coords;
         let mouse_inside = &mut self.mouse_inside;
@@ -205,12 +213,35 @@ impl Window {
         typed_chars.clear();
         dropped_files.clear();
 
-        self.events_loop.poll_events(|event| {
+        let context = &self.context;
+        let env_dpi_factor = self.env_dpi_factor;
+        let mut handle_resize = |logical_size: LogicalSize, dpi_factor: f64| {
+            let physical_size = logical_size.to_physical(dpi_factor);
+
+            let (width, height): (u32, u32) = physical_size.into();
+            unsafe {
+                gl::Viewport(0, 0, width as i32, height as i32);
+            }
+            context.resize(physical_size);
+            *window_width = logical_size.width as f32 / env_dpi_factor;
+            *window_height = logical_size.height as f32 / env_dpi_factor;
+            *window_dpi_factor = dpi_factor as f32 * env_dpi_factor;
+        };
+
+        let events_loop = &mut self.events_loop;
+        events_loop.poll_events(|event| {
             if let Event::WindowEvent { event, .. } = event {
                 match event {
                     WindowEvent::CloseRequested | WindowEvent::Destroyed => running = false,
-                    WindowEvent::Resized(logical_size) => resized_logical_size = Some(logical_size),
-                    WindowEvent::HiDpiFactorChanged(factor) => updated_dpi_factor = Some(factor),
+                    WindowEvent::Resized(logical_size) => {
+                        let dpi_factor = context.window().get_hidpi_factor();
+                        handle_resize(logical_size, dpi_factor);
+                    }
+                    WindowEvent::HiDpiFactorChanged(dpi_factor) => {
+                        if let Some(logical_size) = context.window().get_inner_size() {
+                            handle_resize(logical_size, dpi_factor);
+                        }
+                    }
 
                     WindowEvent::KeyboardInput { input, .. } => {
                         let state = input.state;
@@ -311,37 +342,6 @@ impl Window {
             }
         }
 
-        /* Resize event handling */
-        if let Some(logical_size) = resized_logical_size {
-            let dpi_factor = self.gl_window.get_hidpi_factor();
-            let physical_size = logical_size.to_physical(dpi_factor);
-
-            let (width, height): (u32, u32) = physical_size.into();
-            unsafe {
-                gl::Viewport(0, 0, width as i32, height as i32);
-            }
-            self.gl_window.resize(physical_size);
-            self.width = logical_size.width as f32 / self.env_dpi_factor;
-            self.height = logical_size.height as f32 / self.env_dpi_factor;
-            self.dpi_factor = dpi_factor as f32 * self.env_dpi_factor;
-        }
-
-        /* DPI factor change event handling */
-        if let Some(dpi_factor) = updated_dpi_factor {
-            if let Some(logical_size) = self.gl_window.get_inner_size() {
-                let physical_size = logical_size.to_physical(dpi_factor);
-
-                let (width, height): (u32, u32) = physical_size.into();
-                unsafe {
-                    gl::Viewport(0, 0, width as i32, height as i32);
-                }
-                self.gl_window.resize(physical_size);
-                self.width = logical_size.width as f32 / self.env_dpi_factor;
-                self.height = logical_size.height as f32 / self.env_dpi_factor;
-                self.dpi_factor = dpi_factor as f32 * self.env_dpi_factor;
-            }
-        }
-
         running
     }
 }
@@ -373,7 +373,7 @@ fn window_as_dialog(window: WindowBuilder) -> WindowBuilder {
     target_os = "freebsd",
     target_os = "openbsd"
 ))]
-fn is_wayland(window: &GlWindow) -> bool {
+fn is_wayland(window: &glutin::Window) -> bool {
     use glutin::os::unix::WindowExt;
     window.get_wayland_surface().is_some()
 }
