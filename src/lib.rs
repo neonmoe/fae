@@ -20,5 +20,27 @@ pub use image::*;
 pub use renderer::*;
 pub use window::*;
 
+#[cfg(not(feature = "text"))]
+mod text_dummy;
+
 #[cfg(feature = "text")]
-pub mod text;
+mod text_rusttype;
+
+/// Text rendering functionality.
+pub mod text {
+    /// Defines the alignment of text.
+    #[derive(Clone, Copy, Debug)]
+    pub enum Alignment {
+        /// Text is aligned to the left.
+        Left,
+        /// Text is aligned to the right.
+        Right,
+        /// Text is centered.
+        Center,
+    }
+
+    #[cfg(not(feature = "text"))]
+    pub use crate::text_dummy::*;
+    #[cfg(feature = "text")]
+    pub use crate::text_rusttype::*;
+}

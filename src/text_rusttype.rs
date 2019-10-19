@@ -8,6 +8,7 @@ use crate::gl;
 use crate::gl::types::*;
 use crate::image::Image;
 use crate::renderer::{DrawCallHandle, DrawCallParameters, Renderer, Shaders};
+use crate::text::Alignment;
 use rusttype::gpu_cache::Cache;
 use rusttype::*;
 use std::cell::RefCell;
@@ -23,18 +24,6 @@ const DEFAULT_TEXT_SHADERS: Shaders = Shaders {
     vertex_shader_330: include_str!("shaders/texquad.vert"),
     fragment_shader_330: include_str!("shaders/text.frag"),
 };
-
-/// Defines the alignment of text.
-#[allow(dead_code)]
-#[derive(Clone, Copy, Debug)]
-pub enum Alignment {
-    /// Text is aligned to the left.
-    Left,
-    /// Text is aligned to the right.
-    Right,
-    /// Text is centered.
-    Center,
-}
 
 struct TextRender {
     glyphs: Vec<SizedGlyph>,
@@ -125,6 +114,7 @@ impl TextRenderer {
         (x, y, z): (f32, f32, f32),
         font_size: f32,
         alignment: Alignment,
+        _color: (f32, f32, f32, f32),
         max_row_width: Option<f32>,
         clip_area: Option<(f32, f32, f32, f32)>,
     ) {

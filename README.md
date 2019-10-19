@@ -20,17 +20,18 @@ that will definitely change in the future. It's on crates.io mostly so
 I don't have to come up with another name :)
 
 ## Cargo features
+- The **png** feature implements the `Image::from_png` function, which
+  allows you to load images from PNG data. This is a very convenient
+  feature, but not necessarily a requirement for using the crate, so
+  it's optional.
 - The **text** feature implements the `text` mod, which has
   functionality for drawing strings. Fonts are provided in the form of
   .ttf files shipped with your application. The glyph rendering is
   done by `rusttype`, which this feature adds as a dependency, as well
   as `unicode-normalization`. A lightweight version of this feature is
   planned, where you can use bitmap fonts to conserve executable size
-  and performance. This is enabled by default.
-- The **png** feature implements the `Image::from_png` function, which
-  allows you to load images from PNG data. This is a very convenient
-  feature, but not necessarily a requirement for using the crate, so
-  it's optional. This is enabled by default.
+  and performance. When this is not enabled, text rendering functions
+  are still defined, but print out squares in the place of glyphs.
 - **flame** is available as an optional dependency, because that's how
   the renderer is profiled. If you want to use `flame` in your own
   application that uses `fae`, but *don't* want the `fae` profiling

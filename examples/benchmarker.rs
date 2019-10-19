@@ -32,7 +32,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         TextRenderer::create(fs::read("examples/res/FiraSans.ttf")?, false, &mut renderer)?;
     // Create the draw call for the sprite
     let params = DrawCallParameters {
-        image: Some(Image::from_png(&fs::read("examples/res/sprite.png")?)?),
+        image: {
+            #[cfg(feature = "png")]
+            let image = Image::from_png(&fs::read("examples/res/sprite.png")?)?;
+            #[cfg(not(feature = "png"))]
+            let image = Image::from_color(16, 16, &[0xFF, 0xFF, 0x00, 0xFF]);
+            Some(image)
+        },
         alpha_blending: false,
         ..Default::default()
     };
@@ -70,6 +76,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let start = Instant::now();
     // For testing text input
     let mut customizable_text = String::new();
+    let mut last_over_text = false;
 
     // Loop until we `should_quit` or refresh returns false, ie. the
     // user pressed the "close window" button.
@@ -110,7 +117,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         let (mx, my) = window.mouse_coords;
         let over_text = mx > 200.0 && mx < 340.0 && my > 25.0 && my < 100.0;
-        set_cursor_over_text(&mut window, over_text);
+        if over_text != last_over_text {
+            set_cursor_over_text(&mut window, over_text);
+        }
+        last_over_text = over_text;
 
         renderer.set_profiling(window.pressed_keys.contains(&keys::PROFILE));
 
@@ -157,6 +167,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         timers["text calls"][timer_index].start();
         // Draw some text describing the frame timings
+        let text_color = (1.0, 0.0, 0.0, 1.0);
         let mut y = 5.0;
 
         if cfg!(feature = "flame") {
@@ -164,7 +175,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "Press R to record a frame with flame, see results in flame-graph.html after exiting the application",
                 (20.0, y, -0.6),
                 16.0,
-                Alignment::Left,
+                Alignment::Left, text_color,
                 None,
                 None,
             );
@@ -181,6 +192,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 (10.0, y, -0.6),
                 16.0,
                 Alignment::Left,
+                text_color,
                 None,
                 None,
             );
@@ -192,6 +204,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             (10.0, y, -0.6),
             16.0,
             Alignment::Left,
+            text_color,
             None,
             None,
         );
@@ -202,6 +215,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             (10.0, y, -0.6),
             16.0,
             Alignment::Left,
+            text_color,
             None,
             None,
         );
@@ -212,6 +226,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             (10.0, y, -0.6),
             16.0,
             Alignment::Left,
+            text_color,
             None,
             None,
         );
@@ -224,6 +239,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             (200.0, y, -0.6),
             16.0,
             Alignment::Left,
+            text_color,
             None,
             None,
         );
@@ -234,6 +250,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             (200.0, y, -0.6),
             16.0,
             Alignment::Left,
+            text_color,
             None,
             None,
         );
@@ -245,6 +262,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             (200.0, y, -0.6),
             16.0,
             Alignment::Left,
+            text_color,
             None,
             None,
         );
@@ -255,6 +273,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             (200.0, y, -0.6),
             16.0,
             Alignment::Left,
+            text_color,
             None,
             None,
         );
@@ -268,6 +287,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 (200.0, y, -0.6),
                 16.0,
                 Alignment::Left,
+                text_color,
                 None,
                 None,
             );
@@ -279,6 +299,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             (200.0, y, -0.6),
             16.0,
             Alignment::Left,
+            text_color,
             None,
             None,
         );
