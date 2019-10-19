@@ -41,6 +41,10 @@ pub struct WindowSettings {
     /// floating window, not a tiled one. This is useful for
     /// applications that are supposed to be opened for very short
     /// amounts of time.
+    // TODO: Replace with UnixOptions or something similar?
+    // See docs for glutin::os::unix::WindowBuilderExt for more options.
+    // Or perhaps remove this and provide a way to affect glutin Window and Context creation?
+    // A handle to the glutin window would probably be good as well.
     pub is_dialog: bool,
     /// This should always be true for everything except benchmarks.
     pub vsync: bool,

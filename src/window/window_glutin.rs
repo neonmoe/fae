@@ -114,7 +114,7 @@ impl Window {
             }
         };
 
-        let env_dpi_factor = if is_wayland(&context.window()) {
+        let env_dpi_factor = {
             let multiplier = get_env_dpi();
             if let Some(size) = context.window().get_inner_size() {
                 let (w, h): (f64, f64) = size.into();
@@ -123,8 +123,6 @@ impl Window {
                     .set_inner_size((w * multiplier as f64, h * multiplier as f64).into());
             }
             multiplier
-        } else {
-            1.0
         };
 
         let context = unsafe {
@@ -365,25 +363,4 @@ fn window_as_dialog(window: WindowBuilder) -> WindowBuilder {
 )))]
 fn window_as_dialog(window: WindowBuilder) -> WindowBuilder {
     window
-}
-
-#[cfg(any(
-    target_os = "linux",
-    target_os = "dragonfly",
-    target_os = "freebsd",
-    target_os = "openbsd"
-))]
-fn is_wayland(window: &glutin::Window) -> bool {
-    use glutin::os::unix::WindowExt;
-    window.get_wayland_surface().is_some()
-}
-
-#[cfg(not(any(
-    target_os = "linux",
-    target_os = "dragonfly",
-    target_os = "freebsd",
-    target_os = "openbsd"
-)))]
-fn is_wayland(_: &GlWindow) -> bool {
-    false
 }

@@ -2,6 +2,8 @@
 //!
 //! Mostly just a wrapper/integration layer for rusttype.
 
+// FIXME: The text module needs a rewrite, and I don't think the wrapping even works currently
+
 use crate::gl;
 use crate::gl::types::*;
 use crate::image::Image;

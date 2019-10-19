@@ -280,67 +280,6 @@ impl Renderer {
         DrawCallHandle(index)
     }
 
-    /// Draws a rectangle with a ninepatch texture on the screen. This
-    /// is very similar to [`Renderer::draw_quad`], except that
-    /// stretching is handled differently.
-    ///
-    /// Specifically: The sprite is split into 3x3 tiles. Corner tiles
-    /// are not stretched, the middle tiles of each side are stretched
-    /// along one axis, and the middle-on-both-axis tile is stretched
-    /// on both axis.
-    ///
-    /// - `ninepatch_dimensions`: Contains the widths and the heights
-    /// of the tiles. Arrangement: ((left tile width, middle, right),
-    /// (top tile height, middle, bottom))
-    ///
-    /// See [`Renderer::draw_quad`] for the rest of the parameters'
-    /// docs.
-    pub fn draw_quad_ninepatch(
-        &mut self,
-        ninepatch_dimensions: ((f32, f32, f32), (f32, f32, f32)),
-        coords: (f32, f32, f32, f32),
-        texcoords: (f32, f32, f32, f32),
-        color: (f32, f32, f32, f32),
-        rotation: (f32, f32, f32),
-        z: f32,
-        call_handle: &DrawCallHandle,
-    ) {
-        let ((w0, w1, w2), (h0, h1, h2)) = ninepatch_dimensions;
-        let (x0, y0, x1, y1) = coords;
-        let (rads, rx, ry) = rotation;
-        let (rx, ry) = (rx + x0, ry + y0);
-        let (tx0, ty0, tx1, ty1) = texcoords;
-        let (tex_w, tex_h) = (tx1 - tx0, ty1 - ty0);
-        let (total_w, total_h) = (w0 + w1 + w2, h0 + h1 + h2);
-        let ((tw0, th0), (tw2, th2)) = (
-            (w0 / total_w * tex_w, h0 / total_h * tex_h),
-            (w2 / total_w * tex_w, h2 / total_h * tex_h),
-        );
-
-        let create_tiles = |min: f32, max: f32, margin_min: f32, margin_max: f32| {
-            let mins = [min, min + margin_min, max - margin_max];
-            let maxes = [min + margin_min, max - margin_max, max];
-            (mins, maxes)
-        };
-        let (x0, x1) = create_tiles(x0, x1, w0, w2);
-        let (y0, y1) = create_tiles(y0, y1, h0, h2);
-        let (tx0, tx1) = create_tiles(tx0, tx1, tw0, tw2);
-        let (ty0, ty1) = create_tiles(ty0, ty1, th0, th2);
-
-        for i in 0..9 {
-            let xi = i % 3;
-            let yi = i / 3;
-            self.draw_quad(
-                (x0[xi], y0[yi], x1[xi], y1[yi]),
-                (tx0[xi], ty0[yi], tx1[xi], ty1[yi]),
-                color,
-                (rads, rx - x0[xi], ry - y0[yi]),
-                z,
-                call_handle,
-            );
-        }
-    }
-
     /// Draws a textured rectangle on the screen, but only the parts
     /// inside `clip_area`.
     ///
@@ -414,7 +353,7 @@ impl Renderer {
     /// (logical) pixels. Arrangement: (left, top, right, bottom)
     ///
     /// - `texcoords`: The texture coordinates (UVs) of the quad, in
-    /// the range `0.0 - 1.0`. The shaders will not use the texture at
+    /// the range `0.0 - 1.0`. The shader will not use the texture at
     /// all if the texcoords are all `-1.0`. Same arrangement as
     /// `coords`.
     ///
@@ -486,6 +425,12 @@ impl Renderer {
             call.attributes.vbo_data.clear();
         }
     }
+
+    // TODO: Add a re-render function for fast re-rendering in resize events
+    // Rationale:
+    // - Clears need to be made when resizing, otherwise there will be flickering when expanding the window
+    // - render() might be clearer if split into two anyway: uploading the buffers, and drawing them
+    // - Possibility for optimization: the uploading action could only be ran when needed
 
     /// Renders all currently queued draws.
     ///
