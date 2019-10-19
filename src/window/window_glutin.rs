@@ -21,8 +21,6 @@ pub struct Window {
     pub height: f32,
     /// The dpi of the window.
     pub dpi_factor: f32,
-    /// The opengl legacy status for Renderer.
-    pub opengl21: bool,
     /// The keys which are currently held down. Different type for
     /// each window backend, because there's no unified way of
     /// speaking in keycodes!
@@ -73,9 +71,8 @@ impl Window {
     /// context creation fails.
     pub fn create(settings: &WindowSettings) -> Result<Window, Box<dyn Error>> {
         let events_loop = EventsLoop::new();
-        let opengl21;
         let context = {
-            let create_window = |gl_request, gl_profile| {
+            let create_window = |gl_request| {
                 let mut window = WindowBuilder::new()
                     .with_title(settings.title.clone())
                     .with_dimensions(LogicalSize::new(
@@ -90,7 +87,6 @@ impl Window {
                     .with_vsync(settings.vsync)
                     .with_srgb(true)
                     .with_gl(gl_request)
-                    .with_gl_profile(gl_profile)
                     .build_windowed(window, &events_loop)
             };
 
@@ -98,19 +94,10 @@ impl Window {
                 opengl_version: (2, 1),
                 opengles_version: (2, 0),
             };
-            let gl_req_33 = GlRequest::GlThenGles {
-                opengl_version: (3, 3),
-                opengles_version: (3, 0),
-            };
             if env::var_os("FAE_OPENGL_LEGACY").is_some() {
-                opengl21 = true;
-                create_window(gl_req_21, GlProfile::Compatibility)?
-            } else if let Ok(result) = create_window(gl_req_33, GlProfile::Core) {
-                opengl21 = false;
-                result
+                create_window(gl_req_21)?
             } else {
-                opengl21 = true;
-                create_window(gl_req_21, GlProfile::Compatibility)?
+                create_window(GlRequest::Latest)?
             }
         };
 
@@ -154,7 +141,6 @@ impl Window {
             width: settings.width,
             height: settings.height,
             dpi_factor: 1.0,
-            opengl21,
 
             held_keys: Vec::new(),
             pressed_keys: Vec::new(),

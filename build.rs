@@ -11,4 +11,7 @@ fn main() {
     Registry::new(Api::Gl, (3, 3), Profile::Core, Fallbacks::All, [])
         .write_bindings(GlobalGenerator, &mut file)
         .unwrap();
+
+    // Only rebuild when this file is changed
+    println!("cargo:rerun-if-changed=build.rs");
 }

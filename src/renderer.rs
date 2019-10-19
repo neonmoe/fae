@@ -91,6 +91,7 @@ struct DrawCall {
 #[derive(Clone, Copy, Debug)]
 struct OpenGLState {
     legacy: bool,
+    version: Option<(u8, u8)>,
     // The fields below are settings set by other possible OpenGL
     // calls made in the surrounding program, because the point of
     // this crate is to behave well with other OpenGL code running
@@ -158,16 +159,21 @@ impl Default for DrawCallParameters {
 impl Renderer {
     /// Creates a new Renderer.
     ///
-    /// `opengl21` disables some post-OpenGL 2.1 functionality, like
-    /// VAOs, instanced rendering, and indexed rendering. Ideally this
-    /// should be `false` in all cases where the OpenGL version is
-    /// \>=3.3 (or OpenGL ES >=3) to allow for more optimized
-    /// rendering.
-    pub fn new(opengl21: bool) -> Renderer {
+    /// Takes a Window as a parameter to ensure that a valid OpenGL
+    /// context exists.
+    pub fn new(_: &crate::Window) -> Renderer {
+        let version = get_version();
+        let legacy = if let Some((major, minor)) = &version {
+            *major < 3 || (*major == 3 && *minor < 3)
+        } else {
+            true // Fallback to legacy if parsing fails
+        };
+
         Renderer {
             calls: Vec::with_capacity(2),
             gl_state: OpenGLState {
-                legacy: opengl21,
+                legacy,
+                version,
                 pushed: false,
                 depth_test: false,
                 depth_func: 0,
@@ -195,6 +201,18 @@ impl Renderer {
     /// only enable profiling for singular frames at a time.
     pub fn set_profiling(&mut self, should_profile: bool) {
         self.profiler.should_profile = should_profile;
+    }
+
+    /// Returns whether or not running in legacy mode (OpenGL 3.3+
+    /// optimizations off).
+    pub fn is_legacy(&self) -> bool {
+        self.gl_state.legacy
+    }
+
+    /// Returns the OpenGL version (major, minor) if it could be
+    /// parsed.
+    pub fn get_opengl_version(&self) -> Option<(u8, u8)> {
+        self.gl_state.version
     }
 
     /// Creates a new draw call in the pipeline, and returns its
@@ -862,9 +880,9 @@ fn create_program(vert_source: &str, frag_source: &str, legacy: bool) -> ShaderP
 }
 
 #[inline]
-fn create_attributes(opengl21: bool, program: ShaderProgram) -> Attributes {
+fn create_attributes(legacy: bool, program: ShaderProgram) -> Attributes {
     let mut vao = 0;
-    if !opengl21 {
+    if !legacy {
         unsafe {
             gl::GenVertexArrays(1, &mut vao);
             gl::BindVertexArray(vao);
@@ -873,7 +891,7 @@ fn create_attributes(opengl21: bool, program: ShaderProgram) -> Attributes {
 
     let mut vbo_static = 0;
     let mut element_buffer = 0;
-    if !opengl21 {
+    if !legacy {
         unsafe {
             gl::GenBuffers(1, &mut vbo_static);
             gl::BindBuffer(gl::ARRAY_BUFFER, vbo_static);
@@ -906,7 +924,7 @@ fn create_attributes(opengl21: bool, program: ShaderProgram) -> Attributes {
         gl::BindBuffer(gl::ARRAY_BUFFER, vbo);
     }
 
-    if !opengl21 {
+    if !legacy {
         unsafe {
             enable_vertex_attribs(&[
                 (program.position_attrib_location, 4),
@@ -1009,6 +1027,25 @@ fn print_gl_errors(context: &str) {
         eprintln!("{}", error_msg);
         error = unsafe { gl::GetError() };
     }
+}
+
+// Sorry for the mess, but OpenGL version strings are unreliable, and
+// I'm not sure *how* unreliable. Here's my attempt at a robust way of
+// parsing the version.
+fn get_version() -> Option<(u8, u8)> {
+    let version_str = unsafe { std::ffi::CStr::from_ptr(gl::GetString(gl::VERSION) as *const _) }
+        .to_string_lossy();
+
+    let mut split = version_str.split('.'); // Split at .
+    let major_str = &split.next()?; // Major version is the first part before the first .
+    let major = u8::from_str_radix(major_str, 10).ok()?; // Parse the version
+
+    let rest_of_version = split.next()?; // Find the next part after the first .
+    let end_of_version_num = rest_of_version.find(|c: char| !c.is_digit(10))?; // Find where the minor version ends
+    let minor_str = &rest_of_version[0..end_of_version_num]; // Minor version as str
+    let minor = u8::from_str_radix(minor_str, 10).ok()?; // Parse minor version
+
+    Some((major, minor))
 }
 
 fn gl_error_to_string(error: GLuint) -> String {

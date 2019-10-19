@@ -7,7 +7,7 @@ use std::fs;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut window = Window::create(&WindowSettings::default()).unwrap();
-    let mut renderer = Renderer::new(window.opengl21);
+    let mut renderer = Renderer::new(&window);
     renderer.preserve_gl_state = false;
     let params = DrawCallParameters {
         image: Some(Image::from_png(&fs::read("examples/res/sprite.png")?)?),

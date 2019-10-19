@@ -25,7 +25,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Create the window
     let mut window = Window::create(&WindowSettings::default()).unwrap();
     // Create the OpenGL renderer
-    let mut renderer = Renderer::new(window.opengl21);
+    let mut renderer = Renderer::new(&window);
     renderer.preserve_gl_state = false;
     // Create the text renderer
     let mut text =
@@ -259,6 +259,30 @@ fn main() -> Result<(), Box<dyn Error>> {
             None,
         );
 
+        y += 10.0;
+
+        if let Some((major_ver, minor_ver)) = renderer.get_opengl_version() {
+            y += 20.0;
+            text.draw_text(
+                &format!("OpenGL version: {}.{}", major_ver, minor_ver),
+                (200.0, y, -0.6),
+                16.0,
+                Alignment::Left,
+                None,
+                None,
+            );
+        }
+
+        y += 20.0;
+        text.draw_text(
+            &format!("OpenGL 3.3+ optimizations: {}", !renderer.is_legacy()),
+            (200.0, y, -0.6),
+            16.0,
+            Alignment::Left,
+            None,
+            None,
+        );
+
         timers["text calls"][timer_index].end();
 
         // Render the glyphs into the draw call
@@ -282,7 +306,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 fn set_cursor_over_text(window: &Window, over_text: bool) {
-    use fae::window::glutin::MouseCursor;
+    use fae::glutin::MouseCursor;
     window.set_cursor(if over_text {
         MouseCursor::Text
     } else {
