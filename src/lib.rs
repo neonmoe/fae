@@ -20,32 +20,8 @@ pub use image::*;
 pub use renderer::*;
 pub use window::*;
 
-#[cfg(not(feature = "text"))]
-mod text_dummy;
-
-mod text_layout;
-
 #[cfg(feature = "text")]
-mod text_rusttype;
+pub mod text;
 
 // TODO: Add a feature for using the font8x8 crate as a font
 // text_dummy -> text_renderer, uses a font provider + font8x8 / font-kit as font providers
-
-/// Text rendering functionality.
-pub mod text {
-    /// Defines the alignment of text.
-    #[derive(Clone, Copy, Debug)]
-    pub enum Alignment {
-        /// Text is aligned to the left.
-        Left,
-        /// Text is aligned to the right.
-        Right,
-        /// Text is centered.
-        Center,
-    }
-
-    #[cfg(not(feature = "text"))]
-    pub use crate::text_dummy::*;
-    #[cfg(feature = "text")]
-    pub use crate::text_rusttype::*;
-}
