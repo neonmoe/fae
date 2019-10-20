@@ -1033,15 +1033,17 @@ fn print_gl_errors(context: &str) {
 // I'm not sure *how* unreliable. Here's my attempt at a robust way of
 // parsing the version.
 fn get_version() -> Option<(u8, u8)> {
-    let version_str = unsafe { std::ffi::CStr::from_ptr(gl::GetString(gl::VERSION) as *const _) }
-        .to_string_lossy();
+    let version_str = unsafe { std::ffi::CStr::from_ptr(gl::GetString(gl::VERSION) as *const _) };
+    let version_str = version_str.to_string_lossy();
 
     let mut split = version_str.split('.'); // Split at .
     let major_str = &split.next()?; // Major version is the first part before the first .
     let major = u8::from_str_radix(major_str, 10).ok()?; // Parse the version
 
     let rest_of_version = split.next()?; // Find the next part after the first .
-    let end_of_version_num = rest_of_version.find(|c: char| !c.is_digit(10))?; // Find where the minor version ends
+    let end_of_version_num = rest_of_version
+        .find(|c: char| !c.is_digit(10))
+        .unwrap_or(rest_of_version.len()); // Find where the minor version ends
     let minor_str = &rest_of_version[0..end_of_version_num]; // Minor version as str
     let minor = u8::from_str_radix(minor_str, 10).ok()?; // Parse minor version
 
