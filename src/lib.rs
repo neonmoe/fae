@@ -23,8 +23,13 @@ pub use window::*;
 #[cfg(not(feature = "text"))]
 mod text_dummy;
 
+mod text_layout;
+
 #[cfg(feature = "text")]
 mod text_rusttype;
+
+// TODO: Add a feature for using the font8x8 crate as a font
+// text_dummy -> text_renderer, uses a font provider + font8x8 / font-kit as font providers
 
 /// Text rendering functionality.
 pub mod text {

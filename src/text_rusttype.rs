@@ -2,7 +2,7 @@
 //!
 //! Mostly just a wrapper/integration layer for rusttype.
 
-// FIXME: The text module needs a rewrite, and I don't think the wrapping even works currently
+// FIXME: The text module needs a rewrite, and I don't think the wrapping even works currently. Also: look into other rendering crates?
 
 use crate::gl;
 use crate::gl::types::*;
