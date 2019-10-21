@@ -15,10 +15,7 @@ mod keys {
     pub const CLOSE: glutin::VirtualKeyCode = glutin::VirtualKeyCode::Escape;
     pub const UP: glutin::VirtualKeyCode = glutin::VirtualKeyCode::Up;
     pub const DOWN: glutin::VirtualKeyCode = glutin::VirtualKeyCode::Down;
-    pub const PROFILE: glutin::VirtualKeyCode = glutin::VirtualKeyCode::R;
 }
-
-static mut PROFILING: bool = false;
 
 fn main() -> Result<(), Box<dyn Error>> {
     // Create the window
@@ -41,6 +38,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         ..Default::default()
     };
     let call = renderer.create_draw_call(params);
+    renderer.set_profiling(true);
 
     let mut should_quit = false;
     let mut quad_count = 1;
@@ -87,10 +85,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             timer_index = 0;
         }
 
-        unsafe {
-            PROFILING = window.pressed_keys.contains(&keys::PROFILE);
-        }
-
         timers["whole frame"][timer_index].start();
         timers["application frame"][timer_index].start();
         // Update the text renderer's dpi settings, in case refresh
@@ -119,8 +113,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             set_cursor_over_text(&mut window, over_text);
         }
         last_over_text = over_text;
-
-        renderer.set_profiling(window.pressed_keys.contains(&keys::PROFILE));
 
         let time = Instant::now() - start;
         let time = time.as_secs() as f32 + time.subsec_millis() as f32 / 1000.0;
@@ -316,8 +308,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             16.0,
             Alignment::Left,
             text_color,
-            Some(280.0),
-            Some((20.0, 300.0, 320.0, 600.0)),
+            Some(380.0),
+            Some((20.0, 300.0, 420.0, 600.0)),
         );
 
         timers["text calls"][timer_index].end();
@@ -337,8 +329,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         timers["application frame"][timer_index].end();
     }
 
-    dump_profiling_data();
-
     Ok(())
 }
 
@@ -350,15 +340,6 @@ fn set_cursor_over_text(window: &Window, over_text: bool) {
         MouseCursor::Default
     });
 }
-
-#[cfg(feature = "flame")]
-fn dump_profiling_data() {
-    use std::fs::File;
-    flame::dump_html(&mut File::create("flame-graph.html").unwrap()).unwrap();
-}
-
-#[cfg(not(feature = "flame"))]
-fn dump_profiling_data() {}
 
 use std::cell::Cell;
 
@@ -378,28 +359,10 @@ impl Timer {
         }
     }
 
-    #[cfg(feature = "flame")]
-    pub fn start(&self) {
-        self.start.set(Instant::now());
-        if unsafe { PROFILING } {
-            flame::start(self.name.clone());
-        }
-    }
-
-    #[cfg(feature = "flame")]
-    pub fn end(&self) {
-        if unsafe { PROFILING } {
-            flame::end(self.name.clone());
-        }
-        self.duration.set(Instant::now() - self.start.get());
-    }
-
-    #[cfg(not(feature = "flame"))]
     pub fn start(&self) {
         self.start.set(Instant::now());
     }
 
-    #[cfg(not(feature = "flame"))]
     pub fn end(&self) {
         self.duration.set(Instant::now() - self.start.get());
     }

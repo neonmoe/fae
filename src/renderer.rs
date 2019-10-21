@@ -192,15 +192,10 @@ impl Renderer {
 
     /// Toggles whether profiling is enabled.
     ///
-    /// Profiling is done using the optional `flame` crate, if it
-    /// isn't enabled, this does nothing. If it is, when profiling is
-    /// enabled, the renderer will notify `flame` of specific regions
-    /// of code to quickly see where time is going during
-    /// rendering. Because flame doesn't fold sections with similar
-    /// names together (at the time of writing), it's recommended to
-    /// only enable profiling for singular frames at a time.
+    /// If the `profiler` feature is enabled, the renderer will send
+    /// performance data to the profiler.
     pub fn set_profiling(&mut self, should_profile: bool) {
-        self.profiler.should_profile = should_profile;
+        self.profiler.toggle(should_profile);
     }
 
     /// Returns whether or not running in legacy mode (OpenGL 3.3+
@@ -608,6 +603,7 @@ impl Renderer {
         use std::thread::sleep;
         use std::time::Duration;
 
+        self.profiler.start("synchronization");
         let mut synchronized = false;
 
         if !self.gl_state.legacy {
@@ -639,6 +635,7 @@ impl Renderer {
                 gl::Finish();
             }
         }
+        self.profiler.end("synchronization");
     }
 
     /// Returns the OpenGL texture handle for the texture used by the
@@ -1065,37 +1062,67 @@ fn gl_error_to_string(error: GLuint) -> String {
     }
 }
 
-use std::borrow::Cow;
+use renderer_profiler::Profiler;
 
-#[derive(Clone, Debug)]
-struct Profiler {
-    should_profile: bool,
+#[cfg(feature = "profiler")]
+mod renderer_profiler {
+    use std::cell::RefCell;
+    use std::collections::HashMap;
+    use std::time::Instant;
+
+    #[derive(Clone, Debug)]
+    pub struct Profiler {
+        should_profile: bool,
+        starts: RefCell<HashMap<String, Instant>>,
+    }
+
+    impl Profiler {
+        pub fn new() -> Profiler {
+            Profiler {
+                should_profile: false,
+                starts: RefCell::new(HashMap::new()),
+            }
+        }
+
+        pub fn toggle(&mut self, should_profile: bool) {
+            self.should_profile = should_profile;
+        }
+
+        pub fn start<S: Into<String>>(&self, name: S) {
+            if self.should_profile {
+                let mut starts = self.starts.borrow_mut();
+                starts.insert(name.into(), Instant::now());
+            }
+        }
+
+        pub fn end<S: Into<String>>(&self, name: S) {
+            if self.should_profile {
+                let end_time = Instant::now();
+                let mut starts = self.starts.borrow_mut();
+                let name = name.into();
+                if let Some(start_time) = starts.remove(&name) {
+                    crate::profiler::insert_profiling_data(
+                        name.to_string(),
+                        format!("{:?}", end_time - start_time),
+                    );
+                }
+            }
+        }
+    }
 }
 
-impl Profiler {
-    fn new() -> Profiler {
-        Profiler {
-            should_profile: false,
+#[cfg(not(feature = "profiler"))]
+mod renderer_profiler {
+    #[derive(Clone, Debug)]
+    pub struct Profiler {}
+
+    impl Profiler {
+        pub fn new() -> Profiler {
+            Profiler {}
         }
+
+        pub fn toggle(&mut self, _should_profile: bool) {}
+        pub fn start<S: Into<String>>(&self, _name: S) {}
+        pub fn end<S: Into<String>>(&self, _name: S) {}
     }
-
-    #[cfg(feature = "flame")]
-    fn start<S: Into<Cow<'static, str>>>(&self, name: S) {
-        if self.should_profile {
-            flame::start(name);
-        }
-    }
-
-    #[cfg(feature = "flame")]
-    fn end<S: Into<Cow<'static, str>>>(&self, name: S) {
-        if self.should_profile {
-            flame::end(name);
-        }
-    }
-
-    #[cfg(not(feature = "flame"))]
-    fn start<S: Into<Cow<'static, str>>>(&self, _name: S) {}
-
-    #[cfg(not(feature = "flame"))]
-    fn end<S: Into<Cow<'static, str>>>(&self, _name: S) {}
 }

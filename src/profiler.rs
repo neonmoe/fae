@@ -23,7 +23,7 @@ mod dummy {
     }
 
     /// Operate on a value with a given key, as an i32.
-    pub fn modify_profiler_value_i32<T: FnOnce(i32) -> i32>(key: &str, f: T) {}
+    pub fn modify_profiler_value_i32<T: FnOnce(i32) -> i32>(_key: &str, _f: T) {}
 
     /// Insert data into the `profiler` dictionary of datapoints.
     pub fn insert_profiling_data<T: Into<String>, U: Into<String>>(_key: T, _value: U) {}
