@@ -1,14 +1,18 @@
 //! The text rendering module.
 
 mod fonts;
+#[cfg(feature = "font8x8" /* or font-kit, in the future */)]
+mod glyph_cache;
 mod layout;
 pub(crate) mod types;
 
 pub use crate::text::types::Alignment;
 
+#[cfg(feature = "font8x8" /* or font-kit, in the future */)]
+use crate::text::glyph_cache::*;
 use crate::text::layout::*;
 use crate::text::types::*;
-use crate::{DrawCallHandle, DrawCallParameters, Renderer};
+use crate::{DrawCallHandle, Renderer};
 use std::collections::HashMap;
 
 /// Holds the state required for text rendering, such as the font, and
@@ -22,19 +26,33 @@ pub struct TextRenderer {
 }
 
 impl TextRenderer {
-    /// Creates a new text renderer with no font.
+    /// Creates a new text renderer without any external fonts.
     ///
-    /// Will draw squares in the place of glyphs.
+    /// If the `font8x8` feature is enabled, will use those
+    /// glyphs. Otherwise, will draw squares in the place of those
+    /// glyphs.
     pub fn create(renderer: &mut Renderer) -> TextRenderer {
+        #[cfg(feature = "font8x8" /* or font-kit, in the future */)]
+        let (glyph_cache, call) = GlyphCache::create_cache_and_draw_call(renderer);
+
+        #[cfg(not(feature = "font8x8" /* or font-kit, in the future */))]
+        let call = renderer.create_draw_call(crate::renderer::DrawCallParameters {
+            alpha_blending: false,
+            ..Default::default()
+        });
+
         TextRenderer {
-            call: renderer.create_draw_call(DrawCallParameters {
-                alpha_blending: false,
-                ..Default::default()
-            }),
+            call,
             glyphs: Vec::new(),
             draw_datas: Vec::new(),
             dpi_factor: 1.0,
-            font: Box::new(fonts::DummyProvider),
+            font: {
+                #[cfg(not(feature = "font8x8"))]
+                let provider = fonts::DummyProvider;
+                #[cfg(feature = "font8x8")]
+                let provider = fonts::Font8x8Provider::new(glyph_cache);
+                Box::new(provider)
+            },
         }
     }
 
@@ -93,28 +111,42 @@ impl TextRenderer {
         let mut cursor = PositionPx { x, y };
         let mut text_left = text;
         while !text_left.is_empty() {
-            let (line_len, line_width) =
-                get_line_length_and_width(&metrics, max_line_width, text_left);
+            let (line_len, line_width) = get_line_length_and_width(
+                &self.font,
+                &metrics,
+                font_size,
+                max_line_width,
+                text_left,
+            );
             if let Some(max_line_width) = max_line_width {
                 cursor.x = get_line_start_x(cursor.x, line_width, max_line_width, alignment);
             }
+
             let mut previous_character = None;
             let mut chars_read = 0;
             let mut chars = text_left.chars();
             for c in &mut chars {
                 chars_read += 1;
-                if chars_read >= line_len {
-                    break;
-                }
                 if let Some(metric) = metrics.get(&c).map(|m| m.clone()) {
+                    // Advance the cursor, if this is not the first character
+                    if let Some(previous_character) = previous_character {
+                        if let Some(advance) =
+                            get_char_advance(&self.font, &metrics, font_size, c, previous_character)
+                        {
+                            cursor.x += advance;
+                        }
+                    }
+
                     self.glyphs.push(Glyph {
                         screen_location: metric.size + cursor,
                         draw_data: draw_data_index,
                         id: metric.glyph_id,
                     });
-                    cursor.x += get_char_width(&metrics, c, previous_character);
                 }
                 previous_character = Some(c);
+                if chars_read >= line_len {
+                    break;
+                }
             }
             text_left = chars.as_str();
             cursor = PositionPx {
@@ -127,6 +159,9 @@ impl TextRenderer {
     /// Makes the `draw_text` calls called before this function
     /// render. Should be called every frame before rendering.
     pub fn compose_draw_call(&mut self, renderer: &mut Renderer) {
+        crate::profiler::insert_profiling_data("glyphs drawn", "0");
+        crate::profiler::insert_profiling_data("glyphs rendered", "0");
+
         for glyph in &self.glyphs {
             let font_size = self.draw_datas[glyph.draw_data].font_size;
             let color = self.draw_datas[glyph.draw_data].color;
@@ -134,7 +169,10 @@ impl TextRenderer {
 
             let RectPx { x, y, w, h } = glyph.screen_location;
             let position = (x, y, x + w, y + h);
-            let RectUv { x, y, w, h } = self.font.render_glyph(glyph.id, font_size);
+            let RectUv { x, y, w, h } = match self.font.render_glyph(glyph.id, font_size) {
+                Some(uvs) => uvs,
+                None => continue,
+            };
             let texcoords = (x, y, x + w, y + h);
 
             if let Some(clip_area) = self.draw_datas[glyph.draw_data].clip_area {
@@ -153,5 +191,6 @@ impl TextRenderer {
         }
         self.glyphs.clear();
         self.draw_datas.clear();
+        self.font.update_glyph_cache_expiration();
     }
 }

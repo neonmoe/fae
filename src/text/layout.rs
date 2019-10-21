@@ -1,5 +1,8 @@
-use crate::text::{Alignment, Metric};
+use crate::text::{Alignment, FontProvider, Metric};
 use std::collections::HashMap;
+
+// TODO: Test all the layout features, that they work as they
+// should. Perhaps list them as well, somewhere in docs.
 
 pub(crate) fn get_line_start_x(
     base_x: f32,
@@ -14,16 +17,21 @@ pub(crate) fn get_line_start_x(
     }
 }
 
-pub(crate) fn move_forward_chars(s: &str, n: usize) -> &str {
+pub(crate) fn move_forward_chars(s: &str, n: usize) -> (&str, char) {
     let mut chars = s.chars();
+    let mut last_char = ' ';
     for _ in 0..n {
-        chars.next();
+        if let Some(c) = chars.next() {
+            last_char = c;
+        }
     }
-    chars.as_str()
+    (chars.as_str(), last_char)
 }
 
 pub(crate) fn get_line_length_and_width(
+    font: &Box<dyn FontProvider>,
     metrics: &HashMap<char, Metric>,
+    font_size: f32,
     max_width: Option<f32>,
     mut s: &str,
 ) -> (usize, f32) {
@@ -31,13 +39,19 @@ pub(crate) fn get_line_length_and_width(
     let mut total_width = 0.0;
 
     // Add words until the line can't fit more words
-    'outer: while let Some((word_len, word_width)) =
-        get_word_length(metrics, max_width.map(|w| w - total_width), &s, len == 0)
-    {
+    'outer: while let Some((word_len, word_width)) = get_word_length(
+        font,
+        metrics,
+        font_size,
+        max_width.map(|w| w - total_width),
+        &s,
+        len == 0,
+    ) {
         // Handle a word
         len += word_len;
         total_width += word_width;
-        s = move_forward_chars(s, word_len);
+        let (s_, c) = move_forward_chars(s, word_len);
+        s = s_;
 
         // Break if line is too long
         if s.is_empty() || max_width.iter().any(|w| total_width > *w) {
@@ -46,21 +60,24 @@ pub(crate) fn get_line_length_and_width(
 
         // Handle whitespace after word
         let len_before_whitespace = len;
-        let mut previous_char = None;
+        let mut previous_char = c;
         for c in s.chars() {
             len += 1;
             if c == '\n' {
                 break 'outer;
             } else if c.is_whitespace() {
                 // Update line width
-                total_width += get_char_width(metrics, c, previous_char);
+                if let Some(advance) = get_char_advance(font, metrics, font_size, c, previous_char)
+                {
+                    total_width += advance;
+                }
             } else {
                 len -= 1;
                 break;
             }
-            previous_char = Some(c);
+            previous_char = c;
         }
-        s = move_forward_chars(s, len - len_before_whitespace);
+        s = move_forward_chars(s, len - len_before_whitespace).0;
 
         // Break if line is too long
         if s.is_empty() || max_width.iter().any(|w| total_width > *w) {
@@ -76,7 +93,9 @@ pub(crate) fn get_line_length_and_width(
 // more than a whole line's worth of space, being the first word on
 // the line).
 pub(crate) fn get_word_length(
+    font: &Box<dyn FontProvider>,
     metrics: &HashMap<char, Metric>,
+    font_size: f32,
     max_width: Option<f32>,
     s: &str,
     starts_line: bool,
@@ -94,7 +113,13 @@ pub(crate) fn get_word_length(
         }
 
         // Check if line was overflowed
-        let width = get_char_width(metrics, c, previous_char);
+        if let Some(previous_char) = previous_char {
+            if let Some(advance) = get_char_advance(font, metrics, font_size, c, previous_char) {
+                let previous_width = get_char_width(metrics, previous_char);
+                total_width += advance - previous_width;
+            }
+        }
+        let width = get_char_width(metrics, c);
         total_width += width;
         if max_width.iter().any(|w| total_width > *w) {
             len -= 1;
@@ -122,17 +147,20 @@ pub(crate) fn get_word_length(
     Some((len, total_width))
 }
 
-pub(crate) fn get_char_width(
+pub(crate) fn get_char_advance(
+    font: &Box<dyn FontProvider>,
     metrics: &HashMap<char, Metric>,
+    font_size: f32,
     current_char: char,
-    _previous_char: Option<char>,
-) -> f32 {
-    if let Some(current_metric) = metrics.get(&current_char) {
-        current_metric.size.w + 2.0 // + kerning between this char and the previous char
-    } else {
-        panic!(
-            "'{}' has no metric but was in a string to be drawn",
-            current_char
-        )
-    }
+    previous_char: char,
+) -> Option<f32> {
+    font.get_advance(
+        metrics.get(&previous_char)?.glyph_id,
+        metrics.get(&current_char)?.glyph_id,
+        font_size,
+    )
+}
+
+pub(crate) fn get_char_width(metrics: &HashMap<char, Metric>, c: char) -> f32 {
+    metrics.get(&c).unwrap().size.w
 }

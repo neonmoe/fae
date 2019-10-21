@@ -6,7 +6,7 @@
 #![windows_subsystem = "windows"]
 
 use fae::text::{Alignment, TextRenderer};
-use fae::{DrawCallParameters, Image, Renderer, Window, WindowSettings};
+use fae::{profiler, DrawCallParameters, Image, Renderer, Window, WindowSettings};
 use std::collections::HashMap;
 use std::error::Error;
 use std::time::{Duration, Instant};
@@ -300,6 +300,24 @@ fn main() -> Result<(), Box<dyn Error>> {
             text_color,
             None,
             None,
+        );
+
+        renderer.draw_quad(
+            (20.0, 300.0, 320.0, 600.0),
+            (-1.0, -1.0, -1.0, -1.0),
+            (1.0, 1.0, 1.0, 1.0),
+            (0.0, 0.0, 0.0),
+            -0.55,
+            &call,
+        );
+        text.draw_text(
+            &format!("profiling information:\n{}", profiler::get_profiler_print()),
+            (30.0, 310.0, -0.6),
+            16.0,
+            Alignment::Left,
+            text_color,
+            Some(280.0),
+            Some((20.0, 300.0, 320.0, 600.0)),
         );
 
         timers["text calls"][timer_index].end();

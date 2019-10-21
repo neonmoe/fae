@@ -11,6 +11,10 @@ impl FontProvider for DummyProvider {
         font_size + 1.0
     }
 
+    fn get_advance(&self, _from: u32, _to: u32, font_size: f32) -> Option<f32> {
+        Some(font_size / 2.0)
+    }
+
     fn get_metric(&self, _id: u32, font_size: f32) -> RectPx {
         RectPx {
             x: 0.0,
@@ -20,12 +24,20 @@ impl FontProvider for DummyProvider {
         }
     }
 
-    fn render_glyph(&mut self, _id: u32, _font_size: f32) -> RectUv {
-        RectUv {
-            x: -1.0,
-            y: -1.0,
-            w: 0.0,
-            h: 0.0,
+    fn render_glyph(&mut self, id: u32, _font_size: f32) -> Option<RectUv> {
+        use std::convert::TryFrom;
+        let c = char::try_from(id).ok()?;
+        if c.is_whitespace() {
+            None
+        } else {
+            Some(RectUv {
+                x: -1.0,
+                y: -1.0,
+                w: 0.0,
+                h: 0.0,
+            })
         }
     }
+
+    fn update_glyph_cache_expiration(&mut self) {}
 }

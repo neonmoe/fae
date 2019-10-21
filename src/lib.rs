@@ -23,5 +23,7 @@ pub use window::*;
 #[cfg(feature = "text")]
 pub mod text;
 
-// TODO: Add a feature for using the font8x8 crate as a font
-// text_dummy -> text_renderer, uses a font provider + font8x8 / font-kit as font providers
+/// Module for reading profiling data that `fae` collects. If the
+/// `profiler` feature is disabled, all the functions are no-ops, and
+/// there will be no profiling overhead.
+pub mod profiler;

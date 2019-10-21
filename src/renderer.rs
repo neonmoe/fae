@@ -643,7 +643,7 @@ impl Renderer {
 
     /// Returns the OpenGL texture handle for the texture used by the
     /// draw call.
-    #[cfg(feature = "text")]
+    #[cfg(all(feature = "text", feature = "font8x8" /* or font-kit, in the future */))]
     pub(crate) fn get_texture(&self, call_handle: &DrawCallHandle) -> GLuint {
         self.calls[call_handle.0].texture
     }
@@ -1017,7 +1017,7 @@ fn insert_texture(tex: GLuint, format: GLuint, w: GLint, h: GLint, pixels: &[u8]
 }
 
 // TODO: Change this to print out to env_logger or such, not stderr
-fn print_gl_errors(context: &str) {
+pub(crate) fn print_gl_errors(context: &str) {
     let mut error = unsafe { gl::GetError() };
     while error != gl::NO_ERROR {
         let error_msg = format!("GL error {}: {}", context, gl_error_to_string(error));
