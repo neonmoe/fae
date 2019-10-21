@@ -17,9 +17,6 @@
 //! - If possible, make your textures without using alpha values
 //!   between 1 and 0 (ie. use only 100% and 0% opacity), and disable
 //!   `alpha_blending` in your draw call.
-//! - If this crate is the only place where OpenGL calls are made, or
-//!   if you're handling OpenGL state properly yourself, set your
-//!   [`Renderer`](struct.Renderer.html)'s `preserve_gl_state` to false.
 
 use crate::gl;
 use crate::gl::types::*;
@@ -116,8 +113,8 @@ pub struct Renderer {
     gl_state: OpenGLState,
     profiler: Profiler,
     /// Whether the Renderer should try to preserve the OpenGL
-    /// state. If you're not using OpenGL yourself, set this to
-    /// `false` for less overhead.
+    /// state. If you're using OpenGL yourself, set this to `true` to
+    /// avoid possible headaches.
     pub preserve_gl_state: bool,
 }
 
@@ -186,7 +183,7 @@ impl Renderer {
                 element_buffer: 0,
             },
             profiler: Profiler::new(),
-            preserve_gl_state: true,
+            preserve_gl_state: false,
         }
     }
 

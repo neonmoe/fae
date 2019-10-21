@@ -64,18 +64,19 @@ impl TextRenderer {
         self.dpi_factor = dpi_factor;
     }
 
-    /// Draws text.
+    /// Draws text, and returns a bounding box `(min_x, min_y, max_x,
+    /// max_y)` of all glyphs drawn, if any were.
     ///
     /// - `text`: The rendered text.
     /// - `(x, y, z)`: The position (top-left) of the rendered text
-    /// area.
+    /// area. TODO: The y should be the baseline of the text
     /// - `font_size`: The size of the font.
     /// - `max_line_width`: The width at which the text will wrap. An
     /// effort is made to break lines at word boundaries.
     /// - `clip_area`: The area which defines where the text will be
     /// rendered. Text outside the area will be cut off. For an
     /// example use case, think editable text boxes: the clip area
-    /// would be the text box.
+    /// would be the text box's inner are.
     pub fn draw_text(
         &mut self,
         text: &str,
@@ -85,7 +86,11 @@ impl TextRenderer {
         color: (f32, f32, f32, f32),
         max_line_width: Option<f32>,
         clip_area: Option<(f32, f32, f32, f32)>,
-    ) {
+    ) -> Option<(f32, f32, f32, f32)> {
+        if text.len() == 0 {
+            return None;
+        }
+
         let draw_data_index = self.draw_datas.len();
         self.draw_datas.push(TextDrawData {
             clip_area,
@@ -105,6 +110,13 @@ impl TextRenderer {
             let glyph = Metric { glyph_id, size };
             metrics.insert(c, glyph);
         }
+
+        let (mut min_x, mut min_y, mut max_x, mut max_y) = (
+            std::f32::INFINITY,
+            std::f32::INFINITY,
+            std::f32::NEG_INFINITY,
+            std::f32::NEG_INFINITY,
+        );
 
         self.glyphs.reserve(text.len());
         let line_height = self.font.get_line_height(font_size);
@@ -137,8 +149,13 @@ impl TextRenderer {
                         }
                     }
 
+                    let screen_location = metric.size + cursor;
+                    min_x = min_x.min(screen_location.x);
+                    min_y = min_y.min(screen_location.y);
+                    max_x = max_x.max(screen_location.x + screen_location.w);
+                    max_y = max_y.max(screen_location.y + screen_location.h);
                     self.glyphs.push(Glyph {
-                        screen_location: metric.size + cursor,
+                        screen_location,
                         draw_data: draw_data_index,
                         id: metric.glyph_id,
                     });
@@ -153,6 +170,23 @@ impl TextRenderer {
                 x,
                 y: cursor.y + line_height,
             };
+        }
+
+        if let Some((clip_min_x, clip_min_y, clip_max_x, clip_max_y)) = clip_area {
+            min_x = min_x.max(clip_min_x);
+            min_y = min_y.max(clip_min_y);
+            max_x = max_x.min(clip_max_x);
+            max_y = max_y.min(clip_max_y);
+        }
+
+        if min_x == std::f32::INFINITY
+            || min_y == std::f32::INFINITY
+            || max_x == std::f32::NEG_INFINITY
+            || max_y == std::f32::NEG_INFINITY
+        {
+            None
+        } else {
+            Some((min_x, min_y, max_x, max_y))
         }
     }
 

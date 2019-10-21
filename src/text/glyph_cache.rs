@@ -3,6 +3,8 @@ use crate::image::Image;
 use crate::renderer::{DrawCallHandle, DrawCallParameters, Renderer, Shaders};
 use crate::text::types::*;
 
+// TODO: Gaps between glyphs or tighter uvs to avoid bleeding
+
 const GLYPH_CACHE_WIDTH: u32 = 1024;
 const GLYPH_CACHE_HEIGHT: u32 = 1024;
 

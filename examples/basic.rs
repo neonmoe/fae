@@ -7,7 +7,6 @@ use std::error::Error;
 fn main() -> Result<(), Box<dyn Error>> {
     let mut window = Window::create(&WindowSettings::default()).unwrap();
     let mut renderer = Renderer::new(&window);
-    renderer.preserve_gl_state = false;
     let params = DrawCallParameters {
         image: {
             #[cfg(feature = "png")]

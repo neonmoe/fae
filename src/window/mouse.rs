@@ -1,4 +1,5 @@
 /// Describes a mouse button.
+// TODO: Remove this, use glutin mousebutton
 #[derive(PartialEq, Clone, Copy, Debug)]
 pub enum Mouse {
     /// The left mouse button.

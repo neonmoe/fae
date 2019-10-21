@@ -22,7 +22,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut window = Window::create(&WindowSettings::default()).unwrap();
     // Create the OpenGL renderer
     let mut renderer = Renderer::new(&window);
-    renderer.preserve_gl_state = false;
     // Create the text renderer
     let mut text = TextRenderer::create(&mut renderer);
     // Create the draw call for the sprite
