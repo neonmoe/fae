@@ -64,7 +64,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         {
             // Buttons
-            let px = 1.0 / window.dpi_factor;
+            let px = 2.0;
             let mouse_in = is_mouse_in(&window, (10.0, y, 210.0, y + 40.0));
             if mouse_in && !was_mouse_in[0] {
                 window.set_cursor(fae::glutin::MouseCursor::Hand);

@@ -26,13 +26,16 @@ pub(crate) fn get_env_dpi() -> f32 {
 
 /// Defines a window.
 pub struct WindowSettings {
-    /// Title of the window. Default value: Name of the executable file
+    /// Title of the window. Default value: Name of the executable
+    /// file.
     pub title: String,
-    /// Width of the window in logical pixels. Default value: `640.0`
+    /// Width of the window in logical pixels. Default value: `640.0`.
     pub width: f32,
-    /// Height of the window in logical pixels. Default value: `480.0`
+    /// Height of the window in logical pixels. Default value:
+    /// `480.0`.
     pub height: f32,
-    /// Whether or not the application is a dialog. Default value: `true`
+    /// Whether or not the application is a dialog. Default value:
+    /// `true`.
     ///
     /// This only affects x11 environments with the `glutin` backend,
     /// where it sets the window type to dialog. In [tiling
@@ -46,8 +49,11 @@ pub struct WindowSettings {
     // Or perhaps remove this and provide a way to affect glutin Window and Context creation?
     // A handle to the glutin window would probably be good as well.
     pub is_dialog: bool,
-    /// This should always be true for everything except benchmarks.
+    /// This should always be true for everything except
+    /// benchmarks. Default value: `true`.
     pub vsync: bool,
+    /// Sets the multisampling level. Default value: `4`.
+    pub multisample: u16,
 }
 
 impl Default for WindowSettings {
@@ -62,6 +68,7 @@ impl Default for WindowSettings {
             height: 480.0,
             is_dialog: false,
             vsync: true,
+            multisample: 4,
         }
     }
 }

@@ -86,6 +86,7 @@ impl Window {
                 ContextBuilder::new()
                     .with_vsync(settings.vsync)
                     .with_srgb(true)
+                    .with_multisampling(settings.multisample)
                     .with_gl(gl_request)
                     .build_windowed(window, &events_loop)
             };
