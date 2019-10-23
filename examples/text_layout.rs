@@ -63,6 +63,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         {
             // Buttons
+            let px = 1.0 / window.dpi_factor;
             let mouse_in = is_mouse_in(&window, (10.0, y, 210.0, y + 40.0));
             if mouse_in && !was_mouse_in[0] {
                 window.set_cursor(fae::glutin::MouseCursor::Hand);
@@ -71,7 +72,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
             was_mouse_in[0] = mouse_in;
             renderer.draw_quad_tinted(
-                (11.0, y + 1.0, 209.0, y + 39.0),
+                (10.0 + px, y + px, 210.0 - px, y + 40.0 - px),
                 if mouse_in {
                     (0.9, 0.9, 0.9, 1.0)
                 } else {
@@ -107,7 +108,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
             was_mouse_in[1] = mouse_in;
             renderer.draw_quad_tinted(
-                (11.0, y + 1.0, 209.0, y + 39.0),
+                (10.0 + px, y + px, 210.0 - px, y + 40.0 - px),
                 if mouse_in {
                     (0.9, 0.9, 0.9, 1.0)
                 } else {
@@ -143,7 +144,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
             was_mouse_in[2] = mouse_in;
             renderer.draw_quad_tinted(
-                (11.0, y + 1.0, 209.0, y + 39.0),
+                (10.0 + px, y + px, 210.0 - px, y + 40.0 - px),
                 if mouse_in {
                     (0.9, 0.9, 0.9, 1.0)
                 } else {
