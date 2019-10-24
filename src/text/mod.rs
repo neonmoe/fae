@@ -33,7 +33,7 @@ impl TextRenderer {
     /// glyphs.
     pub fn create(renderer: &mut Renderer) -> TextRenderer {
         #[cfg(feature = "font8x8" /* or font-kit, in the future */)]
-        let (glyph_cache, call) = GlyphCache::create_cache_and_draw_call(renderer);
+        let (glyph_cache, call) = GlyphCache::create_cache_and_draw_call(renderer, 128, 128);
 
         #[cfg(not(feature = "font8x8" /* or font-kit, in the future */))]
         let call = renderer.create_draw_call(crate::renderer::DrawCallParameters {
@@ -226,5 +226,23 @@ impl TextRenderer {
         self.glyphs.clear();
         self.draw_datas.clear();
         self.font.update_glyph_cache_expiration();
+    }
+
+    /// Draws the glyph cache texture in the given screen-space quad,
+    /// for debugging.
+    pub fn debug_draw_glyph_cache(
+        &self,
+        renderer: &mut Renderer,
+        quad: (f32, f32, f32, f32),
+        z: f32,
+    ) {
+        renderer.draw_quad(
+            quad,
+            (0.0, 0.0, 1.0, 1.0),
+            (0.0, 0.0, 0.0, 1.0),
+            (0.0, 0.0, 0.0),
+            z,
+            &self.call,
+        );
     }
 }

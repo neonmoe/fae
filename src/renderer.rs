@@ -118,6 +118,17 @@ pub struct Renderer {
     pub preserve_gl_state: bool,
 }
 
+/// Describes how textures are wrapped.
+#[derive(Debug, Clone)]
+pub enum TextureWrapping {
+    /// Corresponds to GL_CLAMP_TO_EDGE.
+    Clamp,
+    /// Corresponds to GL_REPEAT.
+    Repeat,
+    /// Corresponds to GL_MIRRORED_REPEAT.
+    RepeatMirrored,
+}
+
 /// Options which set capabilities, restrictions and resources for
 /// draw calls. Used in [`Renderer::create_draw_call`].
 #[derive(Debug, Clone)]
@@ -139,6 +150,10 @@ pub struct DrawCallParameters {
     /// scaling? (Tip: for pixel art or other textures that don't
     /// suffer from jaggies, set this to false for the intended look.)
     pub magnification_smoothing: bool,
+    /// Sets the texture's behavior when sampling under 0.0 or over
+    /// 1.0, or smoothing over texture boundaries. (Corresponds to
+    /// GL_TEXTURE_WRAP_S and GL_TEXTURE_WRAP_T, in that order.)
+    pub wrap: (TextureWrapping, TextureWrapping),
 }
 
 impl Default for DrawCallParameters {
@@ -149,6 +164,7 @@ impl Default for DrawCallParameters {
             alpha_blending: true,
             minification_smoothing: true,
             magnification_smoothing: false,
+            wrap: (TextureWrapping::Clamp, TextureWrapping::Clamp),
         }
     }
 }
@@ -232,9 +248,16 @@ impl Renderer {
         let program = create_program(&vert, &frag, self.gl_state.legacy);
         let attributes = create_attributes(self.gl_state.legacy, program);
         let filter = |smoothed| if smoothed { gl::LINEAR } else { gl::NEAREST } as i32;
+        let wrap = |wrap_type| match wrap_type {
+            TextureWrapping::Clamp => gl::CLAMP_TO_EDGE,
+            TextureWrapping::Repeat => gl::REPEAT,
+            TextureWrapping::RepeatMirrored => gl::MIRRORED_REPEAT,
+        };
         let texture = create_texture(
             filter(params.minification_smoothing),
             filter(params.magnification_smoothing),
+            wrap(params.wrap.0) as i32,
+            wrap(params.wrap.1) as i32,
         );
         self.calls.push(DrawCall {
             texture,
@@ -977,15 +1000,17 @@ unsafe fn disable_vertex_attribs(attrib_locations: &[GLuint]) {
 }
 
 #[inline]
-fn create_texture(min_filter: GLint, mag_filter: GLint) -> GLuint {
+fn create_texture(min_filter: GLint, mag_filter: GLint, wrap_s: GLint, wrap_t: GLint) -> GLuint {
     let mut tex = 0;
     unsafe {
         gl::GenTextures(1, &mut tex);
         gl::BindTexture(gl::TEXTURE_2D, tex);
-        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::REPEAT as GLint);
-        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, gl::REPEAT as GLint);
-        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, min_filter as GLint);
-        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, mag_filter as GLint);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::REPEAT as i32);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, gl::REPEAT as i32);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, min_filter);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, mag_filter);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, wrap_s);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, wrap_t);
     }
     print_gl_errors("after creating a texture");
     tex

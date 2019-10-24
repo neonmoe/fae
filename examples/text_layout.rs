@@ -23,6 +23,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         alpha_blending: false,
         ..Default::default()
     });
+    let call = renderer.create_draw_call(Default::default());
 
     let mut time = 0.0f32;
     let mut was_mouse_in = vec![false; 3];
@@ -208,7 +209,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 None,
             ) {
                 renderer.draw_quad_tinted(rect, (0.9, 0.9, 0.5, 1.0), (0.0, 0.0, 0.0), 0.1, &bgs);
-                // y += 10.0 + (rect.3 - rect.1); // uncomment this if adding new y-based things
+                y += 10.0 + (rect.3 - rect.1);
             }
             // Animated text
         }
@@ -226,6 +227,15 @@ fn main() -> Result<(), Box<dyn Error>> {
             );
             // Lorem ipsum
         }
+
+        text.debug_draw_glyph_cache(&mut renderer, (20.0, y, 148.0, y + 128.0), -1.0);
+        renderer.draw_quad_tinted(
+            (20.0, y, 148.0, y + 128.0),
+            (0.9, 0.9, 0.9, 1.0),
+            (0.0, 0.0, 0.0),
+            -0.9,
+            &call,
+        );
 
         text.compose_draw_call(&mut renderer);
         renderer.render(window.width, window.height);

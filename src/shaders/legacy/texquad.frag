@@ -11,7 +11,7 @@ void main(void) {
   } else {
     out_color = frag_color * texture2D(tex, frag_texcoord);
   }
-  if (out_color.a < 0.01) {
+  if (out_color.a < 0.00390625) {
     discard;
   }
   gl_FragColor = out_color;

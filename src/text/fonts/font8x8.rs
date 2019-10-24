@@ -24,7 +24,7 @@ impl FontProvider for Font8x8Provider {
         Some(font_size / 2.0)
     }
 
-    fn get_metric(&self, _id: u32, font_size: f32) -> RectPx {
+    fn get_metric(&self, _id: u32, font_size: f32) -> RectPx<f32> {
         RectPx {
             x: 0.0,
             y: font_size * 0.66 / 3.0,
@@ -93,10 +93,6 @@ fn render_bitmap(c: char, bitmap: [u8; 8], cache: &mut GlyphCache) -> Option<Rec
         crate::profiler::modify_profiler_value_i32("glyphs rendered", |i| i + 1);
         Some(spot.uvs)
     } else {
-        // TODO: Test this case, then replace this branch with ?
-        if cfg!(debug_assertions) {
-            panic!("");
-        }
         None
     }
 }

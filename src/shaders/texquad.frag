@@ -11,7 +11,7 @@ void main(void) {
   } else {
     out_color = frag_color * texture(tex, frag_texcoord.xy);
   }
-  if (out_color.a < 0.01) {
+  if (out_color.a < 0.00390625) {
     discard;
   }
 }
