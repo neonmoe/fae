@@ -18,7 +18,7 @@ In earum architecto qui sunt provident. Vitae rerum molestiae dolorem praesentiu
 fn main() -> Result<(), Box<dyn Error>> {
     let mut window = Window::create(&WindowSettings::default())?;
     let mut renderer = Renderer::new(&window);
-    let mut text = TextRenderer::create(&mut renderer);
+    let mut text = TextRenderer::create_simple(&mut renderer, true);
     let bgs = renderer.create_draw_call(DrawCallParameters {
         alpha_blending: false,
         ..Default::default()

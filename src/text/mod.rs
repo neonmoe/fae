@@ -28,12 +28,16 @@ pub struct TextRenderer {
 impl TextRenderer {
     /// Creates a new text renderer without any external fonts.
     ///
+    /// `smoothed` controls the `magnification_smoothing` value of the
+    /// underlying draw call.
+    ///
     /// If the `font8x8` feature is enabled, will use those
     /// glyphs. Otherwise, will draw squares in the place of those
     /// glyphs.
-    pub fn create(renderer: &mut Renderer) -> TextRenderer {
+    pub fn create_simple(renderer: &mut Renderer, smoothed: bool) -> TextRenderer {
         #[cfg(feature = "font8x8" /* or font-kit, in the future */)]
-        let (glyph_cache, call) = GlyphCache::create_cache_and_draw_call(renderer, 128, 128);
+        let (glyph_cache, call) =
+            GlyphCache::create_cache_and_draw_call(renderer, 128, 128, smoothed);
 
         #[cfg(not(feature = "font8x8" /* or font-kit, in the future */))]
         let call = renderer.create_draw_call(crate::renderer::DrawCallParameters {

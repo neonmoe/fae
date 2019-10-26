@@ -110,7 +110,7 @@ fn get_bitmap(c: char) -> Option<[u8; 8]> {
         0x3040..=0x309F => Some(font8x8::legacy::HIRAGANA_LEGACY[u - 0x3040]),
         // TODO: The 'micro' glyph doesn't seem to work, debug
         // TODO: Test all of the font8x8 glyphs, draw a grid or something
-        0x390..=0x039C => Some(font8x8::legacy::GREEK_LEGACY[u - 0x390]),
+        0x390..=0x03C9 => Some(font8x8::legacy::GREEK_LEGACY[u - 0x390]),
         0xE541..=0xE55A => Some(font8x8::legacy::SGA_LEGACY[u - 0xE541]),
         0x20A7 => Some(font8x8::legacy::MISC_LEGACY[0]),
         0x192 => Some(font8x8::legacy::MISC_LEGACY[1]),

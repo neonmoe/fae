@@ -20,7 +20,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
     let call = renderer.create_draw_call(params);
 
-    let mut text = TextRenderer::create(&mut renderer);
+    let mut text = TextRenderer::create_simple(&mut renderer, true);
 
     let mut should_quit = false;
     while window.refresh() && !should_quit {

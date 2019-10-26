@@ -144,6 +144,7 @@ impl GlyphCache {
         renderer: &mut Renderer,
         width: u32,
         height: u32,
+        smoothed: bool,
     ) -> (GlyphCache, DrawCallHandle) {
         let cache_image = Image::from_color(width as i32, height as i32, &[0, 0, 0, 0]);
         let call = renderer.create_draw_call(DrawCallParameters {
@@ -151,7 +152,7 @@ impl GlyphCache {
             shaders: Some(DEFAULT_TEXT_SHADERS),
             alpha_blending: true,
             minification_smoothing: true,
-            magnification_smoothing: true,
+            magnification_smoothing: smoothed,
             wrap: (TextureWrapping::Clamp, TextureWrapping::Clamp),
         });
         let cache = GlyphCache {

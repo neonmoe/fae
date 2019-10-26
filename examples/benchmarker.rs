@@ -23,7 +23,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Create the OpenGL renderer
     let mut renderer = Renderer::new(&window);
     // Create the text renderer
-    let mut text = TextRenderer::create(&mut renderer);
+    let mut text = TextRenderer::create_simple(&mut renderer, true);
     // Create the draw call for the sprite
     let params = DrawCallParameters {
         image: {
@@ -174,7 +174,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             y += 20.0;
             text.draw_text(
                 &format!(
-                    "{}: {:4.1} μs",
+                    "{}: {:4.1} \u{03bc}s",
                     duration_name,
                     get_avg_timer_mcs(duration_name)
                 ),
