@@ -114,6 +114,7 @@ pub struct Renderer {
     calls: Vec<DrawCall>,
     gl_state: OpenGLState,
     profiler: Profiler,
+    pub(crate) dpi_factor: f32,
     /// Whether the Renderer should try to preserve the OpenGL
     /// state. If you're using OpenGL yourself, set this to `true` to
     /// avoid possible headaches.
@@ -176,7 +177,7 @@ impl Renderer {
     ///
     /// Takes a Window as a parameter to ensure that a valid OpenGL
     /// context exists.
-    pub fn new(_: &crate::Window) -> Renderer {
+    pub fn new(window: &crate::Window) -> Renderer {
         let version = get_version();
         let legacy = if let Some((major, minor)) = &version {
             *major < 3 || (*major == 3 && *minor < 3)
@@ -201,6 +202,7 @@ impl Renderer {
                 element_buffer: 0,
             },
             profiler: Profiler::new(),
+            dpi_factor: window.dpi_factor,
             preserve_gl_state: false,
         }
     }
@@ -389,6 +391,11 @@ impl Renderer {
                 .vbo_data
                 .extend_from_slice(&quad);
         }
+    }
+
+    /// Updates the DPI multiplication factor of the screen.
+    pub fn set_dpi_factor(&mut self, dpi_factor: f32) {
+        self.dpi_factor = dpi_factor;
     }
 
     /// Clears all queued draws. Like a dummy-version of [`Renderer::render`].

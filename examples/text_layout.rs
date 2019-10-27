@@ -30,7 +30,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut pressed_index = None;
     let mut lipsum_alignment = Alignment::Left;
     while window.refresh() {
-        text.update_dpi_factor(window.dpi_factor);
+        renderer.set_dpi_factor(window.dpi_factor);
 
         time += 0.01;
         let osc = time.sin() * 0.5 + 0.5;

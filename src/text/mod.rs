@@ -21,7 +21,6 @@ pub struct TextRenderer {
     call: DrawCallHandle,
     glyphs: Vec<Glyph>,
     draw_datas: Vec<TextDrawData>,
-    dpi_factor: f32,
     font: Box<dyn FontProvider>,
 }
 
@@ -49,7 +48,6 @@ impl TextRenderer {
             call,
             glyphs: Vec::new(),
             draw_datas: Vec::new(),
-            dpi_factor: 1.0,
             font: {
                 #[cfg(not(feature = "font8x8"))]
                 let provider = fonts::DummyProvider;
@@ -58,14 +56,6 @@ impl TextRenderer {
                 Box::new(provider)
             },
         }
-    }
-
-    /// Updates the DPI factor that will be taken into account during
-    /// text rendering. If the window DPI changes, this should be
-    /// called with the new factor before new text draw calls.
-    // TODO: Refactor this function out, it's not good
-    pub fn update_dpi_factor(&mut self, dpi_factor: f32) {
-        self.dpi_factor = dpi_factor;
     }
 
     /// Draws text, and returns a bounding box `(min_x, min_y, max_x,

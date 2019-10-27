@@ -21,7 +21,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     });
 
     while window.refresh() {
-        text.update_dpi_factor(window.dpi_factor);
+        renderer.set_dpi_factor(window.dpi_factor);
 
         text.draw_text(
             "Some text for seeing if everything breaks suddenly or something.\nLet's hope that doesn't happen.",
@@ -50,6 +50,18 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .draw(&call, -0.9)
                 .with_coordinates(x, y, size, size)
                 .with_uvs(0.0 + offset, 0.0 + offset, 1.0 + offset, 1.0 + offset)
+                .finish();
+            y += 10.0 + size;
+        }
+
+        let mut y = 158.0;
+        let x = 128.0;
+        for i in 0..4 {
+            let size = 8.0 * 2.0f32.powf(i as f32) / window.dpi_factor;
+            renderer
+                .draw(&call, -0.9)
+                .with_coordinates(x, y, size, size)
+                .with_texture_coordinates(0, 0, 8, 8)
                 .finish();
             y += 10.0 + size;
         }

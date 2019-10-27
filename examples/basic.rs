@@ -24,7 +24,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut should_quit = false;
     while window.refresh() && !should_quit {
-        text.update_dpi_factor(window.dpi_factor); // TODO: Bad api
+        renderer.set_dpi_factor(window.dpi_factor);
 
         if window
             .pressed_keys

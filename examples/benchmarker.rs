@@ -88,7 +88,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         timers["application frame"][timer_index].start();
         // Update the text renderer's dpi settings, in case refresh
         // changed them
-        text.update_dpi_factor(window.dpi_factor);
+        renderer.set_dpi_factor(window.dpi_factor);
 
         if window.pressed_keys.contains(&keys::CLOSE) {
             should_quit = true;
