@@ -21,6 +21,7 @@
 use crate::gl;
 use crate::gl::types::*;
 use crate::image::Image;
+use crate::renderable::Renderable;
 use std::mem;
 use std::ptr;
 
@@ -79,6 +80,7 @@ struct Attributes {
 #[derive(Clone, Debug)]
 struct DrawCall {
     texture: TextureHandle,
+    texture_size: (i32, i32),
     program: ShaderProgram,
     attributes: Attributes,
     blend: bool,
@@ -261,6 +263,7 @@ impl Renderer {
         );
         self.calls.push(DrawCall {
             texture,
+            texture_size: (0, 0),
             program,
             attributes,
             blend: params.alpha_blending,
@@ -275,54 +278,35 @@ impl Renderer {
                 image.height,
                 &image.pixels,
             );
+            self.calls[index].texture_size = (image.width, image.height);
         }
 
         self.gl_pop();
         DrawCallHandle(index)
     }
 
-    #[allow(dead_code)]
-    pub(crate) fn create_dummy_draw_call(&mut self) -> DrawCallHandle {
-        let index = self.calls.len();
-        self.calls.push(DrawCall {
-            texture: 0,
-            program: ShaderProgram {
-                program: 0,
-                vertex_shader: 0,
-                fragment_shader: 0,
-                projection_matrix_location: 0,
-                position_attrib_location: 0,
-                texcoord_attrib_location: 0,
-                color_attrib_location: 0,
-                rotation_attrib_location: 0,
-                depth_attrib_location: 0,
-                shared_position_attrib_location: 0,
-                shared_texcoord_attrib_location: 0,
-            },
-            attributes: Attributes {
-                vbo: 0,
-                vbo_static: 0,
-                element_buffer: 0,
-                vao: 0,
-                vbo_data: Vec::new(),
-                allocated_vbo_data_size: 0,
-            },
-            blend: false,
-            lowest_depth: 1.0,
-        });
-        DrawCallHandle(index)
+    /// Creates a Renderable struct, which you can render after
+    /// specifying your parameters.
+    ///
+    /// # Usage
+    /// ```no_run
+    /// # fn main() {
+    /// # use fae::{DrawCallParameters, Renderer, Window, WindowSettings};
+    /// # let mut renderer = Renderer::new(&Window::create(&WindowSettings::default()).unwrap());
+    /// # let call = renderer.create_draw_call(DrawCallParameters::default());
+    /// renderer.draw()
+    ///     .with_coordinates(100.0, 100.0, 16.0, 16.0)
+    ///     .with_texture_coordinates(0, 0, 16, 16)
+    ///     .finish(&call);
+    /// # }
+    /// ```
+    #[inline]
+    pub fn draw<'a, 'b>(&'a mut self, call: &'b DrawCallHandle, z: f32) -> Renderable<'a, 'b> {
+        Renderable::create(self, call, z)
     }
 
-    /// Draws a textured rectangle on the screen, but only the parts
-    /// inside `clip_area`.
-    ///
-    /// - `clip_area`: The coordinates of the corners of the clipping
-    /// area, in (logical) pixels. Arrangement: (left, top, right, bottom)
-    ///
-    /// See [`Renderer::draw_quad`] for the rest of the parameters'
-    /// docs.
     #[allow(clippy::too_many_arguments)]
-    pub fn draw_quad_clipped(
+    pub(crate) fn draw_quad_clipped(
         &mut self,
         clip_area: (f32, f32, f32, f32),
         coords: (f32, f32, f32, f32),
@@ -357,53 +341,8 @@ impl Renderer {
         self.draw_quad((x0, y0, x1, y1), texcoords, color, rotation, z, call_handle);
     }
 
-    /// Draws a tinted rectangle on the screen, without any texturing.
-    ///
-    /// Basically a shorthand for [`Renderer::draw_quad`] with the
-    /// `texcoords` set to (-1.0, -1.0, -1.0, -1.0) which are a
-    /// symbolic value for "don't use the texture".
-    pub fn draw_quad_tinted(
-        &mut self,
-        coords: (f32, f32, f32, f32),
-        color: (f32, f32, f32, f32),
-        rotation: (f32, f32, f32),
-        z: f32,
-        call_handle: &DrawCallHandle,
-    ) {
-        self.draw_quad(
-            coords,
-            (-1.0, -1.0, -1.0, -1.0),
-            color,
-            rotation,
-            z,
-            call_handle,
-        );
-    }
-
-    /// Draws a textured rectangle on the screen.
-    ///
-    /// - `coords`: The coordinates of the corners of the quad, in
-    /// (logical) pixels. Arrangement: (left, top, right, bottom)
-    ///
-    /// - `texcoords`: The texture coordinates (UVs) of the quad, in
-    /// the range `0.0 - 1.0`. The shader will not use the texture at
-    /// all if the texcoords are all `-1.0`. Same arrangement as
-    /// `coords`.
-    ///
-    /// - `color`: The color tint of the quad, in the range
-    /// `0-255`. Arrangement: (red, green, blue, alpha)
-    ///
-    /// - `rotation`: The rotation of the quad, in radians, and the
-    /// point (relative to `coords` x and y, in logical pixels as well)
-    /// around which the sprite pivots. Arrangement: (radians, x, y)
-    ///
-    /// - `depth`: Used for ordering sprites on screen, in the range
-    /// `-1.0 - 1.0`. Negative values are in front.
-    ///
-    /// - `call_handle`: The index of the draw call to draw the quad
-    /// in. This is the returned value from [`Renderer::create_draw_call`].
     #[inline]
-    pub fn draw_quad(
+    pub(crate) fn draw_quad(
         &mut self,
         coords: (f32, f32, f32, f32),
         texcoords: (f32, f32, f32, f32),
@@ -663,6 +602,10 @@ impl Renderer {
     #[cfg(all(feature = "text", feature = "font8x8" /* or font-kit, in the future */))]
     pub(crate) fn get_texture(&self, call_handle: &DrawCallHandle) -> GLuint {
         self.calls[call_handle.0].texture
+    }
+
+    pub(crate) fn get_texture_size(&self, call_handle: &DrawCallHandle) -> (i32, i32) {
+        self.calls[call_handle.0].texture_size
     }
 
     /// Saves the current OpenGL state for [`Renderer::gl_pop`] and

@@ -34,13 +34,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         );
 
         text.debug_draw_glyph_cache(&mut renderer, (20.0, 20.0, 148.0, 148.0), -1.0);
-        renderer.draw_quad_tinted(
-            (20.0, 20.0, 148.0, 148.0),
-            (0.9, 0.9, 0.9, 1.0),
-            (0.0, 0.0, 0.0),
-            -0.9,
-            &call,
-        );
+        renderer
+            .draw(&call, -0.9)
+            .with_coordinates(20.0, 20.0, 128.0, 128.0)
+            .with_color(0.9, 0.9, 0.9, 1.0)
+            .finish();
 
         let mut y = 158.0;
         let x = 32.0;
@@ -48,14 +46,11 @@ fn main() -> Result<(), Box<dyn Error>> {
             let size = 8.0 * 2.0f32.powf(i as f32) / window.dpi_factor;
             let px = 1.0 / window.dpi_factor;
             let offset = -0.5 / size * px;
-            renderer.draw_quad(
-                (x, y, x + size, y + size),
-                (0.0 + offset, 0.0 + offset, 1.0 + offset, 1.0 + offset),
-                (1.0, 1.0, 1.0, 1.0),
-                (0.0, 0.0, 0.0),
-                -0.9,
-                &call,
-            );
+            renderer
+                .draw(&call, -0.9)
+                .with_coordinates(x, y, size, size)
+                .with_uvs(0.0 + offset, 0.0 + offset, 1.0 + offset, 1.0 + offset)
+                .finish();
             y += 10.0 + size;
         }
 

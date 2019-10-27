@@ -33,14 +33,11 @@ fn main() -> Result<(), Box<dyn Error>> {
             should_quit = true;
         }
 
-        renderer.draw_quad(
-            (0.0, 0.0, 640.0, 480.0), // The corner coordinates of the quad, in window coordinates (x0, y0, x1, y1)
-            (0.0, 0.0, 1.0, 1.0), // The corner texture coordinates of the quad, in the 0..1 range (x0, y0, x1, y1)
-            (1.0, 1.0, 1.0, 1.0), // The tint color of the texture (r, g, b, a)
-            (0.0, 0.0, 0.0), // The rotation and pivot offset (radians, x, y). If x = 0.0 and y = 0.0, the quad will be rotated around its top-left coordinate, and this is shifted by x and y
-            0.5, // The z coordinate of the quad, to specify which goes in front of what. Negative values are in front.
-            &call, // The draw call during which to render this quad, practically this decides which texture is used
-        );
+        renderer
+            .draw(&call, 0.5)
+            .with_coordinates(0.0, 0.0, 640.0, 480.0)
+            .with_texture_coordinates(0, 0, 1240, 920)
+            .finish();
 
         text.draw_text(
             "Some cool text!",    // The displayed text

@@ -13,10 +13,12 @@ pub mod gl {
 }
 
 mod image;
+mod renderable;
 mod renderer;
 mod window;
 
 pub use image::*;
+pub use renderable::*;
 pub use renderer::*;
 pub use window::*;
 

@@ -45,7 +45,11 @@ fn main() -> Result<(), Box<dyn Error>> {
             None,
             None,
         ) {
-            renderer.draw_quad_tinted(rect, (0.9, 0.9, 0.5, 1.0), (0.0, 0.0, 0.0), 0.1, &bgs);
+            renderer
+                .draw(&bgs, 0.1)
+                .with_coordinates(rect.0, rect.1, rect.2 - rect.0, rect.3 - rect.1)
+                .with_color(0.9, 0.9, 0.5, 1.0)
+                .finish();
         }
         y += 20.0;
 
@@ -58,7 +62,11 @@ fn main() -> Result<(), Box<dyn Error>> {
             None,
             Some((10.0, y, 10.0 + 12.0 * 8.0, y + 16.0)),
         ) {
-            renderer.draw_quad_tinted(rect, (0.9, 0.9, 0.5, 1.0), (0.0, 0.0, 0.0), 0.1, &bgs);
+            renderer
+                .draw(&bgs, 0.1)
+                .with_coordinates(rect.0, rect.1, rect.2 - rect.0, rect.3 - rect.1)
+                .with_color(0.9, 0.9, 0.5, 1.0)
+                .finish();
         }
         y += 20.0;
 
@@ -72,24 +80,17 @@ fn main() -> Result<(), Box<dyn Error>> {
                 window.set_cursor(fae::glutin::MouseCursor::Default);
             }
             was_mouse_in[0] = mouse_in;
-            renderer.draw_quad_tinted(
-                (10.0 + px, y + px, 210.0 - px, y + 40.0 - px),
-                if mouse_in {
-                    (0.9, 0.9, 0.9, 1.0)
-                } else {
-                    (1.0, 1.0, 1.0, 1.0)
-                },
-                (0.0, 0.0, 0.0),
-                0.1,
-                &bgs,
-            );
-            renderer.draw_quad_tinted(
-                (10.0, y, 210.0, y + 40.0),
-                (0.2, 0.2, 0.2, 1.0),
-                (0.0, 0.0, 0.0),
-                0.1,
-                &bgs,
-            );
+            let col = if mouse_in { 0.9 } else { 1.0 };
+            renderer
+                .draw(&bgs, 0.1)
+                .with_coordinates(10.0 + px, y + px, 200.0 - 2.0 * px, 40.0 - 2.0 * px)
+                .with_color(col, col, col, 1.0)
+                .finish();
+            renderer
+                .draw(&bgs, 0.1)
+                .with_coordinates(10.0, y, 200.0, 40.0)
+                .with_color(0.2, 0.2, 0.2, 1.0)
+                .finish();
             text.draw_text(
                 "Left",
                 (10.0, y + 10.0, 0.0),
@@ -108,24 +109,17 @@ fn main() -> Result<(), Box<dyn Error>> {
                 window.set_cursor(fae::glutin::MouseCursor::Default);
             }
             was_mouse_in[1] = mouse_in;
-            renderer.draw_quad_tinted(
-                (10.0 + px, y + px, 210.0 - px, y + 40.0 - px),
-                if mouse_in {
-                    (0.9, 0.9, 0.9, 1.0)
-                } else {
-                    (1.0, 1.0, 1.0, 1.0)
-                },
-                (0.0, 0.0, 0.0),
-                0.1,
-                &bgs,
-            );
-            renderer.draw_quad_tinted(
-                (10.0, y, 210.0, y + 40.0),
-                (0.2, 0.2, 0.2, 1.0),
-                (0.0, 0.0, 0.0),
-                0.1,
-                &bgs,
-            );
+            let col = if mouse_in { 0.9 } else { 1.0 };
+            renderer
+                .draw(&bgs, 0.1)
+                .with_coordinates(10.0 + px, y + px, 200.0 - 2.0 * px, 40.0 - 2.0 * px)
+                .with_color(col, col, col, 1.0)
+                .finish();
+            renderer
+                .draw(&bgs, 0.1)
+                .with_coordinates(10.0, y, 200.0, 40.0)
+                .with_color(0.2, 0.2, 0.2, 1.0)
+                .finish();
             text.draw_text(
                 "Center",
                 (10.0, y + 10.0, 0.0),
@@ -144,24 +138,17 @@ fn main() -> Result<(), Box<dyn Error>> {
                 window.set_cursor(fae::glutin::MouseCursor::Default);
             }
             was_mouse_in[2] = mouse_in;
-            renderer.draw_quad_tinted(
-                (10.0 + px, y + px, 210.0 - px, y + 40.0 - px),
-                if mouse_in {
-                    (0.9, 0.9, 0.9, 1.0)
-                } else {
-                    (1.0, 1.0, 1.0, 1.0)
-                },
-                (0.0, 0.0, 0.0),
-                0.1,
-                &bgs,
-            );
-            renderer.draw_quad_tinted(
-                (10.0, y, 210.0, y + 40.0),
-                (0.2, 0.2, 0.2, 1.0),
-                (0.0, 0.0, 0.0),
-                0.1,
-                &bgs,
-            );
+            let col = if mouse_in { 0.9 } else { 1.0 };
+            renderer
+                .draw(&bgs, 0.1)
+                .with_coordinates(10.0 + px, y + px, 200.0 - 2.0 * px, 40.0 - 2.0 * px)
+                .with_color(col, col, col, 1.0)
+                .finish();
+            renderer
+                .draw(&bgs, 0.1)
+                .with_coordinates(10.0, y, 200.0, 40.0)
+                .with_color(0.2, 0.2, 0.2, 1.0)
+                .finish();
             text.draw_text(
                 "Right",
                 (10.0, y + 10.0, 0.0),
@@ -208,7 +195,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                 Some(40.0 + osc * 100.0),
                 None,
             ) {
-                renderer.draw_quad_tinted(rect, (0.9, 0.9, 0.5, 1.0), (0.0, 0.0, 0.0), 0.1, &bgs);
+                renderer
+                    .draw(&bgs, 0.1)
+                    .with_coordinates(rect.0, rect.1, rect.2 - rect.0, rect.3 - rect.1)
+                    .with_color(0.9, 0.9, 0.5, 1.0)
+                    .finish();
                 y += 10.0 + (rect.3 - rect.1);
             }
             // Animated text
@@ -229,13 +220,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
 
         text.debug_draw_glyph_cache(&mut renderer, (20.0, y, 148.0, y + 128.0), -1.0);
-        renderer.draw_quad_tinted(
-            (20.0, y, 148.0, y + 128.0),
-            (0.9, 0.9, 0.9, 1.0),
-            (0.0, 0.0, 0.0),
-            -0.9,
-            &call,
-        );
+        renderer
+            .draw(&call, -0.9)
+            .with_coordinates(20.0, y, 128.0, 128.0)
+            .with_color(0.9, 0.9, 0.9, 1.0)
+            .finish();
 
         text.compose_draw_call(&mut renderer);
         renderer.render(window.width, window.height);

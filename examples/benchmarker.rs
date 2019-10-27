@@ -118,39 +118,32 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         timers["quad calls"][timer_index].start();
         // Background
-        renderer.draw_quad(
-            (0.0, 0.0, 640.0, 480.0),
-            (0.0, 0.0, 1.0, 1.0),
-            (1.0, 1.0, 1.0, 1.0),
-            (0.0, 0.0, 0.0),
-            0.6,
-            &call,
-        );
+        renderer
+            .draw(&call, 0.6)
+            .with_coordinates(0.0, 0.0, 640.0, 480.0)
+            .with_texture_coordinates(0, 0, 1240, 920)
+            .finish();
 
         // Bottom right corned (for testing smooth resize)
         let (w, h) = (window.width, window.height);
-        renderer.draw_quad(
-            (w - 100.0, h - 100.0, w, h),
-            (0.0, 0.0, 1.0, 1.0),
-            (1.0, 1.0, 0.0, 1.0),
-            (0.0, 0.0, 0.0),
-            0.5,
-            &call,
-        );
+        renderer
+            .draw(&call, 0.5)
+            .with_coordinates(w - 100.0, h - 100.0, 100.0, 100.0)
+            .with_texture_coordinates(0, 0, 1240, 920)
+            .finish();
 
         // Spinny sprites
         for i in 0..quad_count {
             let f = i as f32 / quad_count as f32;
             let x = (f * 3.1415 * 8.0 + time).cos() * 150.0 * f.max(0.3) + 270.0;
             let y = (f * 3.1415 * 8.0 + time).sin() * 150.0 * f.max(0.3) + 190.0;
-            renderer.draw_quad(
-                (x, y, x + 100.0, y + 100.0),
-                (0.0, 0.0, 1.0, 1.0),
-                (1.0, 0.7, 0.9, 1.0),
-                (-time * 1.5, 50.0, 50.0),
-                f - 0.5,
-                &call,
-            );
+            renderer
+                .draw(&call, f - 0.5)
+                .with_coordinates(x, y, 100.0, 100.0)
+                .with_texture_coordinates(0, 0, 1240, 920)
+                .with_color(1.0, 0.7, 0.9, 1.0)
+                .with_rotation(-time * 1.5, 50.0, 50.0)
+                .finish();
         }
         timers["quad calls"][timer_index].end();
 
@@ -293,14 +286,10 @@ fn main() -> Result<(), Box<dyn Error>> {
             None,
         );
 
-        renderer.draw_quad(
-            (20.0, 300.0, 320.0, 600.0),
-            (-1.0, -1.0, -1.0, -1.0),
-            (1.0, 1.0, 1.0, 1.0),
-            (0.0, 0.0, 0.0),
-            -0.55,
-            &call,
-        );
+        renderer
+            .draw(&call, -0.55)
+            .with_coordinates(20.0, 300.0, 300.0, 300.0)
+            .finish();
         text.draw_text(
             &format!("profiling information:\n{}", profiler::get_profiler_print()),
             (30.0, 310.0, -0.6),
