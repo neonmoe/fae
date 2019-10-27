@@ -6,7 +6,6 @@ pub struct Renderable<'a, 'b> {
     renderer: &'a mut Renderer,
     call: &'b DrawCallHandle,
     z: f32,
-    physical_dimensions: Option<(f32, f32)>,
     coords: (f32, f32, f32, f32),
     texcoords: (f32, f32, f32, f32),
     color: (f32, f32, f32, f32),
@@ -25,7 +24,6 @@ impl<'a, 'b> Renderable<'a, 'b> {
             renderer,
             call,
             z,
-            physical_dimensions: None,
             coords: (0.0, 0.0, 0.0, 0.0),
             texcoords: (-1.0, -1.0, -1.0, -1.0),
             color: (1.0, 1.0, 1.0, 1.0),
@@ -71,23 +69,11 @@ impl<'a, 'b> Renderable<'a, 'b> {
         height: f32,
     ) -> Renderable<'a, 'b> {
         self.coords = (x, y, x + width, y + height);
-        self.physical_dimensions = Some((
-            width * self.renderer.dpi_factor,
-            height * self.renderer.dpi_factor,
-        ));
         self
     }
 
     /// Specifies the texture coordinates (in actual pixels, in the
-    /// texture's coordinate space) from where the quad is
-    /// sampled. NOTE: Specify the screen coordinates (ie. call
-    /// `with_coordinates`) before this function to avoid graphical
-    /// glitches.
-    ///
-    /// This function does some correction math to the coordinates. If
-    /// you don't really care about pixel-perfectness and/or have
-    /// smoothing on, or know what you're doing, `with_uvs` is faster
-    /// because it does no additional work.
+    /// texture's coordinate space) from where the quad is sampled.
     #[inline]
     pub fn with_texture_coordinates(
         mut self,
@@ -99,16 +85,7 @@ impl<'a, 'b> Renderable<'a, 'b> {
         let (tw, th) = self.renderer.get_texture_size(self.call);
         let (tw, th) = (tw as f32, th as f32);
         let (x, y, width, height) = (x as f32, y as f32, width as f32, height as f32);
-        if let Some(size) = self.physical_dimensions {
-            self.texcoords = (
-                x / tw - 0.5 / size.0,
-                y / th - 0.5 / size.1,
-                (x + width) / tw - 0.5 / size.0,
-                (y + height) / th - 0.5 / size.1,
-            );
-        } else {
-            self.texcoords = (x / tw, y / th, (x + width) / tw, (y + height) / th);
-        }
+        self.texcoords = (x / tw, y / th, (x + width) / tw, (y + height) / th);
         self
     }
 
