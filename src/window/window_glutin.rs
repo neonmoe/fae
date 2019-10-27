@@ -62,6 +62,7 @@ pub struct Window {
     pub dropped_files: Vec<PathBuf>,
     /// A list of files being currently hovered on the window.
     pub hovered_files: Vec<PathBuf>,
+    // TODO: Handle every glutin event and add fields as needed
 }
 
 impl Window {
@@ -161,9 +162,10 @@ impl Window {
         })
     }
 
-    /// Sets the cursor graphic to the provided one.
-    pub fn set_cursor(&self, cursor: MouseCursor) {
-        self.context.window().set_cursor(cursor);
+    /// Borrows the `glutin` window for resizing, setting the cursor,
+    /// or whatever else you might want to do with it.
+    pub fn get_window(&self) -> &glutin::Window {
+        self.context.window()
     }
 
     /// Updates the window (swaps the front and back buffers). The

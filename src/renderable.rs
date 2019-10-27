@@ -89,6 +89,23 @@ impl<'a, 'b> Renderable<'a, 'b> {
         self
     }
 
+    /// Rounds previously set cooordinates
+    /// ([`with_coordinates`](#method.with_coordinates)) so that they
+    /// align with the physical pixels of the monitor.
+    ///
+    /// This might help you with weird visual glitches, especially if
+    /// you're trying to render quads that have the same physical
+    /// pixel size as the texture it's sampling.
+    #[inline]
+    pub fn with_pixel_alignment(mut self) -> Renderable<'a, 'b> {
+        let (x0, y0, x1, y1) = self.coords;
+        let dpi_factor = self.renderer.dpi_factor;
+        let round_px = |x: f32| (x * dpi_factor).round() / dpi_factor;
+        let (x0, y0, x1, y1) = (round_px(x0), round_px(y0), round_px(x1), round_px(y1));
+        self.coords = (x0, y0, x1, y1);
+        self
+    }
+
     /// Specifies the texture coordinates (as UVs) from where the quad is sampled.
     #[inline]
     pub fn with_uvs(mut self, x0: f32, y0: f32, x1: f32, y1: f32) -> Renderable<'a, 'b> {
