@@ -75,9 +75,13 @@ fn main() -> Result<(), Box<dyn Error>> {
             let px = 2.0;
             let mouse_in = is_mouse_in(&window, (10.0, y, 210.0, y + 40.0));
             if mouse_in && !was_mouse_in[0] {
-                window.set_cursor(fae::glutin::MouseCursor::Hand);
+                window
+                    .get_window()
+                    .set_cursor(fae::glutin::MouseCursor::Hand);
             } else if !mouse_in && was_mouse_in[0] {
-                window.set_cursor(fae::glutin::MouseCursor::Default);
+                window
+                    .get_window()
+                    .set_cursor(fae::glutin::MouseCursor::Default);
             }
             was_mouse_in[0] = mouse_in;
             let col = if mouse_in { 0.9 } else { 1.0 };
@@ -104,9 +108,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             let mouse_in = is_mouse_in(&window, (10.0, y, 210.0, y + 40.0));
             if mouse_in && !was_mouse_in[1] {
-                window.set_cursor(fae::glutin::MouseCursor::Hand);
+                window
+                    .get_window()
+                    .set_cursor(fae::glutin::MouseCursor::Hand);
             } else if !mouse_in && was_mouse_in[1] {
-                window.set_cursor(fae::glutin::MouseCursor::Default);
+                window
+                    .get_window()
+                    .set_cursor(fae::glutin::MouseCursor::Default);
             }
             was_mouse_in[1] = mouse_in;
             let col = if mouse_in { 0.9 } else { 1.0 };
@@ -133,9 +141,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             let mouse_in = is_mouse_in(&window, (10.0, y, 210.0, y + 40.0));
             if mouse_in && !was_mouse_in[2] {
-                window.set_cursor(fae::glutin::MouseCursor::Hand);
+                window
+                    .get_window()
+                    .set_cursor(fae::glutin::MouseCursor::Hand);
             } else if !mouse_in && was_mouse_in[2] {
-                window.set_cursor(fae::glutin::MouseCursor::Default);
+                window
+                    .get_window()
+                    .set_cursor(fae::glutin::MouseCursor::Default);
             }
             was_mouse_in[2] = mouse_in;
             let col = if mouse_in { 0.9 } else { 1.0 };

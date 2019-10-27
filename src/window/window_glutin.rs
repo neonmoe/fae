@@ -245,7 +245,10 @@ impl Window {
                         MouseButton::Other(n) => mouse_inputs.push((Mouse::Other(n + 3), state)),
                     },
                     WindowEvent::CursorMoved { position, .. } => {
-                        *mouse_coords = (position.x as f32, position.y as f32);
+                        *mouse_coords = (
+                            position.x as f32 / env_dpi_factor,
+                            position.y as f32 / env_dpi_factor,
+                        );
                     }
                     WindowEvent::CursorEntered { .. } => *mouse_inside = true,
                     WindowEvent::CursorLeft { .. } => *mouse_inside = false,

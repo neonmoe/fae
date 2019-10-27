@@ -322,7 +322,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 fn set_cursor_over_text(window: &Window, over_text: bool) {
     use fae::glutin::MouseCursor;
-    window.set_cursor(if over_text {
+    window.get_window().set_cursor(if over_text {
         MouseCursor::Text
     } else {
         MouseCursor::Default
