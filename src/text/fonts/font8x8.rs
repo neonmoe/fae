@@ -39,6 +39,7 @@ impl FontProvider for Font8x8Provider {
     fn get_metric(&self, _id: u32, font_size: f32) -> RectPx {
         let glyph_size = get_size(font_size);
         let glyph_y = (self.get_line_height(font_size) - glyph_size) / 2;
+        // TODO: Consider left and right borders in width, also take this into account when rasterizing
         RectPx {
             x: 0,
             y: glyph_y,
@@ -163,9 +164,6 @@ fn get_bitmap(id: u32) -> Option<[u8; 8]> {
 #[test]
 fn get_font8x8_bitmap_works() {
     for u in 0..0xFFFF as u32 {
-        use std::convert::TryFrom;
-        if let Ok(c) = char::try_from(u) {
-            get_bitmap(c);
-        }
+        get_bitmap(u);
     }
 }
