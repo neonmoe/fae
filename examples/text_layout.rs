@@ -54,19 +54,29 @@ fn main() -> Result<(), Box<dyn Error>> {
         y += 20.0;
 
         if let Some(rect) = text.draw_text(
-            "Cut off at |, like so |...and here's text that should not appear",
+            "Cut off at |, like so |",
             (10.0, y, 0.0),
             16.0,
             Alignment::Left,
             (0.0, 0.0, 0.0, 1.0),
             None,
-            Some((10.0, y, 10.0 + 12.0 * 8.0, y + 16.0).into()),
+            None,
         ) {
-            renderer
-                .draw(&bgs, 0.1)
-                .with_coordinates(rect)
-                .with_color(0.9, 0.9, 0.5, 1.0)
-                .finish();
+            if let Some(rect) = text.draw_text(
+                "Cut off at |, like so |...and here's text that should not appear",
+                (10.0, y, 0.0),
+                16.0,
+                Alignment::Left,
+                (0.0, 0.0, 0.0, 1.0),
+                None,
+                Some(rect),
+            ) {
+                renderer
+                    .draw(&bgs, 0.1)
+                    .with_coordinates(rect)
+                    .with_color(0.9, 0.9, 0.5, 1.0)
+                    .finish();
+            }
         }
         y += 20.0;
 
@@ -96,7 +106,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .with_color(0.2, 0.2, 0.2, 1.0)
                 .finish();
             text.draw_text(
-                "Left",
+                " Left",
                 (10.0, y + 10.0, 0.0),
                 20.0,
                 Alignment::Left,
@@ -162,7 +172,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .with_color(0.2, 0.2, 0.2, 1.0)
                 .finish();
             text.draw_text(
-                "Right",
+                "Right ",
                 (10.0, y + 10.0, 0.0),
                 20.0,
                 Alignment::Right,

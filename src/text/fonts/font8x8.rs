@@ -11,25 +11,31 @@ impl Font8x8Provider {
     }
 }
 
+fn get_size(font_size: f32) -> i32 {
+    (font_size / 16.0).max(1.0).round() as i32 * 8
+}
+
 impl FontProvider for Font8x8Provider {
     fn get_glyph_id(&self, c: char) -> u32 {
         c as u32
     }
 
     fn get_line_height(&self, font_size: f32) -> i32 {
-        (font_size + 1.0).round() as i32
+        font_size as i32
     }
 
     fn get_advance(&self, _from: u32, _to: u32, font_size: f32) -> Option<i32> {
-        Some((font_size / 2.0).round() as i32)
+        Some(get_size(font_size))
     }
 
     fn get_metric(&self, _id: u32, font_size: f32) -> RectPx {
+        let glyph_size = get_size(font_size);
+        let glyph_y = (self.get_line_height(font_size) - glyph_size) / 2;
         RectPx {
             x: 0,
-            y: (font_size * 0.66 / 3.0).round() as i32,
-            width: (font_size / 2.0).round() as i32,
-            height: (font_size * 2.0 / 3.0).round() as i32,
+            y: glyph_y,
+            width: glyph_size,
+            height: glyph_size,
         }
     }
 

@@ -39,8 +39,8 @@ impl<'a, 'b> Renderable<'a, 'b> {
     pub fn finish(self) {
         if let Some(area) = self.clip_area {
             self.renderer.draw_quad_clipped(
-                self.coords,
                 area,
+                self.coords,
                 self.texcoords,
                 self.color,
                 self.rotation,
