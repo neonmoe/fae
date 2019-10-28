@@ -102,6 +102,7 @@ impl TextRenderer {
         let dpi_factor = self.dpi_factor;
         let (x, y) = ((x * dpi_factor) as i32, (y * dpi_factor) as i32);
         let max_line_width = max_line_width.map(|f| (f * dpi_factor) as i32);
+        let font_size = font_size * self.dpi_factor;
 
         let draw_data_index = self.draw_datas.len();
         self.draw_datas.push(TextDrawData {

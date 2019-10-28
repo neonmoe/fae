@@ -25,6 +25,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut should_quit = false;
     while window.refresh() && !should_quit {
         renderer.set_dpi_factor(window.dpi_factor);
+        text.set_dpi_factor(window.dpi_factor);
 
         if window
             .pressed_keys
@@ -35,8 +36,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         renderer
             .draw(&call, 0.5)
-            .with_coordinates(0.0, 0.0, 640.0, 480.0)
-            .with_texture_coordinates(0, 0, 1240, 920)
+            .with_coordinates((0.0, 0.0, 640.0, 480.0).into())
+            .with_texture_coordinates((0, 0, 1240, 920).into())
             .finish();
 
         text.draw_text(

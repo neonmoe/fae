@@ -31,6 +31,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut lipsum_alignment = Alignment::Left;
     while window.refresh() {
         renderer.set_dpi_factor(window.dpi_factor);
+        text.set_dpi_factor(window.dpi_factor);
 
         time += 0.01;
         let osc = time.sin() * 0.5 + 0.5;
@@ -39,7 +40,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         if let Some(rect) = text.draw_text(
             "First test, no limits, should be on one line.",
             (10.0, y, 0.0),
-            16.0,
+            20.0,
             Alignment::Left,
             (0.0, 0.0, 0.0, 1.0),
             None,

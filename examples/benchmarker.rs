@@ -86,9 +86,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         timers["whole frame"][timer_index].start();
         timers["application frame"][timer_index].start();
-        // Update the text renderer's dpi settings, in case refresh
+        // Update the renderers' dpi settings, in case refresh
         // changed them
         renderer.set_dpi_factor(window.dpi_factor);
+        text.set_dpi_factor(window.dpi_factor);
 
         if window.pressed_keys.contains(&keys::CLOSE) {
             should_quit = true;
@@ -120,16 +121,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         // Background
         renderer
             .draw(&call, 0.6)
-            .with_coordinates(0.0, 0.0, 640.0, 480.0)
-            .with_texture_coordinates(0, 0, 1240, 920)
+            .with_coordinates((0.0, 0.0, 640.0, 480.0).into())
+            .with_texture_coordinates((0, 0, 1240, 920).into())
             .finish();
 
         // Bottom right corned (for testing smooth resize)
         let (w, h) = (window.width, window.height);
         renderer
             .draw(&call, 0.5)
-            .with_coordinates(w - 100.0, h - 100.0, 100.0, 100.0)
-            .with_texture_coordinates(0, 0, 1240, 920)
+            .with_coordinates((w - 100.0, h - 100.0, 100.0, 100.0).into())
+            .with_texture_coordinates((0, 0, 1240, 920).into())
             .finish();
 
         // Spinny sprites
@@ -139,8 +140,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             let y = (f * 3.1415 * 8.0 + time).sin() * 150.0 * f.max(0.3) + 190.0;
             renderer
                 .draw(&call, f - 0.5)
-                .with_coordinates(x, y, 100.0, 100.0)
-                .with_texture_coordinates(0, 0, 1240, 920)
+                .with_coordinates((x, y, 100.0, 100.0).into())
+                .with_texture_coordinates((0, 0, 1240, 920).into())
                 .with_color(1.0, 0.7, 0.9, 1.0)
                 .with_rotation(-time * 1.5, 50.0, 50.0)
                 .finish();
@@ -286,19 +287,18 @@ fn main() -> Result<(), Box<dyn Error>> {
             None,
         );
 
-        renderer
-            .draw(&call, -0.55)
-            .with_coordinates(20.0, 300.0, 300.0, 300.0)
-            .finish();
-        text.draw_text(
+        if let Some(mut rect) = text.draw_text(
             &format!("profiling information:\n{}", profiler::get_profiler_print()),
             (30.0, 310.0, -0.6),
             16.0,
             Alignment::Left,
             text_color,
             Some(380.0),
-            Some((20.0, 300.0, 420.0, 600.0)),
-        );
+            Some((20.0, 300.0, 420.0, 600.0).into()),
+        ) {
+            rect.width = 300.0;
+            renderer.draw(&call, -0.55).with_coordinates(rect).finish();
+        }
 
         timers["text calls"][timer_index].end();
 
