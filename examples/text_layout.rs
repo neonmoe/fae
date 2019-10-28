@@ -18,7 +18,7 @@ In earum architecto qui sunt provident. Vitae rerum molestiae dolorem praesentiu
 fn main() -> Result<(), Box<dyn Error>> {
     let mut window = Window::create(&WindowSettings::default())?;
     let mut renderer = Renderer::new(&window);
-    let mut text = TextRenderer::create_simple(&mut renderer, true);
+    let mut text = TextRenderer::create_simple(&mut renderer, false);
     let bgs = renderer.create_draw_call(DrawCallParameters {
         alpha_blending: false,
         ..Default::default()
@@ -47,7 +47,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         ) {
             renderer
                 .draw(&bgs, 0.1)
-                .with_coordinates(rect.0, rect.1, rect.2 - rect.0, rect.3 - rect.1)
+                .with_coordinates(rect)
                 .with_color(0.9, 0.9, 0.5, 1.0)
                 .finish();
         }
@@ -60,11 +60,11 @@ fn main() -> Result<(), Box<dyn Error>> {
             Alignment::Left,
             (0.0, 0.0, 0.0, 1.0),
             None,
-            Some((10.0, y, 10.0 + 12.0 * 8.0, y + 16.0)),
+            Some((10.0, y, 10.0 + 12.0 * 8.0, y + 16.0).into()),
         ) {
             renderer
                 .draw(&bgs, 0.1)
-                .with_coordinates(rect.0, rect.1, rect.2 - rect.0, rect.3 - rect.1)
+                .with_coordinates(rect)
                 .with_color(0.9, 0.9, 0.5, 1.0)
                 .finish();
         }
@@ -87,12 +87,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             let col = if mouse_in { 0.9 } else { 1.0 };
             renderer
                 .draw(&bgs, 0.1)
-                .with_coordinates(10.0 + px, y + px, 200.0 - 2.0 * px, 40.0 - 2.0 * px)
+                .with_coordinates((10.0 + px, y + px, 200.0 - 2.0 * px, 40.0 - 2.0 * px).into())
                 .with_color(col, col, col, 1.0)
                 .finish();
             renderer
                 .draw(&bgs, 0.1)
-                .with_coordinates(10.0, y, 200.0, 40.0)
+                .with_coordinates((10.0, y, 200.0, 40.0).into())
                 .with_color(0.2, 0.2, 0.2, 1.0)
                 .finish();
             text.draw_text(
@@ -120,12 +120,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             let col = if mouse_in { 0.9 } else { 1.0 };
             renderer
                 .draw(&bgs, 0.1)
-                .with_coordinates(10.0 + px, y + px, 200.0 - 2.0 * px, 40.0 - 2.0 * px)
+                .with_coordinates((10.0 + px, y + px, 200.0 - 2.0 * px, 40.0 - 2.0 * px).into())
                 .with_color(col, col, col, 1.0)
                 .finish();
             renderer
                 .draw(&bgs, 0.1)
-                .with_coordinates(10.0, y, 200.0, 40.0)
+                .with_coordinates((10.0, y, 200.0, 40.0).into())
                 .with_color(0.2, 0.2, 0.2, 1.0)
                 .finish();
             text.draw_text(
@@ -153,12 +153,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             let col = if mouse_in { 0.9 } else { 1.0 };
             renderer
                 .draw(&bgs, 0.1)
-                .with_coordinates(10.0 + px, y + px, 200.0 - 2.0 * px, 40.0 - 2.0 * px)
+                .with_coordinates((10.0 + px, y + px, 200.0 - 2.0 * px, 40.0 - 2.0 * px).into())
                 .with_color(col, col, col, 1.0)
                 .finish();
             renderer
                 .draw(&bgs, 0.1)
-                .with_coordinates(10.0, y, 200.0, 40.0)
+                .with_coordinates((10.0, y, 200.0, 40.0).into())
                 .with_color(0.2, 0.2, 0.2, 1.0)
                 .finish();
             text.draw_text(
@@ -209,10 +209,10 @@ fn main() -> Result<(), Box<dyn Error>> {
             ) {
                 renderer
                     .draw(&bgs, 0.1)
-                    .with_coordinates(rect.0, rect.1, rect.2 - rect.0, rect.3 - rect.1)
+                    .with_coordinates(rect)
                     .with_color(0.9, 0.9, 0.5, 1.0)
                     .finish();
-                y += 10.0 + (rect.3 - rect.1);
+                y += 10.0 + rect.height;
             }
             // Animated text
         }
@@ -234,7 +234,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         text.debug_draw_glyph_cache(&mut renderer, (20.0, y, 148.0, y + 128.0), -1.0);
         renderer
             .draw(&call, -0.9)
-            .with_coordinates(20.0, y, 128.0, 128.0)
+            .with_coordinates((20.0, y, 128.0, 128.0).into())
             .with_color(0.9, 0.9, 0.9, 1.0)
             .finish();
 

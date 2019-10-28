@@ -1,4 +1,5 @@
 use crate::renderer::{DrawCallHandle, Renderer};
+use crate::types::*;
 
 /// Contains the parameters needed to draw a quad. Created by
 /// [`Renderer::draw()`](struct.Renderer.html#method.draw).
@@ -61,31 +62,19 @@ impl<'a, 'b> Renderable<'a, 'b> {
     /// Specifies the screen coordinates (in logical pixels) where the
     /// quad is drawn.
     #[inline]
-    pub fn with_coordinates(
-        mut self,
-        x: f32,
-        y: f32,
-        width: f32,
-        height: f32,
-    ) -> Renderable<'a, 'b> {
-        self.coords = (x, y, x + width, y + height);
+    pub fn with_coordinates(mut self, rect: Rect) -> Renderable<'a, 'b> {
+        self.coords = rect.into_corners();
         self
     }
 
     /// Specifies the texture coordinates (in actual pixels, in the
     /// texture's coordinate space) from where the quad is sampled.
     #[inline]
-    pub fn with_texture_coordinates(
-        mut self,
-        x: i32,
-        y: i32,
-        width: i32,
-        height: i32,
-    ) -> Renderable<'a, 'b> {
+    pub fn with_texture_coordinates(mut self, rect: RectPx) -> Renderable<'a, 'b> {
         let (tw, th) = self.renderer.get_texture_size(self.call);
         let (tw, th) = (tw as f32, th as f32);
-        let (x, y, width, height) = (x as f32, y as f32, width as f32, height as f32);
-        self.texcoords = (x / tw, y / th, (x + width) / tw, (y + height) / th);
+        let (x0, y0, x1, y1) = rect.into_corners();
+        self.texcoords = (x0 / tw, y0 / th, x1 / tw, y1 / th);
         self
     }
 
@@ -108,16 +97,16 @@ impl<'a, 'b> Renderable<'a, 'b> {
 
     /// Specifies the texture coordinates (as UVs) from where the quad is sampled.
     #[inline]
-    pub fn with_uvs(mut self, x0: f32, y0: f32, x1: f32, y1: f32) -> Renderable<'a, 'b> {
-        self.texcoords = (x0, y0, x1, y1);
+    pub fn with_uvs(mut self, rect: Rect) -> Renderable<'a, 'b> {
+        self.texcoords = rect.into_corners();
         self
     }
 
     /// Specifies the clip area. Only the parts that overlap between
     /// the clip area and this quad are rendered.
     #[inline]
-    pub fn with_clip_area(mut self, x: f32, y: f32, width: f32, height: f32) -> Renderable<'a, 'b> {
-        self.clip_area = Some((x, y, x + width, y + height));
+    pub fn with_clip_area(mut self, rect: Rect) -> Renderable<'a, 'b> {
+        self.clip_area = Some(rect.into_corners());
         self
     }
 

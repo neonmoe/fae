@@ -1,5 +1,11 @@
 //! The text rendering module.
 
+// NOTE: While the API in this module is still based in logical
+// pixels, internally everything should be converted into physical
+// pixels as soon as possible. This is to ensure that glyphs end up
+// rendered correctly on the actual physical pixels that get
+// rasterized.
+
 mod fonts;
 #[cfg(feature = "font8x8" /* or font-kit, in the future */)]
 mod glyph_cache;
@@ -12,6 +18,7 @@ pub use crate::text::types::Alignment;
 use crate::text::glyph_cache::*;
 use crate::text::layout::*;
 use crate::text::types::*;
+use crate::types::*;
 use crate::{DrawCallHandle, Renderer};
 use std::collections::HashMap;
 
@@ -22,6 +29,7 @@ pub struct TextRenderer {
     glyphs: Vec<Glyph>,
     draw_datas: Vec<TextDrawData>,
     font: Box<dyn FontProvider>,
+    dpi_factor: f32,
 }
 
 impl TextRenderer {
@@ -55,7 +63,13 @@ impl TextRenderer {
                 let provider = fonts::Font8x8Provider::new(glyph_cache);
                 Box::new(provider)
             },
+            dpi_factor: 1.0,
         }
+    }
+
+    /// Updates the DPI multiplication factor of the screen.
+    pub fn set_dpi_factor(&mut self, dpi_factor: f32) {
+        self.dpi_factor = dpi_factor;
     }
 
     /// Draws text, and returns a bounding box `(min_x, min_y, max_x,
@@ -79,11 +93,15 @@ impl TextRenderer {
         alignment: Alignment,
         color: (f32, f32, f32, f32),
         max_line_width: Option<f32>,
-        clip_area: Option<(f32, f32, f32, f32)>,
-    ) -> Option<(f32, f32, f32, f32)> {
+        clip_area: Option<Rect>,
+    ) -> Option<Rect> {
         if text.len() == 0 {
             return None;
         }
+
+        let dpi_factor = self.dpi_factor;
+        let (x, y) = ((x * dpi_factor) as i32, (y * dpi_factor) as i32);
+        let max_line_width = max_line_width.map(|f| (f * dpi_factor) as i32);
 
         let draw_data_index = self.draw_datas.len();
         self.draw_datas.push(TextDrawData {
@@ -144,10 +162,12 @@ impl TextRenderer {
                     }
 
                     let screen_location = metric.size + cursor;
-                    min_x = min_x.min(screen_location.x);
-                    min_y = min_y.min(screen_location.y);
-                    max_x = max_x.max(screen_location.x + screen_location.w);
-                    max_y = max_y.max(screen_location.y + screen_location.h);
+                    min_x = min_x.min(screen_location.x as f32 / dpi_factor);
+                    min_y = min_y.min(screen_location.y as f32 / dpi_factor);
+                    max_x =
+                        max_x.max((screen_location.x + screen_location.width) as f32 / dpi_factor);
+                    max_y =
+                        max_y.max((screen_location.y + screen_location.height) as f32 / dpi_factor);
                     self.glyphs.push(Glyph {
                         screen_location,
                         draw_data: draw_data_index,
@@ -166,7 +186,9 @@ impl TextRenderer {
             };
         }
 
-        if let Some((clip_min_x, clip_min_y, clip_max_x, clip_max_y)) = clip_area {
+        if let Some((clip_min_x, clip_min_y, clip_max_x, clip_max_y)) =
+            clip_area.map(|a| a.into_corners())
+        {
             min_x = min_x.max(clip_min_x);
             min_y = min_y.max(clip_min_y);
             max_x = max_x.min(clip_max_x);
@@ -180,7 +202,7 @@ impl TextRenderer {
         {
             None
         } else {
-            Some((min_x, min_y, max_x, max_y))
+            Some((min_x, min_y, max_x - min_x, max_y - min_y).into())
         }
     }
 
@@ -195,27 +217,27 @@ impl TextRenderer {
             let color = self.draw_datas[glyph.draw_data].color;
             let z = self.draw_datas[glyph.draw_data].z;
 
-            let RectPx { x, y, w, h } = glyph.screen_location;
-            let position = (x, y, x + w, y + h);
-            let RectUv { x, y, w, h } = match self.font.render_glyph(glyph.id, font_size) {
-                Some(uvs) => uvs,
+            let screen_location = Rect {
+                x: glyph.screen_location.x as f32 / self.dpi_factor,
+                y: glyph.screen_location.y as f32 / self.dpi_factor,
+                width: glyph.screen_location.width as f32 / self.dpi_factor,
+                height: glyph.screen_location.height as f32 / self.dpi_factor,
+            };
+            let texcoords = match self.font.render_glyph(glyph.id, font_size) {
+                Some(texcoords) => texcoords,
                 None => continue,
             };
-            let texcoords = (x, y, x + w, y + h);
 
-            if let Some(clip_area) = self.draw_datas[glyph.draw_data].clip_area {
-                renderer.draw_quad_clipped(
-                    clip_area,
-                    position,
-                    texcoords,
-                    color,
-                    (0.0, 0.0, 0.0),
-                    z,
-                    &self.call,
-                );
-            } else {
-                renderer.draw_quad(position, texcoords, color, (0.0, 0.0, 0.0), z, &self.call);
+            let mut renderable = renderer.draw(&self.call, z);
+            if let Some(area) = self.draw_datas[glyph.draw_data].clip_area {
+                renderable = renderable.with_clip_area(area);
             }
+            renderable
+                .with_coordinates(screen_location)
+                .with_texture_coordinates(texcoords)
+                .with_color(color.0, color.1, color.2, color.3)
+                .with_pixel_alignment() // TODO: Ensure that this is not needed
+                .finish();
         }
         self.glyphs.clear();
         self.draw_datas.clear();
@@ -227,6 +249,7 @@ impl TextRenderer {
     pub fn debug_draw_glyph_cache(
         &self,
         renderer: &mut Renderer,
+        // TODO: Change this to a rect type
         quad: (f32, f32, f32, f32),
         z: f32,
     ) {

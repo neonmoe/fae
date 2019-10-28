@@ -18,6 +18,8 @@
 //!   between 1 and 0 (ie. use only 100% and 0% opacity), and disable
 //!   `alpha_blending` in your draw call.
 
+// TODO: Use geometry shaders in non-legacy contexts.
+
 use crate::gl;
 use crate::gl::types::*;
 use crate::image::Image;
@@ -296,10 +298,10 @@ impl Renderer {
     /// # use fae::{DrawCallParameters, Renderer, Window, WindowSettings};
     /// # let mut renderer = Renderer::new(&Window::create(&WindowSettings::default()).unwrap());
     /// # let call = renderer.create_draw_call(DrawCallParameters::default());
-    /// renderer.draw()
+    /// renderer.draw(&call, 0.0)
     ///     .with_coordinates(100.0, 100.0, 16.0, 16.0)
     ///     .with_texture_coordinates(0, 0, 16, 16)
-    ///     .finish(&call);
+    ///     .finish();
     /// # }
     /// ```
     #[inline]

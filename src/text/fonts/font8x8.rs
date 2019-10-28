@@ -16,39 +16,32 @@ impl FontProvider for Font8x8Provider {
         c as u32
     }
 
-    fn get_line_height(&self, font_size: f32) -> f32 {
-        font_size + 1.0
+    fn get_line_height(&self, font_size: f32) -> i32 {
+        (font_size + 1.0).round() as i32
     }
 
-    fn get_advance(&self, _from: u32, _to: u32, font_size: f32) -> Option<f32> {
-        Some(font_size / 2.0)
+    fn get_advance(&self, _from: u32, _to: u32, font_size: f32) -> Option<i32> {
+        Some((font_size / 2.0).round() as i32)
     }
 
-    fn get_metric(&self, _id: u32, font_size: f32) -> RectPx<f32> {
+    fn get_metric(&self, _id: u32, font_size: f32) -> RectPx {
         RectPx {
-            x: 0.0,
-            y: font_size * 0.66 / 3.0,
-            w: font_size / 2.0,
-            h: font_size * 2.0 / 3.0,
+            x: 0,
+            y: (font_size * 0.66 / 3.0).round() as i32,
+            width: (font_size / 2.0).round() as i32,
+            height: (font_size * 2.0 / 3.0).round() as i32,
         }
     }
 
-    fn render_glyph(&mut self, id: u32, _font_size: f32) -> Option<RectUv> {
+    fn render_glyph(&mut self, id: u32, _font_size: f32) -> Option<RectPx> {
         use std::convert::TryFrom;
         let c = char::try_from(id).ok()?;
         if c.is_whitespace() {
             return None;
-        } else if let Some(bitmap) = get_bitmap(c) {
-            if let Some(uvs) = render_bitmap(c, bitmap, &mut self.cache) {
-                return Some(uvs);
-            }
+        } else {
+            let bitmap = get_bitmap(c)?;
+            render_bitmap(c, bitmap, &mut self.cache)
         }
-        Some(RectUv {
-            x: -1.0,
-            y: -1.0,
-            w: 0.0,
-            h: 0.0,
-        })
     }
 
     fn update_glyph_cache_expiration(&mut self) {
@@ -56,7 +49,7 @@ impl FontProvider for Font8x8Provider {
     }
 }
 
-fn render_bitmap(c: char, bitmap: [u8; 8], cache: &mut GlyphCache) -> Option<RectUv> {
+fn render_bitmap(c: char, bitmap: [u8; 8], cache: &mut GlyphCache) -> Option<RectPx> {
     let tex = cache.get_texture();
     if let Some(spot) = cache.reserve_uvs(c, 8, 8) {
         if spot.just_reserved {
@@ -78,10 +71,10 @@ fn render_bitmap(c: char, bitmap: [u8; 8], cache: &mut GlyphCache) -> Option<Rec
                 gl::TexSubImage2D(
                     gl::TEXTURE_2D,            // target
                     0,                         // level
-                    spot.tex_rect.x as GLint,  // xoffset
-                    spot.tex_rect.y as GLint,  // yoffset
-                    spot.tex_rect.w as GLint,  // width
-                    spot.tex_rect.h as GLint,  // height
+                    spot.texcoords.x,          // xoffset
+                    spot.texcoords.y,          // yoffset
+                    spot.texcoords.width,      // width
+                    spot.texcoords.height,     // height
                     gl::RED as GLuint,         // format
                     gl::UNSIGNED_BYTE,         // type
                     data.as_ptr() as *const _, // pixels
@@ -91,7 +84,7 @@ fn render_bitmap(c: char, bitmap: [u8; 8], cache: &mut GlyphCache) -> Option<Rec
             crate::profiler::modify_profiler_value_i32("glyphs drawn", |i| i + 1);
         }
         crate::profiler::modify_profiler_value_i32("glyphs rendered", |i| i + 1);
-        Some(spot.uvs)
+        Some(spot.texcoords)
     } else {
         None
     }

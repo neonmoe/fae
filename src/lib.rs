@@ -15,11 +15,13 @@ pub mod gl {
 mod image;
 mod renderable;
 mod renderer;
+mod types;
 mod window;
 
 pub use image::*;
 pub use renderable::*;
 pub use renderer::*;
+pub use types::*;
 pub use window::*;
 
 #[cfg(feature = "text")]

@@ -5,14 +5,14 @@ use std::collections::HashMap;
 // should. Perhaps list them as well, somewhere in docs.
 
 pub(crate) fn get_line_start_x(
-    base_x: f32,
-    line_width: f32,
-    max_line_width: f32,
+    base_x: i32,
+    line_width: i32,
+    max_line_width: i32,
     alignment: Alignment,
-) -> f32 {
+) -> i32 {
     match alignment {
         Alignment::Left => base_x,
-        Alignment::Center => base_x + (max_line_width - line_width) / 2.0,
+        Alignment::Center => base_x + (max_line_width - line_width) / 2,
         Alignment::Right => base_x + (max_line_width - line_width),
     }
 }
@@ -32,11 +32,11 @@ pub(crate) fn get_line_length_and_width(
     font: &Box<dyn FontProvider>,
     metrics: &HashMap<char, Metric>,
     font_size: f32,
-    max_width: Option<f32>,
+    max_width: Option<i32>,
     mut s: &str,
-) -> (usize, f32) {
+) -> (usize, i32) {
     let mut len = 0;
-    let mut total_width = 0.0;
+    let mut total_width = 0;
 
     // Add words until the line can't fit more words
     'outer: while let Some((word_len, word_width)) = get_word_length(
@@ -96,12 +96,12 @@ pub(crate) fn get_word_length(
     font: &Box<dyn FontProvider>,
     metrics: &HashMap<char, Metric>,
     font_size: f32,
-    max_width: Option<f32>,
+    max_width: Option<i32>,
     s: &str,
     starts_line: bool,
-) -> Option<(usize, f32)> {
+) -> Option<(usize, i32)> {
     let mut len = 0;
-    let mut total_width = 0.0;
+    let mut total_width = 0;
     let mut previous_char = None;
     for c in s.chars() {
         len += 1;
@@ -153,7 +153,7 @@ pub(crate) fn get_char_advance(
     font_size: f32,
     current_char: char,
     previous_char: char,
-) -> Option<f32> {
+) -> Option<i32> {
     font.get_advance(
         metrics.get(&previous_char)?.glyph_id,
         metrics.get(&current_char)?.glyph_id,
@@ -161,6 +161,6 @@ pub(crate) fn get_char_advance(
     )
 }
 
-pub(crate) fn get_char_width(metrics: &HashMap<char, Metric>, c: char) -> f32 {
-    metrics.get(&c).unwrap().size.w
+pub(crate) fn get_char_width(metrics: &HashMap<char, Metric>, c: char) -> i32 {
+    metrics.get(&c).unwrap().size.width
 }

@@ -1,14 +1,14 @@
 use crate::gl::types::*;
 use crate::image::Image;
 use crate::renderer::{DrawCallHandle, DrawCallParameters, Renderer, Shaders, TextureWrapping};
-use crate::text::types::*;
+use crate::types::*;
 
 // TODO: Gaps between glyphs or tighter uvs to avoid bleeding
 
 // How far the glyphs are from the texture's edges
-const GLYPH_CACHE_MARGIN: u32 = 1;
+const GLYPH_CACHE_MARGIN: i32 = 1;
 // How far the glyphs are from each other
-const GLYPH_CACHE_GAP: u32 = 1;
+const GLYPH_CACHE_GAP: i32 = 1;
 
 const DEFAULT_TEXT_SHADERS: Shaders = Shaders {
     vertex_shader_110: include_str!("../shaders/legacy/texquad.vert"),
@@ -38,25 +38,25 @@ impl ExpiryStatus {
 #[derive(Clone, Copy)]
 pub(crate) struct GlyphSpot {
     pub just_reserved: bool,
-    pub uvs: RectUv,
-    pub tex_rect: RectPx<u32>,
+    pub texcoords: RectPx,
     content: char,
     #[allow(dead_code)]
-    width: u32,
+    width: i32, // for cache eviction
     status: ExpiryStatus,
 }
 
 struct GlyphLine {
-    cache_width: u32,
-    cache_height: u32,
-    y: u32,
-    height: u32,
-    width_left: u32,
+    cache_width: i32,
+    #[allow(dead_code)]
+    cache_height: i32, // TODO: Allow height stretching up to double of the smallest glyph, but don't go over this
+    y: i32,
+    height: i32,
+    width_left: i32,
     spots: Vec<GlyphSpot>,
 }
 
 impl GlyphLine {
-    fn new(line_y: u32, line_height: u32, cache_width: u32, cache_height: u32) -> GlyphLine {
+    fn new(line_y: i32, line_height: i32, cache_width: i32, cache_height: i32) -> GlyphLine {
         GlyphLine {
             cache_width,
             cache_height,
@@ -71,8 +71,8 @@ impl GlyphLine {
     fn reserve(
         &mut self,
         content: char,
-        width: u32,
-        height: u32,
+        width: i32,
+        height: i32,
         can_evict: bool,
     ) -> Option<GlyphSpot> {
         for i in 0..self.spots.len() {
@@ -90,30 +90,17 @@ impl GlyphLine {
                 None
             }
         } else {
-            let (x, y, w, h) = (
-                self.cache_width - self.width_left + GLYPH_CACHE_MARGIN,
-                self.y,
+            let texcoords = RectPx {
+                x: self.cache_width - self.width_left + GLYPH_CACHE_MARGIN,
+                y: self.y,
                 width,
                 height,
-            );
-            let uvs = RectUv {
-                x: (x as f32 - 0.5) / self.cache_width as f32,
-                y: (y as f32 - 0.5) / self.cache_height as f32,
-                w: (w as f32 + 0.5) / self.cache_width as f32,
-                h: (h as f32 + 0.5) / self.cache_height as f32,
-            };
-            let tex_rect = RectPx {
-                x: x,
-                y: y,
-                w: w,
-                h: h,
             };
             let spot = GlyphSpot {
                 just_reserved: false,
                 content,
-                tex_rect,
+                texcoords,
                 width,
-                uvs,
                 status: ExpiryStatus::UsedDuringThisFrame,
             };
             self.spots.push(spot);
@@ -134,16 +121,16 @@ impl GlyphLine {
 
 pub struct GlyphCache {
     texture: GLuint,
-    width: u32,
-    height: u32,
+    width: i32,
+    height: i32,
     lines: Vec<GlyphLine>,
 }
 
 impl GlyphCache {
     pub fn create_cache_and_draw_call(
         renderer: &mut Renderer,
-        width: u32,
-        height: u32,
+        width: i32,
+        height: i32,
         smoothed: bool,
     ) -> (GlyphCache, DrawCallHandle) {
         let cache_image = Image::from_color(width as i32, height as i32, &[0, 0, 0, 0]);
@@ -164,7 +151,7 @@ impl GlyphCache {
         (cache, call)
     }
 
-    pub(crate) fn reserve_uvs(&mut self, c: char, width: u32, height: u32) -> Option<GlyphSpot> {
+    pub(crate) fn reserve_uvs(&mut self, c: char, width: i32, height: i32) -> Option<GlyphSpot> {
         // First try to find space in the ends of existing lines
         self.reserve_uvs_from_existing(c, width, height, false)
             // Then try adding a new line
@@ -177,8 +164,8 @@ impl GlyphCache {
     fn reserve_uvs_from_existing(
         &mut self,
         c: char,
-        width: u32,
-        height: u32,
+        width: i32,
+        height: i32,
         can_evict: bool,
     ) -> Option<GlyphSpot> {
         for line in &mut self.lines {
@@ -189,7 +176,7 @@ impl GlyphCache {
         None
     }
 
-    fn reserve_uvs_from_new_line(&mut self, c: char, width: u32, height: u32) -> Option<GlyphSpot> {
+    fn reserve_uvs_from_new_line(&mut self, c: char, width: i32, height: i32) -> Option<GlyphSpot> {
         if let Some(new_line) = self.create_line(height) {
             if let Some(spot) = new_line.reserve(c, width, height, false) {
                 return Some(spot);
@@ -208,7 +195,7 @@ impl GlyphCache {
         }
     }
 
-    fn create_line(&mut self, height: u32) -> Option<&mut GlyphLine> {
+    fn create_line(&mut self, height: i32) -> Option<&mut GlyphLine> {
         let mut total_height = GLYPH_CACHE_MARGIN;
         for line in &self.lines {
             total_height += line.height + GLYPH_CACHE_GAP;
