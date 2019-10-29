@@ -40,6 +40,12 @@ impl From<(f32, f32, f32, f32)> for Rect {
     }
 }
 
+impl From<Rect> for (f32, f32, f32, f32) {
+    fn from(from: Rect) -> Self {
+        (from.x, from.y, from.width, from.height)
+    }
+}
+
 /// Represents a rectangle in a coordinate space that consists of
 /// integers.
 ///
@@ -83,6 +89,12 @@ impl From<(i32, i32, i32, i32)> for RectPx {
             width: from.2,
             height: from.3,
         }
+    }
+}
+
+impl From<RectPx> for (i32, i32, i32, i32) {
+    fn from(from: RectPx) -> Self {
+        (from.x, from.y, from.width, from.height)
     }
 }
 

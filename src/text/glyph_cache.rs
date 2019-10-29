@@ -82,7 +82,7 @@ impl GlyphLine {
             }
         }
 
-        if self.width_left - GLYPH_CACHE_MARGIN < width {
+        if self.width_left - GLYPH_CACHE_MARGIN <= width {
             if can_evict {
                 // TODO: evict expired chars to make space for new ones
                 None

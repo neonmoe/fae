@@ -1,8 +1,18 @@
 use crate::text::{Alignment, FontProvider, Metric};
 use std::collections::HashMap;
 
-// TODO: Test all the layout features, that they work as they
-// should. Perhaps list them as well, somewhere in docs.
+// TODO: Use these for word detection and line breaking:
+// Sources for the following two arrays: https://en.wikipedia.org/wiki/Whitespace_character#Unicode
+// Characters that must break lines when encountered:
+static _LINE_BREAKERS: [char; 7] = [
+    '\u{A}', '\u{B}', '\u{C}', '\u{D}', '\u{85}', '\u{2028}', '\u{2029}',
+];
+// Characters that can be used for breaking a line cleanly
+static _WORD_BREAKERS: [char; 19] = [
+    '\u{9}', '\u{20}', '\u{1680}', '\u{2000}', '\u{2001}', '\u{2002}', '\u{2003}', '\u{2004}',
+    '\u{2005}', '\u{2006}', '\u{2008}', '\u{2009}', '\u{200A}', '\u{205F}', '\u{3000}', '\u{180E}',
+    '\u{200B}', '\u{200C}', '\u{200D}',
+];
 
 pub(crate) fn get_line_start_x(
     base_x: i32,
@@ -28,6 +38,7 @@ pub(crate) fn move_forward_chars(s: &str, n: usize) -> (&str, char) {
     (chars.as_str(), last_char)
 }
 
+// Fix line lengths, right aligned text looks *bad*
 pub(crate) fn get_line_length_and_width(
     font: &Box<dyn FontProvider>,
     metrics: &HashMap<char, Metric>,

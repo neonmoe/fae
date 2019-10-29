@@ -4,7 +4,7 @@
 
 use fae::{
     text::{Alignment, TextRenderer},
-    DrawCallParameters, Mouse, Renderer, Window, WindowSettings,
+    DrawCallParameters, Mouse, Rect, Renderer, Window, WindowSettings,
 };
 use std::error::Error;
 
@@ -242,10 +242,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             // Lorem ipsum
         }
 
-        text.debug_draw_glyph_cache(&mut renderer, (20.0, y, 148.0, y + 128.0), -1.0);
+        let cache_size = 256.0 / window.dpi_factor;
+        let (x, y) = (400.0, 260.0);
+        text.debug_draw_glyph_cache(&mut renderer, (x, y, x + cache_size, y + cache_size), -1.0);
         renderer
             .draw(&call, -0.9)
-            .with_coordinates((20.0, y, 128.0, 128.0).into())
+            .with_coordinates((x, y, cache_size, cache_size).into())
             .with_color(0.9, 0.9, 0.9, 1.0)
             .finish();
 

@@ -24,33 +24,30 @@ impl FontProvider for Font8x8Provider {
         get_size(font_size) * 4 / 3
     }
 
-    fn get_advance(&self, from: u32, to: u32, font_size: f32) -> Option<i32> {
-        let size = get_size(font_size);
-        let right = get_right_empty_pixels(from).unwrap_or(0);
-        if to == ' ' as u32 {
-            Some(size * 2 / 3 - right)
-        } else {
-            let left = get_left_empty_pixels(to).unwrap_or(0);
-            let scale = size / 8;
-            Some(size - (right + left - 1) * scale)
-        }
+    fn get_advance(&self, from: u32, _to: u32, font_size: f32) -> Option<i32> {
+        let (_, _, from_width, _) = self.get_metric(from, font_size).into();
+        Some(from_width + 1)
     }
 
-    fn get_metric(&self, _id: u32, font_size: f32) -> RectPx {
-        let glyph_size = get_size(font_size);
-        let glyph_y = (self.get_line_height(font_size) - glyph_size) / 2;
-        // TODO: Consider left and right borders in width, also take this into account when rasterizing
-        RectPx {
-            x: 0,
-            y: glyph_y,
-            width: glyph_size,
-            height: glyph_size,
+    fn get_metric(&self, id: u32, font_size: f32) -> RectPx {
+        let size = get_size(font_size);
+        let y = (self.get_line_height(font_size) - size) / 2;
+        if id == ' ' as u32 {
+            (0, y, size * 2 / 3 - 2, size).into()
+        } else {
+            let (left, right) = get_empty_pixels_sides(id).unwrap_or((0, 0));
+            let width = size - (left + right) * size / 8;
+            (0, y, width, size).into()
         }
     }
 
     fn render_glyph(&mut self, id: u32, _font_size: f32) -> Option<RectPx> {
         let bitmap = get_bitmap(id)?;
-        render_bitmap(id, bitmap, &mut self.cache)
+        if id == ' ' as u32 {
+            None
+        } else {
+            render_bitmap(id, bitmap, &mut self.cache)
+        }
     }
 
     fn update_glyph_cache_expiration(&mut self) {
@@ -59,14 +56,17 @@ impl FontProvider for Font8x8Provider {
 }
 
 fn render_bitmap(id: u32, bitmap: [u8; 8], cache: &mut GlyphCache) -> Option<RectPx> {
+    let (left, right) = get_empty_pixels_sides(id).unwrap_or((0, 0));
+    let (width, height) = ((8 - (left + right)), 8);
+
     use std::convert::TryFrom;
     let c = char::try_from(id).ok()?;
     let tex = cache.get_texture();
-    if let Some(spot) = cache.reserve_uvs(c, 8, 8) {
+    if let Some(spot) = cache.reserve_uvs(c, width, height) {
         if spot.just_reserved {
-            let mut data = Vec::with_capacity(8 * 8);
+            let mut data = Vec::with_capacity((width * height) as usize);
             for y in &bitmap {
-                for x in 0..8 {
+                for x in left..(8 - right) {
                     if (y & (1 << x)) == 0 {
                         data.push(0x00u8);
                     } else {
@@ -79,6 +79,7 @@ fn render_bitmap(id: u32, bitmap: [u8; 8], cache: &mut GlyphCache) -> Option<Rec
                 use crate::gl;
                 use crate::gl::types::*;
                 gl::BindTexture(gl::TEXTURE_2D, tex);
+                gl::PixelStorei(gl::UNPACK_ALIGNMENT, 1);
                 gl::TexSubImage2D(
                     gl::TEXTURE_2D,            // target
                     0,                         // level
@@ -101,41 +102,30 @@ fn render_bitmap(id: u32, bitmap: [u8; 8], cache: &mut GlyphCache) -> Option<Rec
     }
 }
 
-fn get_left_empty_pixels(id: u32) -> Option<i32> {
+fn get_empty_pixels_sides(id: u32) -> Option<(i32, i32)> {
     let bitmap = get_bitmap(id)?;
-    let mut distance = None;
+    let mut left = None;
+    let mut right = None;
     for y in &bitmap {
         for x in 0..8 {
             if (y & (1 << x)) != 0 {
-                if x < distance.unwrap_or(8) {
-                    distance = Some(x);
+                if x < left.unwrap_or(8) {
+                    left = Some(x);
+                }
+                if x > right.unwrap_or(-1) {
+                    right = Some(x);
                 }
             }
         }
     }
-    distance
-}
-
-fn get_right_empty_pixels(id: u32) -> Option<i32> {
-    let bitmap = get_bitmap(id)?;
-    let mut distance = None;
-    for y in &bitmap {
-        for x in 0..8 {
-            if (y & (1 << (7 - x))) != 0 {
-                if x < distance.unwrap_or(8) {
-                    distance = Some(x);
-                }
-            }
-        }
-    }
-    distance
+    Some((left?, 7 - right?))
 }
 
 // This function provides glyphs for 558 characters (for calculating
 // the cache texture size)
 fn get_bitmap(id: u32) -> Option<[u8; 8]> {
     let u = id as usize;
-    match u {
+    let bitmap = match u {
         0..=0x7F => Some(font8x8::legacy::BASIC_LEGACY[u]),
         0x80..=0x9F => Some(font8x8::legacy::CONTROL_LEGACY[u - 0x80]),
         0xA0..=0xFF => Some(font8x8::legacy::LATIN_LEGACY[u - 0xA0]),
@@ -158,7 +148,17 @@ fn get_bitmap(id: u32) -> Option<[u8; 8]> {
         //0xBA => Some(font8x8::legacy::MISC_LEGACY[3]),
         //0x60 => Some(font8x8::legacy::MISC_LEGACY[7]),
         _ => None,
+    }?;
+
+    // Since whitespace and control characters have empty bitmaps in
+    // font8x8, we need to ensure that the bitmap is not empty.
+    for y in &bitmap {
+        if *y != 0 {
+            return Some(bitmap);
+        }
     }
+
+    None
 }
 
 #[test]
