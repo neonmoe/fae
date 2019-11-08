@@ -11,7 +11,10 @@ use std::ops::Add;
 /// let rect_ = (0.0, 0.0, 1.0, 1.0).into();
 /// assert_eq!(rect, rect_);
 /// ```
-// TODO: Change to x0, y0, x1, y1 to allow drawing non-axis-aligned rectangles.
+// Note: Only axis-aligned rectangles are allowed (rotation is
+// specified via another parameter) because this is much more
+// optimizable, and I don't intend to support
+// non-axis-aligned-rectangles.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Rect {
     /// The x-coordinate of the top-left corner of this rectangle.

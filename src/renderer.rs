@@ -1003,6 +1003,7 @@ pub(crate) fn print_gl_errors(context: &str) {
 // Sorry for the mess, but OpenGL version strings are unreliable, and
 // I'm not sure *how* unreliable. Here's my attempt at a robust way of
 // parsing the version.
+// TODO: Take OpenGL ES into consideration
 fn get_version() -> Option<(u8, u8)> {
     let version_str = unsafe { std::ffi::CStr::from_ptr(gl::GetString(gl::VERSION) as *const _) };
     let version_str = version_str.to_string_lossy();
