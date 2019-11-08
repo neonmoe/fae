@@ -1,18 +1,25 @@
 use crate::text::{Alignment, FontProvider, Metric};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
-// TODO: Use these for word detection and line breaking:
 // Sources for the following two arrays: https://en.wikipedia.org/wiki/Whitespace_character#Unicode
 // Characters that must break lines when encountered:
-static _LINE_BREAKERS: [char; 7] = [
+static LINE_BREAKERS: [char; 7] = [
     '\u{A}', '\u{B}', '\u{C}', '\u{D}', '\u{85}', '\u{2028}', '\u{2029}',
 ];
 // Characters that can be used for breaking a line cleanly
-static _WORD_BREAKERS: [char; 19] = [
+static WORD_BREAKERS: [char; 19] = [
     '\u{9}', '\u{20}', '\u{1680}', '\u{2000}', '\u{2001}', '\u{2002}', '\u{2003}', '\u{2004}',
     '\u{2005}', '\u{2006}', '\u{2008}', '\u{2009}', '\u{200A}', '\u{205F}', '\u{3000}', '\u{180E}',
     '\u{200B}', '\u{200C}', '\u{200D}',
 ];
+
+fn can_break(c: &char) -> bool {
+    WORD_BREAKERS.contains(c) || LINE_BREAKERS.contains(c)
+}
+
+fn must_break(c: &char) -> bool {
+    LINE_BREAKERS.contains(c)
+}
 
 pub(crate) fn get_line_start_x(
     base_x: i32,
@@ -27,135 +34,58 @@ pub(crate) fn get_line_start_x(
     }
 }
 
-pub(crate) fn move_forward_chars(s: &str, n: usize) -> (&str, char) {
-    let mut chars = s.chars();
-    let mut last_char = ' ';
-    for _ in 0..n {
-        if let Some(c) = chars.next() {
-            last_char = c;
-        }
-    }
-    (chars.as_str(), last_char)
-}
-
-// Fix line lengths, right aligned text looks *bad*
 pub(crate) fn get_line_length_and_width(
     font: &Box<dyn FontProvider>,
     metrics: &HashMap<char, Metric>,
     font_size: f32,
     max_width: Option<i32>,
-    mut s: &str,
-) -> (usize, i32) {
-    let mut len = 0;
-    let mut total_width = 0;
-
-    // Add words until the line can't fit more words
-    'outer: while let Some((word_len, word_width)) = get_word_length(
-        font,
-        metrics,
-        font_size,
-        max_width.map(|w| w - total_width),
-        &s,
-        len == 0,
-    ) {
-        // Handle a word
-        len += word_len;
-        total_width += word_width;
-        let (s_, c) = move_forward_chars(s, word_len);
-        s = s_;
-
-        // Break if line is too long
-        if s.is_empty() || max_width.iter().any(|w| total_width > *w) {
-            break;
-        }
-
-        // Handle whitespace after word
-        let len_before_whitespace = len;
-        let mut previous_char = c;
-        for c in s.chars() {
-            len += 1;
-            if c == '\n' {
-                break 'outer;
-            } else if c.is_whitespace() {
-                // Update line width
-                if let Some(advance) = get_char_advance(font, metrics, font_size, c, previous_char)
-                {
-                    total_width += advance;
-                }
-            } else {
-                len -= 1;
-                break;
-            }
-            previous_char = c;
-        }
-        s = move_forward_chars(s, len - len_before_whitespace).0;
-
-        // Break if line is too long
-        if s.is_empty() || max_width.iter().any(|w| total_width > *w) {
-            break;
-        }
-    }
-
-    (len, total_width)
-}
-
-// Returns None if the word doesn't fit on this line (and might fit on
-// the next), Some(word length, word width) if it does (or requires
-// more than a whole line's worth of space, being the first word on
-// the line).
-pub(crate) fn get_word_length(
-    font: &Box<dyn FontProvider>,
-    metrics: &HashMap<char, Metric>,
-    font_size: f32,
-    max_width: Option<i32>,
     s: &str,
-    starts_line: bool,
-) -> Option<(usize, i32)> {
+) -> (usize, i32) {
+    let mut widths = VecDeque::new();
+    let mut total_width = 0; // See the end of the function: this is re-calculated there
+    let mut previous_character = None;
     let mut len = 0;
-    let mut total_width = 0;
-    let mut previous_char = None;
+    let mut can_break_len = None;
+
+    // Find characters that fit in the given width
     for c in s.chars() {
         len += 1;
-        if c.is_whitespace() {
-            // Whitespace = end of word, cut off the whitespace and
-            // return
-            len -= 1;
-            break;
-        }
-
-        // Check if line was overflowed
-        if let Some(previous_char) = previous_char {
-            if let Some(advance) = get_char_advance(font, metrics, font_size, c, previous_char) {
-                let previous_width = get_char_width(metrics, previous_char);
-                total_width += advance - previous_width;
+        let mut width = 0;
+        if let Some(previous_character) = previous_character {
+            if let Some(a) = get_char_advance(font, metrics, font_size, c, previous_character) {
+                width -= get_char_width(metrics, previous_character);
+                width += a;
             }
         }
-        let width = get_char_width(metrics, c);
+        width += get_char_width(metrics, c);
+        widths.push_back(width);
         total_width += width;
-        if max_width.iter().any(|w| total_width > *w) {
-            len -= 1;
-            if starts_line {
-                // This word is the first of the line, so we can't get
-                // more space by starting the word on the next
-                // line. So, just cut the word here and continue the
-                // next line from where we now are.
+        previous_character = Some(c);
 
-                // TODO: Consider: text layout as a feature
-                // Should we hyphenate, just cut off and go to the
-                // next line, maybe even hyphenate before trying to go
-                // to the next line (for justify-esque text)?
-                break;
-            } else {
-                // This word is not the first on this line, so return
-                // None to signal that the line ends here, to try and
-                // fit this word on the next line.
-                return None;
-            }
+        if can_break(&c) {
+            can_break_len = Some(len);
         }
 
-        previous_char = Some(c);
+        if must_break(&c) {
+            widths.pop_back(); // Pop off the breaking character
+            break;
+        } else if let Some(max_width) = max_width {
+            if total_width > max_width {
+                if let Some(can_break_len) = can_break_len {
+                    for _ in can_break_len..len {
+                        widths.pop_back(); // Pop off the overflown characters
+                    }
+                    widths.pop_back(); // Pop off the breaking character
+                    len = can_break_len;
+                }
+                break;
+            }
+        }
     }
-    Some((len, total_width))
+
+    let total_width = widths.into_iter().fold(0, |acc, x| acc + x);
+
+    (len, total_width)
 }
 
 pub(crate) fn get_char_advance(

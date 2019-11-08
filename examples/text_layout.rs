@@ -4,7 +4,7 @@
 
 use fae::{
     text::{Alignment, TextRenderer},
-    DrawCallParameters, Mouse, Rect, Renderer, Window, WindowSettings,
+    DrawCallParameters, Mouse, Renderer, Window, WindowSettings,
 };
 use std::error::Error;
 
@@ -223,7 +223,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                     .with_coordinates(rect)
                     .with_color(0.9, 0.9, 0.5, 1.0)
                     .finish();
-                y += 10.0 + rect.height;
             }
             // Animated text
         }

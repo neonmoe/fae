@@ -148,10 +148,8 @@ impl TextRenderer {
             }
 
             let mut previous_character = None;
-            let mut chars_read = 0;
-            let mut chars = text_left.chars();
+            let mut chars = text_left[..line_len].chars();
             for c in &mut chars {
-                chars_read += 1;
                 if let Some(metric) = metrics.get(&c).map(|m| m.clone()) {
                     // Advance the cursor, if this is not the first character
                     if let Some(previous_character) = previous_character {
@@ -176,11 +174,8 @@ impl TextRenderer {
                     });
                 }
                 previous_character = Some(c);
-                if chars_read >= line_len {
-                    break;
-                }
             }
-            text_left = chars.as_str();
+            text_left = &text_left[line_len..];
             cursor = PositionPx {
                 x,
                 y: cursor.y + line_height,
