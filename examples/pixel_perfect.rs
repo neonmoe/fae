@@ -43,8 +43,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             let size = 8.0 * 2.0f32.powf(i as f32) / window.dpi_factor;
             renderer
                 .draw(&call, -0.9)
-                .with_coordinates((x, y, size, size).into())
-                .with_texture_coordinates((0, 0, 8, 8).into())
+                .with_coordinates((x, y, size, size))
+                .with_texture_coordinates((0, 0, 8, 8))
                 .finish();
             text.draw_text(
                 &format!(
@@ -76,8 +76,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             let size = 8.0 * 2.0f32.powf(i as f32) / window.dpi_factor;
             renderer
                 .draw(&call, -0.9)
-                .with_coordinates((x, y, size, size).into())
-                .with_texture_coordinates((0, 0, 8, 8).into())
+                .with_coordinates((x, y, size, size))
+                .with_texture_coordinates((0, 0, 8, 8))
                 .finish();
             y += 10.0 + size;
         }
@@ -98,8 +98,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             let size = 8.0 * 2.0f32.powf(i as f32) / window.dpi_factor;
             renderer
                 .draw(&call, -0.9)
-                .with_coordinates((x, y, size, size).into())
-                .with_texture_coordinates((0, 0, 8, 8).into())
+                .with_coordinates((x, y, size, size))
+                .with_texture_coordinates((0, 0, 8, 8))
                 .with_pixel_alignment()
                 .finish();
             y += 10.0 + size;

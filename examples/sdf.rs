@@ -39,7 +39,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 width: size,
                 height: size,
             })
-            .with_texture_coordinates((0, 0, 64, 64).into())
+            .with_texture_coordinates((0, 0, 64, 64))
             .finish();
 
         let size = 256.0;
@@ -51,7 +51,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 width: size,
                 height: size,
             })
-            .with_texture_coordinates((0, 0, 64, 64).into())
+            .with_texture_coordinates((0, 0, 64, 64))
             .finish();
 
         let size = 128.0;
@@ -63,7 +63,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 width: size,
                 height: size,
             })
-            .with_texture_coordinates((0, 0, 64, 64).into())
+            .with_texture_coordinates((0, 0, 64, 64))
             .finish();
 
         renderer.render(window.width, window.height);

@@ -121,16 +121,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         // Background
         renderer
             .draw(&call, 0.6)
-            .with_coordinates((0.0, 0.0, 640.0, 480.0).into())
-            .with_texture_coordinates((0, 0, 1240, 920).into())
+            .with_coordinates((0.0, 0.0, 640.0, 480.0))
+            .with_texture_coordinates((0, 0, 1240, 920))
             .finish();
 
         // Bottom right corned (for testing smooth resize)
         let (w, h) = (window.width, window.height);
         renderer
             .draw(&call, 0.5)
-            .with_coordinates((w - 100.0, h - 100.0, 100.0, 100.0).into())
-            .with_texture_coordinates((0, 0, 1240, 920).into())
+            .with_coordinates((w - 100.0, h - 100.0, 100.0, 100.0))
+            .with_texture_coordinates((0, 0, 1240, 920))
             .finish();
 
         // Spinny sprites
@@ -140,8 +140,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             let y = (f * 3.1415 * 8.0 + time).sin() * 150.0 * f.max(0.3) + 190.0;
             renderer
                 .draw(&call, f - 0.5)
-                .with_coordinates((x, y, 100.0, 100.0).into())
-                .with_texture_coordinates((0, 0, 1240, 920).into())
+                .with_coordinates((x, y, 100.0, 100.0))
+                .with_texture_coordinates((0, 0, 1240, 920))
                 .with_color(1.0, 0.7, 0.9, 1.0)
                 .with_rotation(-time * 1.5, 50.0, 50.0)
                 .finish();

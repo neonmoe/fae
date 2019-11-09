@@ -62,18 +62,28 @@ impl<'a, 'b> Renderable<'a, 'b> {
     /// Specifies the screen coordinates (in logical pixels) where the
     /// quad is drawn.
     #[inline]
-    pub fn with_coordinates(mut self, rect: Rect) -> Renderable<'a, 'b> {
-        self.coords = rect.into_corners();
+    pub fn with_coordinates<T: Into<Rect>>(mut self, rect: T) -> Renderable<'a, 'b> {
+        self.coords = rect.into().into_corners();
+        self
+    }
+
+    /// Specifies the screen coordinates (in *physical* pixels) where
+    /// the quad is drawn.
+    #[inline]
+    pub fn with_physical_coordinates<T: Into<Rect>>(mut self, rect: T) -> Renderable<'a, 'b> {
+        let (x0, y0, x1, y1) = rect.into().into_corners();
+        let df = self.renderer.dpi_factor;
+        self.coords = (x0 / df, y0 / df, x1 / df, y1 / df);
         self
     }
 
     /// Specifies the texture coordinates (in actual pixels, in the
     /// texture's coordinate space) from where the quad is sampled.
     #[inline]
-    pub fn with_texture_coordinates(mut self, rect: RectPx) -> Renderable<'a, 'b> {
+    pub fn with_texture_coordinates<T: Into<Rect>>(mut self, rect: T) -> Renderable<'a, 'b> {
         let (tw, th) = self.renderer.get_texture_size(self.call);
         let (tw, th) = (tw as f32, th as f32);
-        let (x0, y0, x1, y1) = rect.into_corners();
+        let (x0, y0, x1, y1) = rect.into().into_corners();
         self.texcoords = (x0 / tw, y0 / th, x1 / tw, y1 / th);
         self
     }

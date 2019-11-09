@@ -44,6 +44,28 @@ impl From<(f32, f32, f32, f32)> for Rect {
     }
 }
 
+impl From<(i32, i32, i32, i32)> for Rect {
+    fn from(from: (i32, i32, i32, i32)) -> Self {
+        Rect {
+            x: from.0 as f32,
+            y: from.1 as f32,
+            width: from.2 as f32,
+            height: from.3 as f32,
+        }
+    }
+}
+
+impl From<RectPx> for Rect {
+    fn from(from: RectPx) -> Self {
+        Rect {
+            x: from.x as f32,
+            y: from.y as f32,
+            width: from.width as f32,
+            height: from.height as f32,
+        }
+    }
+}
+
 impl From<Rect> for (f32, f32, f32, f32) {
     fn from(from: Rect) -> Self {
         (from.x, from.y, from.width, from.height)
@@ -72,17 +94,6 @@ pub struct RectPx {
     pub width: i32,
     /// The height of this rectangle.
     pub height: i32,
-}
-
-impl RectPx {
-    pub(crate) fn into_corners(self) -> (f32, f32, f32, f32) {
-        (
-            self.x as f32,
-            self.y as f32,
-            (self.x + self.width) as f32,
-            (self.y + self.height) as f32,
-        )
-    }
 }
 
 impl From<(i32, i32, i32, i32)> for RectPx {

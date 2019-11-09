@@ -299,8 +299,8 @@ impl Renderer {
     /// # let mut renderer = Renderer::new(&Window::create(&WindowSettings::default()).unwrap());
     /// # let call = renderer.create_draw_call(DrawCallParameters::default());
     /// renderer.draw(&call, 0.0)
-    ///     .with_coordinates((100.0, 100.0, 16.0, 16.0).into())
-    ///     .with_texture_coordinates((0, 0, 16, 16).into())
+    ///     .with_coordinates((100.0, 100.0, 16.0, 16.0))
+    ///     .with_texture_coordinates((0, 0, 16, 16))
     ///     .finish();
     /// # }
     /// ```

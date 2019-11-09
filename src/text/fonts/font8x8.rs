@@ -11,8 +11,19 @@ impl Font8x8Provider {
     }
 }
 
+#[inline]
 fn get_size(font_size: f32) -> i32 {
-    (font_size / 16.0).max(1.0).round() as i32 * 8
+    font_size as i32
+}
+
+#[inline]
+fn get_width(id: u32, font_size: f32) -> f32 {
+    let (left, right) = get_empty_pixels_sides(id).unwrap_or((0, 0));
+    if id == ' ' as u32 {
+        font_size * 2.0 / 3.0 - 2.0
+    } else {
+        font_size - (left + right) as f32 * font_size / 8.0
+    }
 }
 
 impl FontProvider for Font8x8Provider {
@@ -25,20 +36,13 @@ impl FontProvider for Font8x8Provider {
     }
 
     fn get_advance(&self, from: u32, _to: u32, font_size: f32) -> Option<i32> {
-        let (_, _, from_width, _) = self.get_metric(from, font_size).into();
-        Some(from_width + 1)
+        Some((get_width(from, font_size) + 1.0).round() as i32)
     }
 
     fn get_metric(&self, id: u32, font_size: f32) -> RectPx {
         let size = get_size(font_size);
         let y = (self.get_line_height(font_size) - size) / 2;
-        if id == ' ' as u32 {
-            (0, y, size * 2 / 3 - 2, size).into()
-        } else {
-            let (left, right) = get_empty_pixels_sides(id).unwrap_or((0, 0));
-            let width = size - (left + right) * size / 8;
-            (0, y, width, size).into()
-        }
+        (0, y, get_width(id, font_size).round() as i32, size).into()
     }
 
     fn render_glyph(&mut self, id: u32, _font_size: f32) -> Option<RectPx> {

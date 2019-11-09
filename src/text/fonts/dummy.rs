@@ -2,17 +2,13 @@ use crate::text::*;
 
 pub struct DummyProvider;
 
-fn get_size(font_size: f32) -> i32 {
-    (font_size / 16.0).max(1.0).round() as i32 * 8
-}
-
 impl FontProvider for DummyProvider {
     fn get_glyph_id(&self, c: char) -> u32 {
         c as u32
     }
 
     fn get_line_height(&self, font_size: f32) -> i32 {
-        get_size(font_size) * 4 / 3
+        font_size as i32 * 4 / 3
     }
 
     fn get_advance(&self, _from: u32, _to: u32, font_size: f32) -> Option<i32> {

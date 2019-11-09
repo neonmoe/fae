@@ -213,26 +213,54 @@ impl TextRenderer {
             let color = self.draw_datas[glyph.draw_data].color;
             let z = self.draw_datas[glyph.draw_data].z;
 
+            // Note to reader: Careful attention is paid to the fact
+            // that the `screen_location` Rect's and `texcoords`
+            // Rect's fields have exactly the same fractional
+            // parts. This is to ensure that glyphs are drawn pixel
+            // perfectly in the case of matching width & height, which
+            // is the case when rendering glyphs that were rasterized
+            // specifically for this resolution (ie. not bitmap
+            // fonts). An offset is applied (0.5px in each direction,
+            // expanding outwards) to capture half a pixel around the
+            // glyph: if the glyph texture is stretched, this will
+            // preserve the linear blending around the border of the
+            // glyph, and does nothing if the texture is not
+            // stretched.
+
             let screen_location = Rect {
-                x: glyph.screen_location.x as f32 / self.dpi_factor,
-                y: glyph.screen_location.y as f32 / self.dpi_factor,
-                width: glyph.screen_location.width as f32 / self.dpi_factor,
-                height: glyph.screen_location.height as f32 / self.dpi_factor,
+                x: glyph.screen_location.x as f32 - 0.5,
+                y: glyph.screen_location.y as f32 - 0.5,
+                width: glyph.screen_location.width as f32 + 1.0,
+                height: glyph.screen_location.height as f32 + 1.0,
             };
             let texcoords = match self.font.render_glyph(glyph.id, font_size) {
-                Some(texcoords) => texcoords,
+                Some(RectPx {
+                    x,
+                    y,
+                    width,
+                    height,
+                }) => Rect {
+                    x: x as f32 - 0.5,
+                    y: y as f32 - 0.5,
+                    width: width as f32 + 1.0,
+                    height: height as f32 + 1.0,
+                },
                 None => continue,
             };
+
+            debug_assert_eq!(screen_location.x.fract(), texcoords.x.fract());
+            debug_assert_eq!(screen_location.y.fract(), texcoords.y.fract());
+            debug_assert_eq!(screen_location.width.fract(), texcoords.width.fract());
+            debug_assert_eq!(screen_location.height.fract(), texcoords.height.fract());
 
             let mut renderable = renderer.draw(&self.call, z);
             if let Some(area) = self.draw_datas[glyph.draw_data].clip_area {
                 renderable = renderable.with_clip_area(area);
             }
             renderable
-                .with_coordinates(screen_location)
+                .with_physical_coordinates(screen_location)
                 .with_texture_coordinates(texcoords)
                 .with_color(color.0, color.1, color.2, color.3)
-                .with_pixel_alignment() // TODO: Ensure that this is not needed
                 .finish();
         }
         self.glyphs.clear();

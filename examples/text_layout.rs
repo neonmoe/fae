@@ -18,14 +18,13 @@ In earum architecto qui sunt provident. Vitae rerum molestiae dolorem praesentiu
 fn main() -> Result<(), Box<dyn Error>> {
     let mut window = Window::create(&WindowSettings::default())?;
     let mut renderer = Renderer::new(&window);
-    let mut text = TextRenderer::create_simple(&mut renderer, false);
+    let mut text = TextRenderer::create_simple(&mut renderer, true);
     let bgs = renderer.create_draw_call(DrawCallParameters {
         alpha_blending: false,
         ..Default::default()
     });
     let call = renderer.create_draw_call(Default::default());
 
-    let mut time = 0.0f32;
     let mut was_mouse_in = vec![false; 3];
     let mut pressed_index = None;
     let mut lipsum_alignment = Alignment::Left;
@@ -33,14 +32,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         renderer.set_dpi_factor(window.dpi_factor);
         text.set_dpi_factor(window.dpi_factor);
 
-        time += 0.01;
-        let osc = time.sin() * 0.5 + 0.5;
         let mut y = 10.0;
 
         if let Some(rect) = text.draw_text(
             "First test, no limits, should be on one line.",
             (10.0, y, 0.0),
-            20.0,
+            16.0,
             Alignment::Left,
             (0.0, 0.0, 0.0, 1.0),
             None,
@@ -57,7 +54,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         if let Some(rect) = text.draw_text(
             "Cut off at |, like so |",
             (10.0, y, 0.0),
-            16.0,
+            14.0,
             Alignment::Left,
             (0.0, 0.0, 0.0, 1.0),
             None,
@@ -66,7 +63,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             if let Some(rect) = text.draw_text(
                 "Cut off at |, like so |...and here's text that should not appear",
                 (10.0, y, 0.0),
-                16.0,
+                14.0,
                 Alignment::Left,
                 (0.0, 0.0, 0.0, 1.0),
                 None,
@@ -98,12 +95,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             let col = if mouse_in { 0.9 } else { 1.0 };
             renderer
                 .draw(&bgs, 0.1)
-                .with_coordinates((10.0 + px, y + px, 200.0 - 2.0 * px, 40.0 - 2.0 * px).into())
+                .with_coordinates((10.0 + px, y + px, 200.0 - 2.0 * px, 40.0 - 2.0 * px))
                 .with_color(col, col, col, 1.0)
                 .finish();
             renderer
                 .draw(&bgs, 0.1)
-                .with_coordinates((10.0, y, 200.0, 40.0).into())
+                .with_coordinates((10.0, y, 200.0, 40.0))
                 .with_color(0.2, 0.2, 0.2, 1.0)
                 .finish();
             text.draw_text(
@@ -131,12 +128,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             let col = if mouse_in { 0.9 } else { 1.0 };
             renderer
                 .draw(&bgs, 0.1)
-                .with_coordinates((10.0 + px, y + px, 200.0 - 2.0 * px, 40.0 - 2.0 * px).into())
+                .with_coordinates((10.0 + px, y + px, 200.0 - 2.0 * px, 40.0 - 2.0 * px))
                 .with_color(col, col, col, 1.0)
                 .finish();
             renderer
                 .draw(&bgs, 0.1)
-                .with_coordinates((10.0, y, 200.0, 40.0).into())
+                .with_coordinates((10.0, y, 200.0, 40.0))
                 .with_color(0.2, 0.2, 0.2, 1.0)
                 .finish();
             text.draw_text(
@@ -164,12 +161,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             let col = if mouse_in { 0.9 } else { 1.0 };
             renderer
                 .draw(&bgs, 0.1)
-                .with_coordinates((10.0 + px, y + px, 200.0 - 2.0 * px, 40.0 - 2.0 * px).into())
+                .with_coordinates((10.0 + px, y + px, 200.0 - 2.0 * px, 40.0 - 2.0 * px))
                 .with_color(col, col, col, 1.0)
                 .finish();
             renderer
                 .draw(&bgs, 0.1)
-                .with_coordinates((10.0, y, 200.0, 40.0).into())
+                .with_coordinates((10.0, y, 200.0, 40.0))
                 .with_color(0.2, 0.2, 0.2, 1.0)
                 .finish();
             text.draw_text(
@@ -208,31 +205,42 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
 
         {
-            // Animated text
-            if let Some(rect) = text.draw_text(
-                "FirstSecndThirdNow break at word boundary hah ha ha ha",
-                (10.0, y, 0.0),
-                16.0,
-                Alignment::Left,
-                (0.0, 0.0, 0.0, 1.0),
-                Some(40.0 + osc * 100.0),
-                None,
-            ) {
-                renderer
-                    .draw(&bgs, 0.1)
-                    .with_coordinates(rect)
-                    .with_color(0.9, 0.9, 0.5, 1.0)
-                    .finish();
+            // Size comparisons
+            for i in 0..8 {
+                if let Some(rect) = text.draw_text(
+                    "The quick brown fox jumps over the lazy dog",
+                    (10.0, y, 0.0),
+                    (8 + i) as f32,
+                    Alignment::Left,
+                    (0.0, 0.0, 0.0, 1.0),
+                    None,
+                    None,
+                ) {
+                    y += rect.height + 1.0;
+                }
             }
-            // Animated text
+            // Size comparisons
         }
 
         {
             // Lorem ipsum
+            let font_size = 8.0;
+            text.draw_text(
+                &format!(
+                    "Font size of lorem ipsum: {} px",
+                    (font_size * window.dpi_factor) as i32
+                ),
+                (300.0, 30.0, 0.0),
+                font_size / window.dpi_factor,
+                lipsum_alignment,
+                (0.1, 0.1, 0.1, 1.0),
+                Some(320.0),
+                None,
+            );
             text.draw_text(
                 LOREM_IPSUM,
                 (300.0, 40.0, 0.0),
-                16.0,
+                font_size,
                 lipsum_alignment,
                 (0.0, 0.0, 0.0, 1.0),
                 Some(320.0),
@@ -241,12 +249,15 @@ fn main() -> Result<(), Box<dyn Error>> {
             // Lorem ipsum
         }
 
-        let cache_size = 256.0 / window.dpi_factor;
-        let (x, y) = (400.0, 260.0);
+        let cache_size = 128.0 / window.dpi_factor;
+        let (x, y) = (
+            window.width as f32 - 20.0 - cache_size,
+            window.height as f32 - 20.0 - cache_size,
+        );
         text.debug_draw_glyph_cache(&mut renderer, (x, y, x + cache_size, y + cache_size), -1.0);
         renderer
             .draw(&call, -0.9)
-            .with_coordinates((x, y, cache_size, cache_size).into())
+            .with_coordinates((x, y, cache_size, cache_size))
             .with_color(0.9, 0.9, 0.9, 1.0)
             .finish();
 

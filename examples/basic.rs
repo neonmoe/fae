@@ -36,8 +36,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         renderer
             .draw(&call, 0.5)
-            .with_coordinates((0.0, 0.0, 640.0, 480.0).into())
-            .with_texture_coordinates((0, 0, 1240, 920).into())
+            .with_coordinates((0.0, 0.0, 640.0, 480.0))
+            .with_texture_coordinates((0, 0, 1240, 920))
             .finish();
 
         text.draw_text(
