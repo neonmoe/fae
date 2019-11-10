@@ -21,7 +21,7 @@
 use crate::gl;
 use crate::gl::types::*;
 use crate::image::Image;
-use crate::renderable::Renderable;
+use crate::sprite::Sprite;
 use std::mem;
 use std::ptr;
 
@@ -323,8 +323,8 @@ impl Renderer {
         DrawCallHandle(index)
     }
 
-    /// Creates a Renderable struct, which you can render after
-    /// specifying your parameters.
+    /// Creates a Sprite struct, which you can render after specifying
+    /// your parameters.
     ///
     /// # Usage
     /// ```no_run
@@ -339,8 +339,8 @@ impl Renderer {
     /// # }
     /// ```
     #[inline]
-    pub fn draw<'a, 'b>(&'a mut self, call: &'b DrawCallHandle, z: f32) -> Renderable<'a, 'b> {
-        Renderable::create(self, call, z)
+    pub fn draw<'a, 'b>(&'a mut self, call: &'b DrawCallHandle, z: f32) -> Sprite<'a, 'b> {
+        Sprite::create(self, call, z)
     }
 
     #[allow(clippy::too_many_arguments)]

@@ -3,8 +3,6 @@ use crate::image::Image;
 use crate::renderer::{DrawCallHandle, DrawCallParameters, Renderer, Shaders, TextureWrapping};
 use crate::types::*;
 
-// TODO: Gaps between glyphs or tighter uvs to avoid bleeding
-
 // How far the glyphs are from the texture's edges
 const GLYPH_CACHE_MARGIN: i32 = 1;
 // How far the glyphs are from each other
@@ -63,7 +61,6 @@ impl GlyphLine {
         }
     }
 
-    // TODO: read through this and ensure it works
     fn reserve(
         &mut self,
         content: char,

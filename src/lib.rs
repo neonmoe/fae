@@ -13,14 +13,14 @@ pub mod gl {
 }
 
 mod image;
-mod renderable;
 mod renderer;
+mod sprite;
 mod types;
 mod window;
 
 pub use image::*;
-pub use renderable::*;
 pub use renderer::*;
+pub use sprite::*;
 pub use types::*;
 pub use window::*;
 
