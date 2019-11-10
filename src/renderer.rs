@@ -32,8 +32,11 @@ type VBOHandle = GLuint;
 type VAOHandle = GLuint;
 
 /// A handle with which you can draw during a specific draw
-/// call. Created during [`Renderer::create_draw_call`], used during
-/// [`Renderer::draw_quad`] and its variations.
+/// call.
+///
+/// Created during
+/// [`Renderer::create_draw_call`](struct.Renderer.html#method.create_draw_call),
+/// used in [`Renderer::draw`](struct.Renderer.html#method.draw).
 pub struct DrawCallHandle(usize);
 
 /// Represents the shader code for a shader. Used in
@@ -52,6 +55,23 @@ pub struct Shaders {
     /// The GLSL 1.10 version of the fragment shader. Ensure that the
     /// first line is `#version 110`!
     pub fragment_shader_110: &'static str,
+}
+
+static DEFAULT_SHADERS: [&'static str; 4] = [
+    include_str!("shaders/legacy/texquad.vert"),
+    include_str!("shaders/legacy/texquad.frag"),
+    include_str!("shaders/texquad.vert"),
+    include_str!("shaders/texquad.frag"),
+];
+impl Default for Shaders {
+    fn default() -> Self {
+        Shaders {
+            vertex_shader_110: DEFAULT_SHADERS[0],
+            fragment_shader_110: DEFAULT_SHADERS[1],
+            vertex_shader_330: DEFAULT_SHADERS[2],
+            fragment_shader_330: DEFAULT_SHADERS[3],
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -110,7 +130,7 @@ struct OpenGLState {
 }
 
 /// Contains the data and functionality needed to draw rectangles with
-/// OpenGL. **Requires** a valid OpenGL context.
+/// OpenGL.
 #[derive(Debug)]
 pub struct Renderer {
     calls: Vec<DrawCall>,
@@ -119,32 +139,39 @@ pub struct Renderer {
     pub(crate) dpi_factor: f32,
     /// Whether the Renderer should try to preserve the OpenGL
     /// state. If you're using OpenGL yourself, set this to `true` to
-    /// avoid possible headaches.
+    /// avoid possible headaches. This is only best effort however,
+    /// don't trust this to make the state clean.
     pub preserve_gl_state: bool,
 }
 
 /// Describes how textures are wrapped.
 #[derive(Debug, Clone)]
 pub enum TextureWrapping {
-    /// Corresponds to GL_CLAMP_TO_EDGE.
+    /// Corresponds to `GL_CLAMP_TO_EDGE`.
     Clamp,
-    /// Corresponds to GL_REPEAT.
+    /// Corresponds to `GL_REPEAT`.
     Repeat,
-    /// Corresponds to GL_MIRRORED_REPEAT.
+    /// Corresponds to `GL_MIRRORED_REPEAT`.
     RepeatMirrored,
 }
 
 /// Options which set capabilities, restrictions and resources for
-/// draw calls. Used in [`Renderer::create_draw_call`].
+/// draw calls.
+///
+/// Used in
+/// [`Renderer::create_draw_call`](struct.Renderer.html#method.create_draw_call)
+/// to create a [`DrawCallHandle`](struct.DrawCallHandle.html) which
+/// can then be used to
+/// [`Renderer::draw`](struct.Renderer.html#method.draw) with.
 #[derive(Debug, Clone)]
 pub struct DrawCallParameters {
     /// The texture used when drawing with this draw call.
     pub image: Option<Image>,
     /// The shaders used when drawing with this draw call.
-    pub shaders: Option<Shaders>,
+    pub shaders: Shaders,
     /// Whether to blend with previously drawn pixels when drawing
-    /// over them, or just replace the color. (In OpenGL terms:
-    /// whether GL_BLEND is enabled.)
+    /// over them, or just replace the color. (In technical terms:
+    /// whether `GL_BLEND` and back-to-front sorting are enabled.)
     pub alpha_blending: bool,
     /// When drawing quads that are smaller than the texture provided,
     /// use linear (true) or nearest neighbor (false) smoothing when
@@ -155,9 +182,10 @@ pub struct DrawCallParameters {
     /// scaling? (Tip: for pixel art or other textures that don't
     /// suffer from jaggies, set this to false for the intended look.)
     pub magnification_smoothing: bool,
-    /// Sets the texture's behavior when sampling under 0.0 or over
-    /// 1.0, or smoothing over texture boundaries. (Corresponds to
-    /// GL_TEXTURE_WRAP_S and GL_TEXTURE_WRAP_T, in that order.)
+    /// Sets the texture's behavior when sampling coordinates under
+    /// 0.0 or over 1.0, or smoothing over texture
+    /// boundaries. (Corresponds to `GL_TEXTURE_WRAP_S` and
+    /// `GL_TEXTURE_WRAP_T`, in that order.)
     pub wrap: (TextureWrapping, TextureWrapping),
 }
 
@@ -165,7 +193,7 @@ impl Default for DrawCallParameters {
     fn default() -> DrawCallParameters {
         DrawCallParameters {
             image: None,
-            shaders: None,
+            shaders: Default::default(),
             alpha_blending: true,
             minification_smoothing: true,
             magnification_smoothing: false,
@@ -175,10 +203,7 @@ impl Default for DrawCallParameters {
 }
 
 impl Renderer {
-    /// Creates a new Renderer.
-    ///
-    /// Takes a Window as a parameter to ensure that a valid OpenGL
-    /// context exists.
+    /// Creates a new Renderer. **Requires** a valid OpenGL context.
     pub fn new(window: &crate::Window) -> Renderer {
         let version = get_version();
         let legacy = if let Some((major, minor)) = &version {
@@ -229,21 +254,24 @@ impl Renderer {
         self.gl_state.version
     }
 
-    /// Creates a new draw call in the pipeline, and returns its
-    /// index.
+    /// Creates a new draw call in the pipeline, and returns a handle
+    /// to use it with.
     ///
-    /// Using the index, you can call [`Renderer::draw_quad`] to draw
+    /// Using the handle, you can call
+    /// [`Renderer::draw`](struct.Renderer.html#method.draw) to draw
     /// sprites from your image. As a rule of thumb, try to minimize
     /// the amount of draw calls.
     ///
     /// If you want to use your own GLSL shaders, you can provide them
-    /// with the `shaders` parameter. Use `None` for defaults. Make
+    /// with the `shaders` parameter. The `Shaders` struct implements
+    /// `Default`, so you can replace only the shaders you want to
+    /// replace, which usually means just the fragment shaders. Make
     /// sure to study the uniform variables and attributes of the
     /// default shaders before making your own.
     pub fn create_draw_call(&mut self, params: DrawCallParameters) -> DrawCallHandle {
         self.gl_push();
 
-        let shaders = params.shaders.unwrap_or(DEFAULT_QUAD_SHADERS);
+        let shaders = params.shaders;
         let (vert, frag) = if self.gl_state.legacy {
             (shaders.vertex_shader_110, shaders.fragment_shader_110)
         } else {
@@ -398,13 +426,6 @@ impl Renderer {
     /// Updates the DPI multiplication factor of the screen.
     pub fn set_dpi_factor(&mut self, dpi_factor: f32) {
         self.dpi_factor = dpi_factor;
-    }
-
-    /// Clears all queued draws. Like a dummy-version of [`Renderer::render`].
-    pub fn flush(&mut self) {
-        for call in self.calls.iter_mut() {
-            call.attributes.vbo_data.clear();
-        }
     }
 
     // TODO: Add a re-render function for fast re-rendering in resize events
@@ -723,13 +744,6 @@ impl Drop for Renderer {
         }
     }
 }
-
-const DEFAULT_QUAD_SHADERS: Shaders = Shaders {
-    vertex_shader_110: include_str!("shaders/legacy/texquad.vert"),
-    fragment_shader_110: include_str!("shaders/legacy/texquad.frag"),
-    vertex_shader_330: include_str!("shaders/texquad.vert"),
-    fragment_shader_330: include_str!("shaders/texquad.frag"),
-};
 
 #[inline]
 fn create_program(vert_source: &str, frag_source: &str, legacy: bool) -> ShaderProgram {

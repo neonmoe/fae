@@ -10,12 +10,8 @@ const GLYPH_CACHE_MARGIN: i32 = 1;
 // How far the glyphs are from each other
 const GLYPH_CACHE_GAP: i32 = 1;
 
-const DEFAULT_TEXT_SHADERS: Shaders = Shaders {
-    vertex_shader_110: include_str!("../shaders/legacy/texquad.vert"),
-    fragment_shader_110: include_str!("../shaders/legacy/text.frag"),
-    vertex_shader_330: include_str!("../shaders/texquad.vert"),
-    fragment_shader_330: include_str!("../shaders/text.frag"),
-};
+const TEXT_FRAGMENT_SHADER_110: &'static str = include_str!("../shaders/legacy/text.frag");
+const TEXT_FRAGMENT_SHADER_330: &'static str = include_str!("../shaders/text.frag");
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum ExpiryStatus {
@@ -136,7 +132,11 @@ impl GlyphCache {
         let cache_image = Image::from_color(width as i32, height as i32, &[0, 0, 0, 0]);
         let call = renderer.create_draw_call(DrawCallParameters {
             image: Some(cache_image),
-            shaders: Some(DEFAULT_TEXT_SHADERS),
+            shaders: Shaders {
+                fragment_shader_110: TEXT_FRAGMENT_SHADER_110,
+                fragment_shader_330: TEXT_FRAGMENT_SHADER_330,
+                ..Default::default()
+            },
             alpha_blending: true,
             minification_smoothing: true,
             magnification_smoothing: smoothed,

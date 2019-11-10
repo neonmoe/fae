@@ -75,6 +75,9 @@ impl From<Rect> for (f32, f32, f32, f32) {
 /// Represents a rectangle in a coordinate space that consists of
 /// integers.
 ///
+/// Useful for when you want to be sure all operations are
+/// `i32`-based. Internally used in texture/sprite handling.
+///
 /// # Usage
 /// ```
 /// # use fae::RectPx;

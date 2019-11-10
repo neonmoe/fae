@@ -9,7 +9,7 @@ use std::env;
 use std::error::Error;
 use std::path::PathBuf;
 
-/// Wrapper for a Glutin window.
+/// Wrapper for a Glutin window, to provide a less event-based API.
 pub struct Window {
     env_dpi_factor: f32,
     context: WindowedContext<PossiblyCurrent>,
@@ -21,17 +21,11 @@ pub struct Window {
     pub height: f32,
     /// The dpi of the window.
     pub dpi_factor: f32,
-    /// The keys which are currently held down. Different type for
-    /// each window backend, because there's no unified way of
-    /// speaking in keycodes!
+    /// The keys which are currently held down.
     pub held_keys: Vec<VirtualKeyCode>,
-    /// The keys which were pressed this frame. Different type for
-    /// each window backend, because there's no unified way of
-    /// speaking in keycodes!
+    /// The keys which were pressed this frame.
     pub pressed_keys: Vec<VirtualKeyCode>,
-    /// The keys which were released this frame. Different type for
-    /// each window backend, because there's no unified way of
-    /// speaking in keycodes!
+    /// The keys which were released this frame.
     pub released_keys: Vec<VirtualKeyCode>,
     /// The characters typed this frame, in chronological order.
     pub typed_chars: Vec<char>,
@@ -70,6 +64,7 @@ impl Window {
     ///
     /// Can result in an error if window creation fails or OpenGL
     /// context creation fails.
+    // TODO: Take in a (WindowBuilder, ContextBuilder) instead of WindowSettings, and impl From<WindowSettings> for (WindowSettings, ContextBuilder)
     pub fn create(settings: &WindowSettings) -> Result<Window, Box<dyn Error>> {
         let events_loop = EventsLoop::new();
         let context = {

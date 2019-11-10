@@ -33,36 +33,23 @@ pub struct TextRenderer {
 }
 
 impl TextRenderer {
-    /// Creates a new text renderer without any external fonts.
+    /// Creates a new text renderer using the font provided by
+    /// `font8x8`.
     ///
-    /// `smoothed` controls the `magnification_smoothing` value of the
-    /// underlying draw call.
-    ///
-    /// If the `font8x8` feature is enabled, will use those
-    /// glyphs. Otherwise, will draw squares in the place of those
-    /// glyphs.
-    pub fn create_simple(renderer: &mut Renderer, smoothed: bool) -> TextRenderer {
-        #[cfg(feature = "font8x8" /* or font-kit, in the future */)]
+    /// If `smoothed` is `true`, glyphs which are bigger than 8
+    /// physical pixels will be linearly interpolated when stretching
+    /// (smooth but blurry). If `false`, nearest-neighbor
+    /// interpolation is used (crisp but pixelated).
+    #[cfg(feature = "font8x8")]
+    pub fn with_font8x8(renderer: &mut Renderer, smoothed: bool) -> TextRenderer {
         let (glyph_cache, call) =
             GlyphCache::create_cache_and_draw_call(renderer, 128, 128, smoothed);
-
-        #[cfg(not(feature = "font8x8" /* or font-kit, in the future */))]
-        let call = renderer.create_draw_call(crate::renderer::DrawCallParameters {
-            alpha_blending: false,
-            ..Default::default()
-        });
 
         TextRenderer {
             call,
             glyphs: Vec::new(),
             draw_datas: Vec::new(),
-            font: {
-                #[cfg(not(feature = "font8x8"))]
-                let provider = fonts::DummyProvider;
-                #[cfg(feature = "font8x8")]
-                let provider = fonts::Font8x8Provider::new(glyph_cache);
-                Box::new(provider)
-            },
+            font: Box::new(fonts::Font8x8Provider::new(glyph_cache)),
             dpi_factor: 1.0,
         }
     }
@@ -85,6 +72,7 @@ impl TextRenderer {
     /// rendered. Text outside the area will be cut off. For an
     /// example use case, think editable text boxes: the clip area
     /// would be the text box's inner are.
+    // TODO: Switch draw_text to a Renderable-like api
     pub fn draw_text(
         &mut self,
         text: &str,
@@ -202,8 +190,8 @@ impl TextRenderer {
         }
     }
 
-    /// Makes the `draw_text` calls called before this function
-    /// render. Should be called every frame before rendering.
+    /// Sends all the glyphs to the Renderer. Should be called every
+    /// frame before [`Renderer::render`](../struct.Renderer.html#method.render).
     pub fn compose_draw_call(&mut self, renderer: &mut Renderer) {
         crate::profiler::insert_profiling_data("glyphs drawn", "0");
         crate::profiler::insert_profiling_data("glyphs rendered", "0");

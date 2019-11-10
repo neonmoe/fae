@@ -17,13 +17,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     let params = DrawCallParameters {
         image: { Some(image) },
         magnification_smoothing: true,
-        shaders: Some(Shaders {
-            vertex_shader_110: include_str!("../src/shaders/legacy/texquad.vert"),
-            fragment_shader_110: include_str!("../src/shaders/legacy/texquad.frag"),
-            vertex_shader_330: include_str!("../src/shaders/texquad.vert"),
+        shaders: Shaders {
             //fragment_shader_330: include_str!("../src/shaders/texquad.frag"),
             fragment_shader_330: SHADER,
-        }),
+            ..Default::default()
+        },
         ..Default::default()
     };
     let call = renderer.create_draw_call(params);
