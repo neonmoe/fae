@@ -1,41 +1,40 @@
 # Fae
 Fae is a simple, performant, and compatible 2D rendering crate built
-on top of `glutin`, with optional text rendering functionality. Ever
-wanted to make an application on top of `glutin`, but can't be
-bothered to write the ~1k lines of boilerplate OpenGL and event
-handling for `draw_quad`?  This is what I made for that usecase.
+on top of `glutin`, with optional text rendering functionality.
 
 Fae's main design goals are simplicity and performance while
 supporting older/low-end target platforms. The optional text-rendering
-feature `text` uses `rusttype`.
+feature `text` can draw simple text with the `font8x8` crate, or more
+sophisticated TTF-based text via `font-kit` (WIP).
 
-Fae supports OpenGL 2.1+ and OpenGL ES 2.0+ contexts, but will do some
-optimizations (that is, use VAOs) if a newer context is available.
+Fae supports OpenGL 2.1 and OpenGL ES 2.0 contexts, but will do some
+optimizations (VAOs, instanced rendering) if a newer context
+(3.3+/ES 3.0+) is available.
+
+This is not a serious contender intended to replace any general 2D
+rendering crates. I'm developing this as an exercise to learn about
+OpenGL and font rendering, with an eventual goal of being usable for
+my own applications. Use with caution!
 
 ## Important note
 Fae is currently under development, and I wouldn't recommend it for
-any kind of usage yet. Especially since the API is currently oriented
-so it fits the backend of the crate, instead of being easy to use, and
-that will definitely change in the future. It's on crates.io mostly so
-I don't have to come up with another name :)
+any kind of usage yet. It's on crates.io mostly so I don't have to
+come up with another name :)
 
 ## Cargo features
 - The **png** feature implements the `Image::from_png` function, which
   allows you to load images from PNG data. This is a very convenient
   feature, but not necessarily a requirement for using the crate, so
-  it's optional.
+  it's optional. Also, it adds some executable size, so use with
+  caution, if you're going for minimalism.
 - The **text** feature implements the `text` mod, which has
-  functionality for drawing strings. Fonts are provided in the form of
-  .ttf files shipped with your application. The glyph rendering is
-  done by `rusttype`, which this feature adds as a dependency, as well
-  as `unicode-normalization`. A lightweight version of this feature is
-  planned, where you can use bitmap fonts to conserve executable size
-  and performance. When this is not enabled, text rendering functions
-  are still defined, but print out squares in the place of glyphs.
-- **flame** is available as an optional dependency, because that's how
-  the renderer is profiled. If you want to use `flame` in your own
-  application that uses `fae`, but *don't* want the `fae` profiling
-  information, use `Renderer::set_profiling(false)`.
+  functionality for drawing strings. If `font8x8` is enabled as a
+  feature (which it is, by default), you can draw text with a simple
+  8x8 bitmap-based font. If `font-kit` is enabled, you can draw text
+  with any font provided by it (WIP).
+- The **profiler** feature implements the `profiler` mod.
+  Everything in the `minreq::profiler` module is a no-op if this
+  feature is disabled.
 
 ## Notes
 - You can force the crate to use an OpenGL 2.1 context by setting the
