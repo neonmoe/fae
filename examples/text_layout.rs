@@ -1,6 +1,5 @@
 //! This example writes text in varying ways to test that the layout
 //! functionality works correctly.
-#![windows_subsystem = "windows"]
 
 use fae::{
     text::{Alignment, TextRenderer},
@@ -16,9 +15,11 @@ In earum architecto qui sunt provident. Vitae rerum molestiae dolorem praesentiu
 ";
 
 fn main() -> Result<(), Box<dyn Error>> {
+    env_logger::init();
+
     let mut window = Window::create(&WindowSettings::default())?;
     let mut renderer = Renderer::new(&window);
-    let mut text = TextRenderer::create_simple(&mut renderer, true);
+    let mut text = TextRenderer::with_font8x8(&mut renderer, true);
     let bgs = renderer.create_draw_call(DrawCallParameters {
         alpha_blending: false,
         ..Default::default()

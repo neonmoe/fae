@@ -5,7 +5,6 @@ use crate::window::{get_env_dpi, Mouse};
 pub use glutin;
 use glutin::dpi::*;
 use glutin::*;
-use std::env;
 use std::error::Error;
 use std::path::PathBuf;
 
@@ -68,34 +67,22 @@ impl Window {
     pub fn create(settings: &WindowSettings) -> Result<Window, Box<dyn Error>> {
         let events_loop = EventsLoop::new();
         let context = {
-            let create_window = |gl_request| {
-                let mut window = WindowBuilder::new()
-                    .with_title(settings.title.clone())
-                    .with_dimensions(LogicalSize::new(
-                        f64::from(settings.width),
-                        f64::from(settings.height),
-                    ))
-                    .with_visibility(false);
-                if settings.is_dialog {
-                    window = window_as_dialog(window);
-                }
-                ContextBuilder::new()
-                    .with_vsync(settings.vsync)
-                    .with_srgb(true)
-                    .with_multisampling(settings.multisample)
-                    .with_gl(gl_request)
-                    .build_windowed(window, &events_loop)
-            };
-
-            let gl_req_21 = GlRequest::GlThenGles {
-                opengl_version: (2, 1),
-                opengles_version: (2, 0),
-            };
-            if env::var_os("FAE_OPENGL_LEGACY").is_some() {
-                create_window(gl_req_21)?
-            } else {
-                create_window(GlRequest::Latest)?
+            let mut window = WindowBuilder::new()
+                .with_title(settings.title.clone())
+                .with_dimensions(LogicalSize::new(
+                    f64::from(settings.width),
+                    f64::from(settings.height),
+                ))
+                .with_visibility(false);
+            if settings.is_dialog {
+                window = window_as_dialog(window);
             }
+            ContextBuilder::new()
+                .with_vsync(settings.vsync)
+                .with_srgb(true)
+                .with_multisampling(settings.multisample)
+                .with_gl(GlRequest::Latest)
+                .build_windowed(window, &events_loop)?
         };
 
         let env_dpi_factor = {
@@ -115,16 +102,6 @@ impl Window {
                 Err((_, err)) => return Err(Box::new(err)),
             };
             gl::load_with(|symbol| context.get_proc_address(symbol) as *const _);
-            /* use std::ffi::CStr;
-
-            Uncomment in case of opengl shenanigans
-
-            let opengl_version_string = String::from_utf8_lossy(
-                CStr::from_ptr(gl::GetString(gl::VERSION) as *const _).to_bytes(),
-            );
-            if cfg!(debug_assertions) {
-                println!("OpenGL version: {}", opengl_version_string);
-            }*/
             context
         };
 

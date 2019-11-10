@@ -1,10 +1,10 @@
-#![windows_subsystem = "windows"]
-
 use fae::text::{Alignment, TextRenderer};
 use fae::{DrawCallParameters, Image, Renderer, Window, WindowSettings};
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
+    env_logger::init();
+
     let mut window = Window::create(&WindowSettings::default()).unwrap();
     let mut renderer = Renderer::new(&window);
     let params = DrawCallParameters {
@@ -20,7 +20,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
     let call = renderer.create_draw_call(params);
 
-    let mut text = TextRenderer::create_simple(&mut renderer, true);
+    let mut text = TextRenderer::with_font8x8(&mut renderer, true);
 
     let mut should_quit = false;
     while window.refresh() && !should_quit {

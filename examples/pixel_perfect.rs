@@ -1,5 +1,4 @@
 //! This example is used to debug that fae renders textures pixel-perfectly if the texture's resolution matches the quad's coordinates.
-#![windows_subsystem = "windows"]
 
 use fae::{
     glutin::dpi::LogicalSize,
@@ -9,6 +8,8 @@ use fae::{
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
+    env_logger::init();
+
     let mut window = Window::create(&WindowSettings {
         multisample: 8,
         width: 500.0,
@@ -16,7 +17,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         ..Default::default()
     })?;
     let mut renderer = Renderer::new(&window);
-    let mut text = TextRenderer::create_simple(&mut renderer, false);
+    let mut text = TextRenderer::with_font8x8(&mut renderer, false);
     let call = renderer.create_draw_call(DrawCallParameters {
         image: Some(Image::from_png(include_bytes!("res/sprite_8x8.png"))?),
         minification_smoothing: true,

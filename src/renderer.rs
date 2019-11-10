@@ -18,8 +18,6 @@
 //!   between 1 and 0 (ie. use only 100% and 0% opacity), and disable
 //!   `alpha_blending` in your draw call.
 
-// TODO: Use geometry shaders in non-legacy contexts.
-
 use crate::gl;
 use crate::gl::types::*;
 use crate::image::Image;
@@ -207,7 +205,15 @@ impl Renderer {
     pub fn new(window: &crate::Window) -> Renderer {
         let version = get_version();
         let legacy = if let Some((major, minor)) = &version {
-            *major < 3 || (*major == 3 && *minor < 3)
+            let legacy = *major < 3 || (*major == 3 && *minor < 3);
+            log::info!(
+                "OpenGL version: {}.{}{}{}",
+                major,
+                minor,
+                "",
+                if legacy { " (fae legacy mode)" } else { "" },
+            );
+            legacy
         } else {
             true // Fallback to legacy if parsing fails
         };
@@ -1001,7 +1007,6 @@ fn insert_texture(tex: GLuint, format: GLuint, w: GLint, h: GLint, pixels: &[u8]
     print_gl_errors("after inserting a texture");
 }
 
-// TODO: Change this to print out to env_logger or such, not stderr
 pub(crate) fn print_gl_errors(context: &str) {
     let mut error = unsafe { gl::GetError() };
     while error != gl::NO_ERROR {
@@ -1009,7 +1014,7 @@ pub(crate) fn print_gl_errors(context: &str) {
         if cfg!(debug_assertions) {
             panic!("{}", error_msg);
         }
-        eprintln!("{}", error_msg);
+        log::error!("{}", error_msg);
         error = unsafe { gl::GetError() };
     }
 }

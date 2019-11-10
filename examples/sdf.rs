@@ -3,14 +3,14 @@
 
 // TODO: Test out the signed-distance-field crate
 
-#![windows_subsystem = "windows"]
-
 use fae::{DrawCallParameters, Image, Rect, Renderer, Shaders, Window, WindowSettings};
 use std::error::Error;
 
 static SHADER: &'static str = include_str!("res/sdf_shader.frag");
 
 fn main() -> Result<(), Box<dyn Error>> {
+    env_logger::init();
+
     let image = generate_sdf(Image::from_png(&std::fs::read("examples/res/letter.png")?)?);
     let mut window = Window::create(&WindowSettings::default()).unwrap();
     let mut renderer = Renderer::new(&window);

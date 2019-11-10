@@ -3,7 +3,6 @@
 //! Note: this example will be pretty much entirely rewritten once
 //! some API has been decided on. Currently it's just doing the calls
 //! as they happen to be ordered in the codebase.
-#![windows_subsystem = "windows"]
 
 use fae::text::{Alignment, TextRenderer};
 use fae::{profiler, DrawCallParameters, Image, Renderer, Window, WindowSettings};
@@ -18,12 +17,14 @@ mod keys {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
+    env_logger::init();
+
     // Create the window
     let mut window = Window::create(&WindowSettings::default()).unwrap();
     // Create the OpenGL renderer
     let mut renderer = Renderer::new(&window);
     // Create the text renderer
-    let mut text = TextRenderer::create_simple(&mut renderer, true);
+    let mut text = TextRenderer::with_font8x8(&mut renderer, true);
     // Create the draw call for the sprite
     let params = DrawCallParameters {
         image: {

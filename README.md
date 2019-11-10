@@ -36,17 +36,6 @@ come up with another name :)
   Everything in the `minreq::profiler` module is a no-op if this
   feature is disabled.
 
-## Notes
-- You can force the crate to use an OpenGL 2.1 context by setting the
-  `FAE_OPENGL_LEGACY` environment variable. This is intended for
-  making sure that builds work in both legacy and modern modes, though
-  of course, if there are visual differences between the modes (aside
-  from fps), they should be considered a bug in this crate. Make an
-  issue! Example usage:
-  ```sh
-  FAE_OPENGL_LEGACY=1 cargo run
-  ```
-
 ## Issues / contributing
 If you come across bugs, other issues or feature requests, feel free
 to open an issue on
