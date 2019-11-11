@@ -158,7 +158,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             text.draw_text(
                 "Press R to record a frame with flame, see results in flame-graph.html after exiting the application",
                 (20.0, y, -0.6),
-                16.0,
+                11.0,
                 Alignment::Left, text_color,
                 None,
                 None,
@@ -174,7 +174,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     get_avg_timer_mcs(duration_name)
                 ),
                 (10.0, y, -0.6),
-                16.0,
+                11.0,
                 Alignment::Left,
                 text_color,
                 None,
@@ -186,7 +186,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         text.draw_text(
             &format!("Quad count: {}", quad_count),
             (10.0, y, -0.6),
-            16.0,
+            11.0,
             Alignment::Left,
             text_color,
             None,
@@ -197,7 +197,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         text.draw_text(
             &format!("Pressed keys: {:?}", window.held_keys),
             (10.0, y, -0.6),
-            16.0,
+            11.0,
             Alignment::Left,
             text_color,
             None,
@@ -208,7 +208,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         text.draw_text(
             &format!("Scaling factor: {:.1}", window.dpi_factor),
             (10.0, y, -0.6),
-            16.0,
+            11.0,
             Alignment::Left,
             text_color,
             None,
@@ -221,7 +221,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         text.draw_text(
             &format!("Type some text: {}", customizable_text),
             (200.0, y, -0.6),
-            16.0,
+            11.0,
             Alignment::Left,
             text_color,
             None,
@@ -232,7 +232,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         text.draw_text(
             &format!("Mouse held: {:?}", window.mouse_held),
             (200.0, y, -0.6),
-            16.0,
+            11.0,
             Alignment::Left,
             text_color,
             None,
@@ -244,7 +244,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         text.draw_text(
             &format!("Mouse position: {}, {}", mouse_x, mouse_y),
             (200.0, y, -0.6),
-            16.0,
+            11.0,
             Alignment::Left,
             text_color,
             None,
@@ -255,7 +255,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         text.draw_text(
             &format!("Mouse in window: {}", window.mouse_inside),
             (200.0, y, -0.6),
-            16.0,
+            11.0,
             Alignment::Left,
             text_color,
             None,
@@ -264,12 +264,14 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         y += 10.0;
 
-        if let Some((major_ver, minor_ver)) = renderer.get_opengl_version() {
+        if let fae::gl_version::OpenGlVersion::Available { major, minor, .. } =
+            renderer.get_opengl_version()
+        {
             y += 20.0;
             text.draw_text(
-                &format!("OpenGL version: {}.{}", major_ver, minor_ver),
+                &format!("OpenGL version: {}.{}", major, minor),
                 (200.0, y, -0.6),
-                16.0,
+                11.0,
                 Alignment::Left,
                 text_color,
                 None,
@@ -281,7 +283,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         text.draw_text(
             &format!("OpenGL 3.3+ optimizations: {}", !renderer.is_legacy()),
             (200.0, y, -0.6),
-            16.0,
+            11.0,
             Alignment::Left,
             text_color,
             None,
@@ -291,7 +293,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         if let Some(mut rect) = text.draw_text(
             &format!("profiling information:\n{}", profiler::get_profiler_print()),
             (30.0, 310.0, -0.6),
-            16.0,
+            11.0,
             Alignment::Left,
             text_color,
             Some(380.0),

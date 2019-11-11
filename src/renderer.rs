@@ -20,10 +20,13 @@
 
 use crate::gl;
 use crate::gl::types::*;
+use crate::gl_version::{self, OpenGlApi, OpenGlVersion};
 use crate::image::Image;
 use crate::sprite::Sprite;
 use std::mem;
 use std::ptr;
+
+pub use crate::shaders::Shaders;
 
 type TextureHandle = GLuint;
 type VBOHandle = GLuint;
@@ -36,41 +39,6 @@ type VAOHandle = GLuint;
 /// [`Renderer::create_draw_call`](struct.Renderer.html#method.create_draw_call),
 /// used in [`Renderer::draw`](struct.Renderer.html#method.draw).
 pub struct DrawCallHandle(usize);
-
-/// Represents the shader code for a shader. Used in
-/// [`Renderer::create_draw_call`].
-#[derive(Clone, Copy, Debug)]
-pub struct Shaders {
-    /// The GLSL 3.30 version of the vertex shader. Ensure that the
-    /// first line is `#version 330`!
-    pub vertex_shader_330: &'static str,
-    /// The GLSL 3.30 version of the fragment shader. Ensure that the
-    /// first line is `#version 330`!
-    pub fragment_shader_330: &'static str,
-    /// The GLSL 1.10 version of the vertex shader. Ensure that the
-    /// first line is `#version 110`!
-    pub vertex_shader_110: &'static str,
-    /// The GLSL 1.10 version of the fragment shader. Ensure that the
-    /// first line is `#version 110`!
-    pub fragment_shader_110: &'static str,
-}
-
-static DEFAULT_SHADERS: [&'static str; 4] = [
-    include_str!("shaders/legacy/texquad.vert"),
-    include_str!("shaders/legacy/texquad.frag"),
-    include_str!("shaders/texquad.vert"),
-    include_str!("shaders/texquad.frag"),
-];
-impl Default for Shaders {
-    fn default() -> Self {
-        Shaders {
-            vertex_shader_110: DEFAULT_SHADERS[0],
-            fragment_shader_110: DEFAULT_SHADERS[1],
-            vertex_shader_330: DEFAULT_SHADERS[2],
-            fragment_shader_330: DEFAULT_SHADERS[3],
-        }
-    }
-}
 
 #[derive(Clone, Copy, Debug)]
 struct ShaderProgram {
@@ -107,10 +75,10 @@ struct DrawCall {
     lowest_depth: f32,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 struct OpenGLState {
     legacy: bool,
-    version: Option<(u8, u8)>,
+    version: OpenGlVersion,
     // The fields below are settings set by other possible OpenGL
     // calls made in the surrounding program, because the point of
     // this crate is to behave well with other OpenGL code running
@@ -203,19 +171,29 @@ impl Default for DrawCallParameters {
 impl Renderer {
     /// Creates a new Renderer. **Requires** a valid OpenGL context.
     pub fn new(window: &crate::Window) -> Renderer {
-        let version = get_version();
-        let legacy = if let Some((major, minor)) = &version {
-            let legacy = *major < 3 || (*major == 3 && *minor < 3);
-            log::info!(
-                "OpenGL version: {}.{}{}{}",
-                major,
-                minor,
-                "",
-                if legacy { " (fae legacy mode)" } else { "" },
-            );
-            legacy
-        } else {
-            true // Fallback to legacy if parsing fails
+        let version = gl_version::get_version();
+        let legacy = match &version {
+            OpenGlVersion::Available { api, major, minor } => {
+                let legacy = match api {
+                    OpenGlApi::Desktop => *major < 3 || (*major == 3 && *minor < 3),
+                    OpenGlApi::ES => *major < 3,
+                };
+                log::info!(
+                    "OpenGL version: {}.{}{}{}",
+                    major,
+                    minor,
+                    "",
+                    if legacy { " (legacy)" } else { "" },
+                );
+                legacy
+            }
+            OpenGlVersion::Unavailable { version_string } => {
+                log::info!(
+                    "Failed to parse OpenGL version string: '{}'",
+                    version_string
+                );
+                true
+            }
         };
 
         Renderer {
@@ -256,8 +234,8 @@ impl Renderer {
 
     /// Returns the OpenGL version (major, minor) if it could be
     /// parsed.
-    pub fn get_opengl_version(&self) -> Option<(u8, u8)> {
-        self.gl_state.version
+    pub fn get_opengl_version(&self) -> &OpenGlVersion {
+        &self.gl_state.version
     }
 
     /// Creates a new draw call in the pipeline, and returns a handle
@@ -277,12 +255,15 @@ impl Renderer {
     pub fn create_draw_call(&mut self, params: DrawCallParameters) -> DrawCallHandle {
         self.gl_push();
 
-        let shaders = params.shaders;
-        let (vert, frag) = if self.gl_state.legacy {
-            (shaders.vertex_shader_110, shaders.fragment_shader_110)
-        } else {
-            (shaders.vertex_shader_330, shaders.fragment_shader_330)
-        };
+        let (api, legacy) = (
+            match self.gl_state.version {
+                OpenGlVersion::Available { api, .. } => api,
+                _ => OpenGlApi::Desktop,
+            },
+            self.gl_state.legacy,
+        );
+        let vert = params.shaders.create_vert_string(api, legacy);
+        let frag = params.shaders.create_frag_string(api, legacy);
         let index = self.calls.len();
 
         let program = create_program(&vert, &frag, self.gl_state.legacy);
@@ -1017,28 +998,6 @@ pub(crate) fn print_gl_errors(context: &str) {
         log::error!("{}", error_msg);
         error = unsafe { gl::GetError() };
     }
-}
-
-// Sorry for the mess, but OpenGL version strings are unreliable, and
-// I'm not sure *how* unreliable. Here's my attempt at a robust way of
-// parsing the version.
-// TODO: Take OpenGL ES into consideration
-fn get_version() -> Option<(u8, u8)> {
-    let version_str = unsafe { std::ffi::CStr::from_ptr(gl::GetString(gl::VERSION) as *const _) };
-    let version_str = version_str.to_string_lossy();
-
-    let mut split = version_str.split('.'); // Split at .
-    let major_str = &split.next()?; // Major version is the first part before the first .
-    let major = u8::from_str_radix(major_str, 10).ok()?; // Parse the version
-
-    let rest_of_version = split.next()?; // Find the next part after the first .
-    let end_of_version_num = rest_of_version
-        .find(|c: char| !c.is_digit(10))
-        .unwrap_or(rest_of_version.len()); // Find where the minor version ends
-    let minor_str = &rest_of_version[0..end_of_version_num]; // Minor version as str
-    let minor = u8::from_str_radix(minor_str, 10).ok()?; // Parse minor version
-
-    Some((major, minor))
 }
 
 fn gl_error_to_string(error: GLuint) -> String {

@@ -34,6 +34,7 @@ pub(crate) fn get_line_start_x(
     }
 }
 
+// FIXME: There seems to be a problem when rendering lines that end in <micro>s
 pub(crate) fn get_line_length_and_width(
     font: &Box<dyn FontProvider>,
     metrics: &HashMap<char, Metric>,

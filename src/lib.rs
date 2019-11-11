@@ -9,11 +9,14 @@
 #[allow(missing_docs, unknown_lints, clippy::all)]
 #[allow(bare_trait_objects)] // Only needed until gl_generator update
 pub mod gl {
+    //! OpenGL functions and constants.
     include!(concat!(env!("OUT_DIR"), "/gl_bindings.rs"));
 }
 
+pub mod gl_version;
 mod image;
 mod renderer;
+mod shaders;
 mod sprite;
 mod types;
 mod window;
