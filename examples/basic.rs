@@ -3,7 +3,7 @@ use fae::{DrawCallParameters, Image, Renderer, Window, WindowSettings};
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    env_logger::init();
+    env_logger::from_env(env_logger::Env::default().default_filter_or("trace")).init();
 
     let mut window = Window::create(&WindowSettings::default()).unwrap();
     let mut renderer = Renderer::new(&window);

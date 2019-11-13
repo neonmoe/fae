@@ -3,6 +3,8 @@ use crate::image::Image;
 use crate::renderer::{DrawCallHandle, DrawCallParameters, Renderer, Shaders, TextureWrapping};
 use crate::types::*;
 
+use std::collections::HashMap;
+
 // How far the glyphs are from the texture's edges
 const GLYPH_CACHE_MARGIN: i32 = 1;
 // How far the glyphs are from each other
@@ -10,6 +12,17 @@ const GLYPH_CACHE_GAP: i32 = 1;
 
 const TEXT_FRAGMENT_SHADER_110: &'static str = include_str!("../shaders/legacy/text.frag");
 const TEXT_FRAGMENT_SHADER_330: &'static str = include_str!("../shaders/text.frag");
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct CacheIdentifier {
+    c: char,
+}
+
+impl CacheIdentifier {
+    pub fn new(c: char) -> CacheIdentifier {
+        CacheIdentifier { c }
+    }
+}
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum ExpiryStatus {
@@ -33,7 +46,6 @@ impl ExpiryStatus {
 pub(crate) struct GlyphSpot {
     pub just_reserved: bool,
     pub texcoords: RectPx,
-    content: char,
     #[allow(dead_code)]
     width: i32, // for cache eviction
     status: ExpiryStatus,
@@ -46,7 +58,7 @@ struct GlyphLine {
     y: i32,
     height: i32,
     width_left: i32,
-    spots: Vec<GlyphSpot>,
+    spots: HashMap<CacheIdentifier, GlyphSpot>,
 }
 
 impl GlyphLine {
@@ -57,22 +69,20 @@ impl GlyphLine {
             y: line_y,
             height: line_height,
             width_left: cache_width - GLYPH_CACHE_MARGIN,
-            spots: Vec::new(),
+            spots: HashMap::new(),
         }
     }
 
     fn reserve(
         &mut self,
-        content: char,
+        id: CacheIdentifier,
         width: i32,
         height: i32,
         can_evict: bool,
     ) -> Option<GlyphSpot> {
-        for i in 0..self.spots.len() {
-            if self.spots[i].content == content {
-                self.spots[i].status = ExpiryStatus::UsedDuringThisFrame;
-                return Some(self.spots[i]);
-            }
+        if let Some(spot) = self.spots.get_mut(&id) {
+            spot.status = ExpiryStatus::UsedDuringThisFrame;
+            return Some(*spot);
         }
 
         if self.width_left - GLYPH_CACHE_MARGIN <= width {
@@ -91,12 +101,11 @@ impl GlyphLine {
             };
             let spot = GlyphSpot {
                 just_reserved: false,
-                content,
                 texcoords,
                 width,
                 status: ExpiryStatus::UsedDuringThisFrame,
             };
-            self.spots.push(spot);
+            self.spots.insert(id, spot);
             self.width_left -= width + GLYPH_CACHE_GAP;
 
             let mut spot = spot.clone();
@@ -106,7 +115,7 @@ impl GlyphLine {
     }
 
     fn expire_one_step(&mut self) {
-        for spot in &mut self.spots {
+        for spot in self.spots.values_mut() {
             spot.status.expire_one_step();
         }
     }
@@ -117,6 +126,7 @@ pub struct GlyphCache {
     width: i32,
     height: i32,
     lines: Vec<GlyphLine>,
+    out_of_memory: bool,
 }
 
 impl GlyphCache {
@@ -144,38 +154,59 @@ impl GlyphCache {
             width,
             height,
             lines: Vec::new(),
+            out_of_memory: false,
         };
         (cache, call)
     }
 
-    pub(crate) fn reserve_uvs(&mut self, c: char, width: i32, height: i32) -> Option<GlyphSpot> {
-        // First try to find space in the ends of existing lines
-        self.reserve_uvs_from_existing(c, width, height, false)
+    pub(crate) fn reserve_uvs(
+        &mut self,
+        id: CacheIdentifier,
+        width: i32,
+        height: i32,
+    ) -> Option<GlyphSpot> {
+        if let Some(uvs) = self
+            // First try to find space in the ends of existing lines
+            .reserve_uvs_from_existing(id, width, height, false)
             // Then try adding a new line
-            .or_else(|| self.reserve_uvs_from_new_line(c, width, height))
+            .or_else(|| self.reserve_uvs_from_new_line(id, width, height))
             // Then try evicting old characters
-            .or_else(|| self.reserve_uvs_from_existing(c, width, height, true))
+            .or_else(|| self.reserve_uvs_from_existing(id, width, height, true))
         // TODO: Add glyph cache texture re-sizing as a last resort
+        {
+            Some(uvs)
+        } else {
+            if !self.out_of_memory {
+                log::warn!("glyph cache ran out of space: {:?}", id);
+            }
+            self.out_of_memory = true;
+            None
+        }
     }
 
     fn reserve_uvs_from_existing(
         &mut self,
-        c: char,
+        id: CacheIdentifier,
         width: i32,
         height: i32,
         can_evict: bool,
     ) -> Option<GlyphSpot> {
         for line in &mut self.lines {
-            if let Some(spot) = line.reserve(c, width, height, can_evict) {
+            if let Some(spot) = line.reserve(id, width, height, can_evict) {
                 return Some(spot);
             }
         }
         None
     }
 
-    fn reserve_uvs_from_new_line(&mut self, c: char, width: i32, height: i32) -> Option<GlyphSpot> {
+    fn reserve_uvs_from_new_line(
+        &mut self,
+        id: CacheIdentifier,
+        width: i32,
+        height: i32,
+    ) -> Option<GlyphSpot> {
         if let Some(new_line) = self.create_line(height) {
-            if let Some(spot) = new_line.reserve(c, width, height, false) {
+            if let Some(spot) = new_line.reserve(id, width, height, false) {
                 return Some(spot);
             }
         }

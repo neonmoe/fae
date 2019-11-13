@@ -15,7 +15,7 @@ In earum architecto qui sunt provident. Vitae rerum molestiae dolorem praesentiu
 ";
 
 fn main() -> Result<(), Box<dyn Error>> {
-    env_logger::init();
+    env_logger::from_env(env_logger::Env::default().default_filter_or("trace")).init();
 
     let mut window = Window::create(&WindowSettings::default())?;
     let mut renderer = Renderer::new(&window);

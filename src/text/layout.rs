@@ -76,8 +76,12 @@ pub(crate) fn get_line_length_and_width(
                     for _ in can_break_len..len {
                         widths.pop_back(); // Pop off the overflown characters
                     }
-                    widths.pop_back(); // Pop off the breaking character
                     len = can_break_len;
+
+                    widths.pop_back(); // Pop off the breaking character (from the width)
+                } else {
+                    widths.pop_back(); // Pop off the overflown character
+                    len -= 1;
                 }
                 break;
             }

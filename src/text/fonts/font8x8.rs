@@ -1,4 +1,4 @@
-use crate::text::glyph_cache::GlyphCache;
+use crate::text::glyph_cache::{CacheIdentifier, GlyphCache};
 use crate::text::*;
 
 pub struct Font8x8Provider {
@@ -46,10 +46,10 @@ impl FontProvider for Font8x8Provider {
     }
 
     fn render_glyph(&mut self, id: u32, _font_size: f32) -> Option<RectPx> {
-        let bitmap = get_bitmap(id)?;
         if id == ' ' as u32 {
             None
         } else {
+            let bitmap = get_bitmap(id)?;
             render_bitmap(id, bitmap, &mut self.cache)
         }
     }
@@ -66,7 +66,7 @@ fn render_bitmap(id: u32, bitmap: [u8; 8], cache: &mut GlyphCache) -> Option<Rec
     use std::convert::TryFrom;
     let c = char::try_from(id).ok()?;
     let tex = cache.get_texture();
-    if let Some(spot) = cache.reserve_uvs(c, width, height) {
+    if let Some(spot) = cache.reserve_uvs(CacheIdentifier::new(c), width, height) {
         if spot.just_reserved {
             let mut data = Vec::with_capacity((width * height) as usize);
             for y in &bitmap {
@@ -127,7 +127,8 @@ fn get_empty_pixels_sides(id: u32) -> Option<(i32, i32)> {
 
 // This function provides glyphs for 558 characters (for calculating
 // the cache texture size)
-fn get_bitmap(id: u32) -> Option<[u8; 8]> {
+#[doc(hidden)]
+pub fn get_bitmap(id: u32) -> Option<[u8; 8]> {
     let u = id as usize;
     let bitmap = match u {
         0..=0x7F => Some(font8x8::legacy::BASIC_LEGACY[u]),
@@ -136,7 +137,6 @@ fn get_bitmap(id: u32) -> Option<[u8; 8]> {
         0x2500..=0x257F => Some(font8x8::legacy::BOX_LEGACY[u - 0x2500]),
         0x2580..=0x259F => Some(font8x8::legacy::BLOCK_LEGACY[u - 0x2580]),
         0x3040..=0x309F => Some(font8x8::legacy::HIRAGANA_LEGACY[u - 0x3040]),
-        // TODO: The 'micro' glyph doesn't seem to work, debug
         // TODO: Test all of the font8x8 glyphs, draw a grid or something
         0x390..=0x03C9 => Some(font8x8::legacy::GREEK_LEGACY[u - 0x390]),
         0xE541..=0xE55A => Some(font8x8::legacy::SGA_LEGACY[u - 0xE541]),

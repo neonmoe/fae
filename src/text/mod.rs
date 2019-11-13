@@ -12,6 +12,10 @@ mod glyph_cache;
 mod layout;
 pub(crate) mod types;
 
+// This is here for the font8x8_glyphs example
+#[doc(hidden)]
+pub use crate::text::fonts::font8x8::get_bitmap;
+
 pub use crate::text::types::Alignment;
 
 #[cfg(feature = "font8x8" /* or font-kit, in the future */)]
@@ -43,7 +47,7 @@ impl TextRenderer {
     #[cfg(feature = "font8x8")]
     pub fn with_font8x8(renderer: &mut Renderer, smoothed: bool) -> TextRenderer {
         let (glyph_cache, call) =
-            GlyphCache::create_cache_and_draw_call(renderer, 128, 128, smoothed);
+            GlyphCache::create_cache_and_draw_call(renderer, 256, 256, smoothed);
 
         TextRenderer {
             call,
@@ -136,7 +140,8 @@ impl TextRenderer {
             }
 
             let mut previous_character = None;
-            let mut chars = text_left[..line_len].chars();
+            let mut chars = text_left.chars();
+            let mut chars_processed = 0;
             for c in &mut chars {
                 if let Some(metric) = metrics.get(&c).map(|m| m.clone()) {
                     // Advance the cursor, if this is not the first character
@@ -162,8 +167,13 @@ impl TextRenderer {
                     });
                 }
                 previous_character = Some(c);
+
+                chars_processed += 1;
+                if chars_processed >= line_len {
+                    break;
+                }
             }
-            text_left = &text_left[line_len..];
+            text_left = chars.as_str();
             cursor = PositionPx {
                 x,
                 y: cursor.y + line_height,
@@ -196,7 +206,11 @@ impl TextRenderer {
         crate::profiler::insert_profiling_data("glyphs drawn", "0");
         crate::profiler::insert_profiling_data("glyphs rendered", "0");
 
+        let mut total_nanos = 0u64;
         for glyph in &self.glyphs {
+            use std::time::Instant;
+            let start = Instant::now();
+
             let font_size = self.draw_datas[glyph.draw_data].font_size;
             let color = self.draw_datas[glyph.draw_data].color;
             let z = self.draw_datas[glyph.draw_data].z;
@@ -250,7 +264,16 @@ impl TextRenderer {
                 .with_texture_coordinates(texcoords)
                 .with_color(color.0, color.1, color.2, color.3)
                 .finish();
+
+            let glyph_duration = Instant::now() - start;
+            total_nanos += glyph_duration.subsec_nanos() as u64;
         }
+        let avg_nanos = total_nanos / self.glyphs.len() as u64;
+        crate::profiler::insert_profiling_data(
+            "avg. draw call compose time per glyph",
+            &format!("{} ns", avg_nanos),
+        );
+
         self.glyphs.clear();
         self.draw_datas.clear();
         self.font.update_glyph_cache_expiration();
