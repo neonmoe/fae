@@ -1,23 +1,3 @@
-//! The rendering module.
-//!
-//! This module is responsible for the actual drawing procedures,
-//! written in OpenGL. Usage in general terms:
-//! - Create a window and load the OpenGL functions with
-//!   `gl::load_with`.
-//! - Create draw calls for each texture you want to use.
-//! - Draw with [`Renderer::draw_quad`](struct.Renderer.html#method.draw_quad)
-//!   and similar functions using the draw call index to use specific
-//!   textures.
-//!
-//! ## Optimization tips
-//! - Try to define different Z coordinates for your elements, and
-//!   draw the ones in front first. This way you'll avoid rendering
-//!   over already drawn pixels. If you're rendering *lots* of sprites,
-//!   this is a good place to start optimizing.
-//! - If possible, make your textures without using alpha values
-//!   between 1 and 0 (ie. use only 100% and 0% opacity), and disable
-//!   `alpha_blending` in your draw call.
-
 use crate::gl;
 use crate::gl::types::*;
 use crate::gl_version::{self, OpenGlApi, OpenGlVersion};
@@ -32,8 +12,7 @@ type TextureHandle = GLuint;
 type VBOHandle = GLuint;
 type VAOHandle = GLuint;
 
-/// A handle with which you can draw during a specific draw
-/// call.
+/// A handle with which you can draw during a specific draw call.
 ///
 /// Created during
 /// [`Renderer::create_draw_call`](struct.Renderer.html#method.create_draw_call),
@@ -97,6 +76,20 @@ struct OpenGLState {
 
 /// Contains the data and functionality needed to draw rectangles with
 /// OpenGL.
+///
+/// ## Optimization tips
+/// - Draw the sprites in front first. This way you'll avoid rendering
+///   over already drawn pixels. If you're rendering *lots* of sprites,
+///   this is a good place to start optimizing.
+///   - Note: try to constrain your Z-values to small ranges within
+///     individual draw calls; draw call rendering order is decided by
+///     the lowest z-coordinate that each draw call has to draw. This
+///     can even cause visual glitches in alpha-blended draw calls, if
+///     their sprites overlap and have overlapping ranges of
+///     Z-coordinates.
+/// - If possible, make your textures without using alpha values
+///   between 1 and 0 (ie. use only 100% and 0% opacity), and disable
+///   `alpha_blending` in your draw call.
 #[derive(Debug)]
 pub struct Renderer {
     calls: Vec<DrawCall>,
@@ -232,8 +225,7 @@ impl Renderer {
         self.gl_state.legacy
     }
 
-    /// Returns the OpenGL version (major, minor) if it could be
-    /// parsed.
+    /// Returns the OpenGL version if it could be parsed.
     pub fn get_opengl_version(&self) -> &OpenGlVersion {
         &self.gl_state.version
     }
