@@ -1,6 +1,7 @@
 use crate::gl::types::*;
 use crate::image::Image;
 use crate::renderer::{DrawCallHandle, DrawCallParameters, Renderer, Shaders, TextureWrapping};
+use crate::text::types::*;
 use crate::types::*;
 
 use std::collections::HashMap;
@@ -12,17 +13,6 @@ const GLYPH_CACHE_GAP: i32 = 1;
 
 const TEXT_FRAGMENT_SHADER_110: &'static str = include_str!("../shaders/legacy/text.frag");
 const TEXT_FRAGMENT_SHADER_330: &'static str = include_str!("../shaders/text.frag");
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct CacheIdentifier {
-    c: char,
-}
-
-impl CacheIdentifier {
-    pub fn new(c: char) -> CacheIdentifier {
-        CacheIdentifier { c }
-    }
-}
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum ExpiryStatus {

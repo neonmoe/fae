@@ -40,3 +40,14 @@ pub(crate) trait FontProvider {
     fn render_glyph(&mut self, id: u32, font_size: f32) -> Option<RectPx>;
     fn update_glyph_cache_expiration(&mut self);
 }
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct CacheIdentifier {
+    c: char,
+}
+
+impl CacheIdentifier {
+    pub fn new(c: char) -> CacheIdentifier {
+        CacheIdentifier { c }
+    }
+}

@@ -269,10 +269,7 @@ impl TextRenderer {
             total_nanos += glyph_duration.subsec_nanos() as u64;
         }
         let avg_nanos = total_nanos / self.glyphs.len() as u64;
-        crate::profiler::insert_profiling_data(
-            "avg. draw call compose time per glyph",
-            &format!("{} ns", avg_nanos),
-        );
+        crate::profiler::insert_profiling_data("avg. glyph cpu time", &format!("{} ns", avg_nanos));
 
         self.glyphs.clear();
         self.draw_datas.clear();
@@ -281,20 +278,17 @@ impl TextRenderer {
 
     /// Draws the glyph cache texture in the given screen-space quad,
     /// for debugging.
-    pub fn debug_draw_glyph_cache(
+    pub fn debug_draw_glyph_cache<R: Into<Rect>>(
         &self,
         renderer: &mut Renderer,
-        // TODO: Change this to a rect type
-        quad: (f32, f32, f32, f32),
+        coordinates: R,
         z: f32,
     ) {
-        renderer.draw_quad(
-            quad,
-            (0.0, 0.0, 1.0, 1.0),
-            (0.0, 0.0, 0.0, 1.0),
-            (0.0, 0.0, 0.0),
-            z,
-            &self.call,
-        );
+        renderer
+            .draw(&self.call, z)
+            .with_coordinates(coordinates)
+            .with_uvs((0.0, 0.0, 1.0, 1.0))
+            .with_color(0.0, 0.0, 0.0, 1.0)
+            .finish();
     }
 }

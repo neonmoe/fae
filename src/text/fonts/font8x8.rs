@@ -1,4 +1,5 @@
-use crate::text::glyph_cache::{CacheIdentifier, GlyphCache};
+use crate::text::glyph_cache::GlyphCache;
+use crate::text::types::*;
 use crate::text::*;
 
 pub struct Font8x8Provider {
