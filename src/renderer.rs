@@ -730,18 +730,16 @@ fn create_program(vert_source: &str, frag_source: &str, legacy: bool) -> ShaderP
         let mut compilation_status = 0;
         gl::GetShaderiv(shader, gl::COMPILE_STATUS, &mut compilation_status);
         if compilation_status as u8 != gl::TRUE {
-            let mut info = [0; 1024];
+            let mut info = vec![0; 1024];
             gl::GetShaderInfoLog(shader, 1024, ptr::null_mut(), info.as_mut_ptr());
-
-            let error_msg = format!(
+            log::error!(
                 "Shader ({}) compilation failed:\n{}",
                 shader_type,
-                String::from_utf8_lossy(&mem::transmute::<[i8; 1024], [u8; 1024]>(info)[..])
+                error_buffer_into_string(info).trim()
             );
             if cfg!(debug_assertions) {
-                panic!("{}", error_msg);
+                panic!("shader compilation failed");
             }
-            eprintln!("{}", error_msg);
         }
     };
 
@@ -778,17 +776,15 @@ fn create_program(vert_source: &str, frag_source: &str, legacy: bool) -> ShaderP
         let mut link_status = 0;
         gl::GetProgramiv(program, gl::LINK_STATUS, &mut link_status);
         if link_status as u8 != gl::TRUE {
-            let mut info = [0; 1024];
+            let mut info = vec![0; 1024];
             gl::GetProgramInfoLog(program, 1024, ptr::null_mut(), info.as_mut_ptr());
-
-            let error_msg = format!(
+            log::error!(
                 "Program linking failed:\n{}",
-                String::from_utf8_lossy(&mem::transmute::<[i8; 1024], [u8; 1024]>(info)[..])
+                error_buffer_into_string(info).trim()
             );
             if cfg!(debug_assertions) {
-                panic!("{}", error_msg);
+                panic!("program linking failed");
             }
-            eprintln!("{}", error_msg);
         }
         print_gl_errors("after shader program creation");
     }
@@ -1005,6 +1001,20 @@ fn gl_error_to_string(error: GLuint) -> String {
         0x0531 => "GL_TABLE_TOO_LARGE (0x0531)".to_owned(),
         _ => format!("unknown error ({:#06x})", error),
     }
+}
+
+fn error_buffer_into_string(raw: Vec<i8>) -> String {
+    let len = raw
+        .iter()
+        .enumerate() // Enumerate: values are (index, &value)
+        .find(|&(_, &v)| v == 0) // Find the nul byte
+        .map(|(i, _)| i) // Get the index to use as the length
+        .unwrap_or(1024); // If no nul byte was found, assume 1024 for length
+    let info: Vec<u8> = raw[0..len]
+        .iter()
+        .map(|&i| unsafe { mem::transmute::<i8, u8>(i) })
+        .collect();
+    String::from_utf8_lossy(&info).to_string()
 }
 
 use renderer_profiler::Profiler;

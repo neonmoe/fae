@@ -64,7 +64,11 @@ fn create_string(
             .to_string()
             .lines()
             .map(|line| replace_version(line, legacy))
-            .collect(),
+            .fold(
+                // The 28 here is the maximum amount of bytes added by replace_version
+                String::with_capacity(base_string.len() + 28),
+                |acc, line| acc + line + "\n",
+            ),
     }
 }
 
@@ -73,7 +77,7 @@ fn replace_version(line: &str, legacy: bool) -> &str {
         if legacy {
             "#version 100"
         } else {
-            "#version 300 es"
+            "#version 300 es\nprecision mediump float;"
         }
     } else {
         line
