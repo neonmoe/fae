@@ -41,7 +41,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
 
         text.draw_text(
-            "Every character in font8x8, 32 per row:",
+            "Every character in font8x8:",
             (10.0, 10.0, 0.0),
             10.0,
             Alignment::Left,
@@ -65,7 +65,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             window.width as f32 - 20.0 - cache_size,
             window.height as f32 - 20.0 - cache_size,
         );
-        text.debug_draw_glyph_cache(&mut renderer, (x, y, x + cache_size, y + cache_size), -1.0);
+        text.debug_draw_glyph_cache(&mut renderer, (x, y, cache_size, cache_size), -1.0);
         renderer
             .draw(&call, -0.9)
             .with_coordinates((x, y, cache_size, cache_size))

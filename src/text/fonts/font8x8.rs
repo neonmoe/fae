@@ -19,7 +19,7 @@ fn get_size(font_size: f32) -> i32 {
 
 #[inline]
 fn get_width(id: u32, font_size: f32) -> f32 {
-    let (left, right) = get_empty_pixels_sides(id).unwrap_or((0, 0));
+    let (left, right) = get_empty_pixels_left_right(id).unwrap_or((0, 0));
     if id == ' ' as u32 {
         font_size * 2.0 / 3.0 - 2.0
     } else {
@@ -42,8 +42,12 @@ impl FontProvider for Font8x8Provider {
 
     fn get_metric(&self, id: u32, font_size: f32) -> RectPx {
         let size = get_size(font_size);
-        let y = (self.get_line_height(font_size) - size) / 2;
-        (0, y, get_width(id, font_size).round() as i32, size).into()
+        let (top, bottom) = get_empty_pixels_top_bottom(id)
+            .map(|(t, b)| (t as f32 * font_size / 8.0, b as f32 * font_size / 8.0))
+            .unwrap_or((0.0, 0.0));
+        let height = (font_size - (top + bottom)) as i32;
+        let y = ((self.get_line_height(font_size) - size) as f32 / 2.0 + top) as i32;
+        (0, y, get_width(id, font_size).round() as i32, height).into()
     }
 
     fn render_glyph(&mut self, id: u32, _font_size: f32) -> Option<RectPx> {
@@ -61,8 +65,9 @@ impl FontProvider for Font8x8Provider {
 }
 
 fn render_bitmap(id: u32, bitmap: [u8; 8], cache: &mut GlyphCache) -> Option<RectPx> {
-    let (left, right) = get_empty_pixels_sides(id).unwrap_or((0, 0));
-    let (width, height) = ((8 - (left + right)), 8);
+    let (left, right) = get_empty_pixels_left_right(id).unwrap_or((0, 0));
+    let (top, bottom) = get_empty_pixels_top_bottom(id).unwrap_or((0, 0));
+    let (width, height) = ((8 - (left + right)), 8 - (top + bottom));
 
     use std::convert::TryFrom;
     let c = char::try_from(id).ok()?;
@@ -70,9 +75,10 @@ fn render_bitmap(id: u32, bitmap: [u8; 8], cache: &mut GlyphCache) -> Option<Rec
     if let Some(spot) = cache.reserve_uvs(CacheIdentifier::new(c), width, height) {
         if spot.just_reserved {
             let mut data = Vec::with_capacity((width * height) as usize);
-            for y in &bitmap {
+            for y in top..(8 - bottom) {
+                let color = bitmap[y as usize];
                 for x in left..(8 - right) {
-                    if (y & (1 << x)) == 0 {
+                    if (color & (1 << x)) == 0 {
                         data.push(0x00u8);
                     } else {
                         data.push(0xFFu8);
@@ -107,7 +113,7 @@ fn render_bitmap(id: u32, bitmap: [u8; 8], cache: &mut GlyphCache) -> Option<Rec
     }
 }
 
-fn get_empty_pixels_sides(id: u32) -> Option<(i32, i32)> {
+fn get_empty_pixels_left_right(id: u32) -> Option<(i32, i32)> {
     let bitmap = get_bitmap(id)?;
     let mut left = None;
     let mut right = None;
@@ -126,6 +132,23 @@ fn get_empty_pixels_sides(id: u32) -> Option<(i32, i32)> {
     Some((left?, 7 - right?))
 }
 
+fn get_empty_pixels_top_bottom(id: u32) -> Option<(i32, i32)> {
+    let bitmap = get_bitmap(id)?;
+    let mut top = None;
+    let mut bottom = None;
+    for i in 0..bitmap.len() {
+        let (i, y) = (i as i32, bitmap[i]);
+
+        if y != 0 {
+            if top.is_none() {
+                top = Some(i);
+            }
+            bottom = Some(i);
+        }
+    }
+    Some((top?, 7 - bottom?))
+}
+
 // This function provides glyphs for 558 characters (for calculating
 // the cache texture size)
 #[doc(hidden)]
@@ -138,7 +161,6 @@ pub fn get_bitmap(id: u32) -> Option<[u8; 8]> {
         0x2500..=0x257F => Some(font8x8::legacy::BOX_LEGACY[u - 0x2500]),
         0x2580..=0x259F => Some(font8x8::legacy::BLOCK_LEGACY[u - 0x2580]),
         0x3040..=0x309F => Some(font8x8::legacy::HIRAGANA_LEGACY[u - 0x3040]),
-        // TODO: Test all of the font8x8 glyphs, draw a grid or something
         0x390..=0x03C9 => Some(font8x8::legacy::GREEK_LEGACY[u - 0x390]),
         0xE541..=0xE55A => Some(font8x8::legacy::SGA_LEGACY[u - 0xE541]),
         0x20A7 => Some(font8x8::legacy::MISC_LEGACY[0]),
