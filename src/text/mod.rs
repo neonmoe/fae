@@ -47,7 +47,7 @@ impl TextRenderer {
     #[cfg(feature = "font8x8")]
     pub fn with_font8x8(renderer: &mut Renderer, smoothed: bool) -> TextRenderer {
         let (glyph_cache, call) =
-            GlyphCache::create_cache_and_draw_call(renderer, 256, 256, smoothed);
+            GlyphCache::create_cache_and_draw_call(renderer, 128, 128, smoothed);
 
         TextRenderer {
             call,

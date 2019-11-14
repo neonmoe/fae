@@ -72,8 +72,8 @@ fn render_bitmap(id: u32, bitmap: [u8; 8], cache: &mut GlyphCache) -> Option<Rec
     use std::convert::TryFrom;
     let c = char::try_from(id).ok()?;
     let tex = cache.get_texture();
-    if let Some(spot) = cache.reserve_uvs(CacheIdentifier::new(c), width, height) {
-        if spot.just_reserved {
+    if let Some((spot, new)) = cache.reserve_uvs(CacheIdentifier::new(c), width, height) {
+        if new {
             let mut data = Vec::with_capacity((width * height) as usize);
             for y in top..(8 - bottom) {
                 let color = bitmap[y as usize];
@@ -94,10 +94,10 @@ fn render_bitmap(id: u32, bitmap: [u8; 8], cache: &mut GlyphCache) -> Option<Rec
                 gl::TexSubImage2D(
                     gl::TEXTURE_2D,            // target
                     0,                         // level
-                    spot.texcoords.x,          // xoffset
-                    spot.texcoords.y,          // yoffset
-                    spot.texcoords.width,      // width
-                    spot.texcoords.height,     // height
+                    spot.x,                    // xoffset
+                    spot.y,                    // yoffset
+                    spot.width,                // width
+                    spot.height,               // height
                     gl::RED as GLuint,         // format
                     gl::UNSIGNED_BYTE,         // type
                     data.as_ptr() as *const _, // pixels
@@ -107,7 +107,7 @@ fn render_bitmap(id: u32, bitmap: [u8; 8], cache: &mut GlyphCache) -> Option<Rec
             crate::profiler::modify_profiler_value_i32("glyphs drawn", |i| i + 1);
         }
         crate::profiler::modify_profiler_value_i32("glyphs rendered", |i| i + 1);
-        Some(spot.texcoords)
+        Some(spot)
     } else {
         None
     }

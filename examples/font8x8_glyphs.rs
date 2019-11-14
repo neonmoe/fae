@@ -16,6 +16,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut text = TextRenderer::with_font8x8(&mut renderer, true);
     let call = renderer.create_draw_call(Default::default());
 
+    let mut offset = 0;
+    let len = 200;
     let mut all_characters = String::new();
     for u in 0..0xFFFF {
         if text::get_bitmap(u).is_some() {
@@ -30,8 +32,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         renderer.set_dpi_factor(window.dpi_factor);
         text.set_dpi_factor(window.dpi_factor);
 
+        offset += 1;
+        let s: String = all_characters
+            .chars()
+            .cycle()
+            .skip(offset)
+            .take(len)
+            .collect();
+
         text.draw_text(
-            &all_characters,
+            &s,
             (10.0, 30.0, 0.0),
             12.0,
             Alignment::Left,
