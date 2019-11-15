@@ -211,14 +211,7 @@ impl TextRenderer {
     /// Sends all the glyphs to the Renderer. Should be called every
     /// frame before [`Renderer::render`](../struct.Renderer.html#method.render).
     pub fn compose_draw_call(&mut self, renderer: &mut Renderer) {
-        crate::profiler::insert_profiling_data("glyphs drawn", "0");
-        crate::profiler::insert_profiling_data("glyphs rendered", "0");
-
-        let mut total_nanos = 0u64;
         for glyph in &self.glyphs {
-            use std::time::Instant;
-            let start = Instant::now();
-
             let font_size = self.draw_datas[glyph.draw_data].font_size;
             let color = self.draw_datas[glyph.draw_data].color;
             let z = self.draw_datas[glyph.draw_data].z;
@@ -272,12 +265,7 @@ impl TextRenderer {
                 .with_texture_coordinates(texcoords)
                 .with_color(color.0, color.1, color.2, color.3)
                 .finish();
-
-            let glyph_duration = Instant::now() - start;
-            total_nanos += glyph_duration.subsec_nanos() as u64;
         }
-        let avg_nanos = total_nanos / self.glyphs.len() as u64;
-        crate::profiler::insert_profiling_data("avg. glyph cpu time", &format!("{} ns", avg_nanos));
 
         self.glyphs.clear();
         self.draw_datas.clear();

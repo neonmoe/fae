@@ -79,9 +79,11 @@ impl Font8x8Provider {
                     );
                     crate::renderer::print_gl_errors("after font8x8 render_bitmap texsubimage2d");
                 }
-                crate::profiler::modify_profiler_value_i32("glyphs drawn", |i| i + 1);
+                crate::profiler::write(|p| p.glyph_cache_misses += 1);
+            } else {
+                crate::profiler::write(|p| p.glyph_cache_hits += 1);
             }
-            crate::profiler::modify_profiler_value_i32("glyphs rendered", |i| i + 1);
+            crate::profiler::write(|p| p.glyphs_drawn += 1);
             Some(spot)
         } else {
             None
@@ -108,6 +110,7 @@ impl FontProvider for Font8x8Provider {
         let y_offset = (self.get_line_height(font_size) as i32 - scale(8, font_size)) / 2;
         RectPx {
             x: 0,
+            // TODO: Something is still wrong with this y
             y: y_offset + scale(metrics.y, font_size),
             width: scale(metrics.width, font_size),
             height: scale(metrics.height, font_size),

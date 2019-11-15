@@ -1,3 +1,36 @@
+//! Module for reading the profiling data that `fae` collects. If the
+//! `profiler` feature is disabled, all the functions are no-ops, and
+//! there will be no profiling overhead. Probably not very useful
+//! outside of this crate's development.
+
+/// The data collected by `fae` internals. Returned by
+/// [`profiler::read`](fn.read.html).
+#[derive(Clone, Debug)]
+pub struct ProfilingData {
+    /// The amount of glyphs that had to be rasterized during this
+    /// frame (ie. they weren't in the glyph cache).
+    pub glyph_cache_misses: u32,
+    /// The amount of glyphs that didn't have to rasterized during
+    /// this frame (ie. they were in the glyph cache).
+    pub glyph_cache_hits: u32,
+    /// The amount of glyphs that were drawn during this frame.
+    pub glyphs_drawn: u32,
+    /// The amount of glyphs that were drawn during this frame
+    /// overall.
+    pub quads_drawn: u32,
+}
+
+impl ProfilingData {
+    fn cleared() -> ProfilingData {
+        ProfilingData {
+            glyph_cache_misses: 0,
+            glyph_cache_hits: 0,
+            glyphs_drawn: 0,
+            quads_drawn: 0,
+        }
+    }
+}
+
 #[cfg(feature = "profiler")]
 pub use actual::*;
 #[cfg(not(feature = "profiler"))]
@@ -5,98 +38,62 @@ pub use dummy::*;
 
 #[cfg(not(feature = "profiler"))]
 mod dummy {
-    use std::collections::HashMap;
+    use super::ProfilingData;
 
-    /// Get a pretty-debug-printed String of the profiling data.
-    pub fn get_profiler_print() -> String {
-        "profiler feature not enabled".to_string()
+    pub(crate) fn refresh() {}
+    pub(crate) fn write<F: FnOnce(&mut ProfilingData) + Copy>(_f: F) {}
+
+    /// Returns a copy of the last frame's profiling data. If the
+    /// `profiler` feature is disabled, it will always be zeroed and
+    /// initialized on the spot.
+    pub fn read() -> ProfilingData {
+        ProfilingData::cleared()
     }
-
-    /// Get a clone of the profiling data at current time.
-    pub fn get_profiler_clone() -> HashMap<String, String> {
-        HashMap::new()
-    }
-
-    /// Get a clone of the profiling value corresponding to the given key.
-    pub fn get_profiler_value_clone(_key: &str) -> Option<String> {
-        None
-    }
-
-    /// Operate on a value with a given key, as an i32.
-    pub fn modify_profiler_value_i32<T: FnOnce(i32) -> i32>(_key: &str, _f: T) {}
-
-    /// Insert data into the `profiler` dictionary of datapoints.
-    pub fn insert_profiling_data<T: Into<String>, U: Into<String>>(_key: T, _value: U) {}
 }
 
 #[cfg(feature = "profiler")]
 mod actual {
-    use std::collections::HashMap;
+    use super::ProfilingData;
     use std::sync::Mutex;
 
-    thread_local! {
-        static DEBUG_MAP: Mutex<HashMap<String, String>> = Mutex::new(HashMap::new());
-    }
+    impl ProfilingData {
+        fn copy_from(&mut self, other: &ProfilingData) {
+            *self = other.clone();
+        }
 
-    /// Get a pretty-debug-printed String of the profiling data.
-    pub fn get_profiler_print() -> String {
-        let mut result = None;
-        DEBUG_MAP.with(|map| {
-            let map = map.lock().unwrap();
-            result = Some(format!("{:#?}", map));
-        });
-        if let Some(result) = result {
-            result
-        } else {
-            "failed to read profiling information".to_string()
+        fn clear(&mut self) {
+            *self = ProfilingData::cleared();
         }
     }
 
-    /// Get a clone of the profiling data at current time.
-    pub fn get_profiler_clone() -> HashMap<String, String> {
-        let mut result = None;
-        DEBUG_MAP.with(|map| {
-            let map = map.lock().unwrap();
-            result = Some(map.clone());
-        });
-        if let Some(result) = result {
-            result
-        } else {
-            HashMap::new()
-        }
+    lazy_static::lazy_static! {
+        static ref FRONT: Mutex<ProfilingData> = Mutex::new(ProfilingData::cleared());
+        static ref BACK: Mutex<ProfilingData> = Mutex::new(ProfilingData::cleared());
     }
 
-    /// Get a clone of the profiling value corresponding to the given key.
-    pub fn get_profiler_value_clone(key: &str) -> Option<String> {
-        let mut result = None;
-        DEBUG_MAP.with(|map| {
-            let map = map.lock().unwrap();
-            result = map.get(key).map(|s| s.to_string());
-        });
-        result
-    }
-
-    /// Operate on a value with a given key, as an i32.
-    pub fn modify_profiler_value_i32<T: FnOnce(i32) -> i32>(key: &str, f: T) {
-        DEBUG_MAP.with(|map| {
-            let mut map = map.lock().unwrap();
-            if let Some(new_value) = map
-                .get(key)
-                .and_then(|s| i32::from_str_radix(s, 10).ok())
-                .map(f)
-                .map(|i| i.to_string())
-            {
-                map.insert(key.to_string(), new_value);
+    pub(crate) fn refresh() {
+        if let Ok(ref mut front) = FRONT.lock() {
+            if let Ok(ref mut back) = BACK.lock() {
+                front.copy_from(back);
+                back.clear();
             }
-        });
+        }
     }
 
-    /// Insert data into the `profiler` dictionary of datapoints.
-    pub fn insert_profiling_data<T: Into<String>, U: Into<String>>(key: T, value: U) {
-        let (key, value) = (key.into(), value.into());
-        DEBUG_MAP.with(move |map| {
-            let mut map = map.lock().unwrap();
-            map.insert(key, value);
-        });
+    pub(crate) fn write<F: FnOnce(&mut ProfilingData) + Copy>(f: F) {
+        if let Ok(ref mut instance) = BACK.lock() {
+            f(instance);
+        }
+    }
+
+    /// Returns a copy of the last frame's profiling data. If the
+    /// `profiler` feature is disabled, it will always be zeroed and
+    /// initialized on the spot.
+    pub fn read() -> ProfilingData {
+        if let Ok(instance) = FRONT.lock() {
+            instance.clone()
+        } else {
+            ProfilingData::cleared()
+        }
     }
 }

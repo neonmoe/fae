@@ -38,7 +38,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         ..Default::default()
     };
     let call = renderer.create_draw_call(params);
-    renderer.set_profiling(true);
 
     let mut should_quit = false;
     let mut quad_count = 1;
@@ -291,7 +290,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         );
 
         if let Some(mut rect) = text.draw_text(
-            &format!("profiling information:\n{}", profiler::get_profiler_print()),
+            &format!("profiling information:\n{:#?}", profiler::read()),
             (30.0, 310.0, -0.6),
             11.0,
             Alignment::Left,
@@ -299,7 +298,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             Some(380.0),
             Some((20.0, 300.0, 420.0, 600.0).into()),
         ) {
-            rect.width = 300.0;
+            rect.width = 380.0;
             renderer.draw(&call, -0.55).with_coordinates(rect).finish();
         }
 

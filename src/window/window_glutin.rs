@@ -154,6 +154,8 @@ impl Window {
     /// Polls for new events. Returns whether the user has requested
     /// the window to be closed.
     pub fn refresh(&mut self) -> bool {
+        crate::profiler::refresh();
+
         let mut running = true;
         let mut key_inputs = Vec::new();
         let mut mouse_inputs = Vec::new();

@@ -30,7 +30,4 @@ pub use window::*;
 #[cfg(feature = "text")]
 pub mod text;
 
-/// Module for reading profiling data that `fae` collects. If the
-/// `profiler` feature is disabled, all the functions are no-ops, and
-/// there will be no profiling overhead.
 pub mod profiler;

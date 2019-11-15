@@ -19,11 +19,13 @@ glutin = "^0.21.1"
 log = "^0.4.8"
 png = { version = "^0.15.0", optional = true }
 font8x8 = { version = "^0.2.5", optional = true, default_features = false, features = ["std"] }
+lazy_static = { version = "^1.4.0", optional = true }
 
 [features]
+# FIXME: the `profiler` feature should not be default in releases
 default = ["text", "png", "font8x8", "profiler"]
 text = []
-profiler = []
+profiler = ["lazy_static"]
 
 [dev-dependencies]
 # Note: using a logger adds a lot of executable size.

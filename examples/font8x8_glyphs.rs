@@ -17,7 +17,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let call = renderer.create_draw_call(Default::default());
 
     let mut offset = 0;
-    let len = 200;
+    let len = 100;
     let mut all_characters = String::new();
     for u in 0..0xFFFF {
         if text::get_bitmap(u).is_some() {
@@ -60,8 +60,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             None,
         );
 
+        let profiling_data = fae::profiler::read();
         text.draw_text(
-            &profiler::get_profiler_print(),
+            &format!("{:#?}", profiling_data),
             (10.0, 340.0, 0.0),
             10.0,
             Alignment::Left,
@@ -69,6 +70,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             None,
             None,
         );
+
+        let misses = profiling_data.glyph_cache_misses;
+        let total = profiling_data.glyphs_drawn;
+        if total > 0 {
+            text.draw_text(
+                &format!(
+                    "Glyph cache miss ratio: {:3.1} %",
+                    (misses as f32 / total as f32 * 100.0)
+                ),
+                (10.0, 310.0, 0.0),
+                10.0,
+                Alignment::Left,
+                (0.0, 0.0, 0.0, 1.0),
+                None,
+                None,
+            );
+        }
 
         let cache_size = 256.0 / window.dpi_factor;
         let (x, y) = (

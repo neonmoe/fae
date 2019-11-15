@@ -94,7 +94,6 @@ struct OpenGLState {
 pub struct Renderer {
     calls: Vec<DrawCall>,
     gl_state: OpenGLState,
-    profiler: Profiler,
     pub(crate) dpi_factor: f32,
     /// Whether the Renderer should try to preserve the OpenGL
     /// state. If you're using OpenGL yourself, set this to `true` to
@@ -205,18 +204,9 @@ impl Renderer {
                 vbo: 0,
                 element_buffer: 0,
             },
-            profiler: Profiler::new(),
             dpi_factor: window.dpi_factor,
             preserve_gl_state: false,
         }
-    }
-
-    /// Toggles whether profiling is enabled.
-    ///
-    /// If the `profiler` feature is enabled, the renderer will send
-    /// performance data to the profiler.
-    pub fn set_profiling(&mut self, should_profile: bool) {
-        self.profiler.toggle(should_profile);
     }
 
     /// Returns whether or not running in legacy mode (OpenGL 3.3+
@@ -420,7 +410,6 @@ impl Renderer {
     /// is more efficient, as there is less overdraw because of depth
     /// testing, but proper blending requires back to front ordering.
     pub fn render(&mut self, width: f32, height: f32) {
-        self.profiler.start("render");
         self.gl_push();
 
         let m00 = 2.0 / width;
@@ -429,13 +418,10 @@ impl Renderer {
             m00, 0.0, 0.0, -1.0, 0.0, m11, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
         ];
 
-        let profiler = &self.profiler;
-        profiler.start("clear");
         unsafe {
             gl::ClearColor(1.0, 1.0, 1.0, 1.0);
             gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
         }
-        profiler.end("clear");
 
         let legacy = self.gl_state.legacy;
 
@@ -458,13 +444,10 @@ impl Renderer {
         for i in call_indices {
             let call = &mut self.calls[i];
 
-            profiler.start(format!("call {}", i));
             if call.attributes.vbo_data.is_empty() {
-                profiler.end(format!("call {}", i));
                 continue;
             }
 
-            profiler.start("setting state");
             unsafe {
                 if call.blend {
                     gl::Enable(gl::BLEND);
@@ -487,23 +470,18 @@ impl Renderer {
                 gl::BindTexture(gl::TEXTURE_2D, call.texture);
                 gl::BindBuffer(gl::ARRAY_BUFFER, call.attributes.vbo);
             }
-            profiler.end("setting state");
             print_gl_errors(&format!("after initializing draw call #{}", i));
 
             let len = (mem::size_of::<f32>() * call.attributes.vbo_data.len()) as isize;
             let ptr = call.attributes.vbo_data.as_ptr() as *const _;
             if len <= call.attributes.allocated_vbo_data_size {
                 unsafe {
-                    profiler.start("bufferSubData");
                     gl::BufferSubData(gl::ARRAY_BUFFER, 0, len, ptr);
-                    profiler.end("bufferSubData");
                 }
             } else {
                 call.attributes.allocated_vbo_data_size = len;
                 unsafe {
-                    profiler.start("bufferData");
                     gl::BufferData(gl::ARRAY_BUFFER, len, ptr, gl::STREAM_DRAW);
-                    profiler.end("bufferData");
                 }
             }
             print_gl_errors(&format!("after pushing vertex buffer #{}", i));
@@ -512,37 +490,31 @@ impl Renderer {
                 // 12 floats (3 for pos + 2 tex + 4 col + 3 rot) per vertex
                 let vertex_count = call.attributes.vbo_data.len() as i32 / 12;
                 unsafe {
-                    profiler.start("enable vertex attribs");
                     enable_vertex_attribs(&[
                         (call.program.position_attrib_location, 3),
                         (call.program.texcoord_attrib_location, 2),
                         (call.program.color_attrib_location, 4),
                         (call.program.rotation_attrib_location, 3),
                     ]);
-                    profiler.end("enable vertex attribs");
-                    profiler.start("drawArrays");
                     gl::DrawArrays(gl::TRIANGLES, 0, vertex_count);
-                    profiler.end("drawArrays");
-                    profiler.start("disable vertex attribs");
                     disable_vertex_attribs(&[
                         call.program.position_attrib_location,
                         call.program.texcoord_attrib_location,
                         call.program.color_attrib_location,
                         call.program.rotation_attrib_location,
                     ]);
-                    profiler.end("disable vertex attribs");
                 }
+                crate::profiler::write(|p| p.quads_drawn += vertex_count as u32 / 6);
                 print_gl_errors(&format!("[legacy] after drawing buffer #{}", i));
             } else {
                 // 16 floats (4 for x,y,w,h + 4 tex xywh + 4 col + 3 rot + 1 z) per vertex
                 let count = call.attributes.vbo_data.len() as i32 / 16;
                 let mode = gl::TRIANGLES;
                 let val_type = gl::UNSIGNED_BYTE;
-                profiler.start("drawElementsInstanced");
                 unsafe {
                     gl::DrawElementsInstanced(mode, 6, val_type, ptr::null(), count);
                 }
-                profiler.end("drawElementsInstanced");
+                crate::profiler::write(|p| p.quads_drawn += count as u32);
                 print_gl_errors(&format!("after drawing buffer #{}", i));
             }
 
@@ -550,11 +522,9 @@ impl Renderer {
             call.lowest_depth = 1.0;
 
             print_gl_errors(&*format!("after render #{}", i));
-            profiler.end(format!("call {}", i));
         }
 
         self.gl_pop();
-        self.profiler.end("render");
     }
 
     /// Synchronizes the GPU and CPU state, ensuring that all OpenGL
@@ -571,7 +541,6 @@ impl Renderer {
         use std::thread::sleep;
         use std::time::Duration;
 
-        self.profiler.start("synchronization");
         let mut synchronized = false;
 
         if !self.gl_state.legacy {
@@ -603,7 +572,6 @@ impl Renderer {
                 gl::Finish();
             }
         }
-        self.profiler.end("synchronization");
     }
 
     /// Returns the OpenGL texture handle for the texture used by the
@@ -620,7 +588,6 @@ impl Renderer {
     /// Saves the current OpenGL state for [`Renderer::gl_pop`] and
     /// then sets some defaults used by this crate.
     fn gl_push(&mut self) {
-        self.profiler.start("gl state push");
         if !self.gl_state.pushed {
             unsafe {
                 self.gl_state.depth_test = gl::IsEnabled(gl::DEPTH_TEST) != 0;
@@ -646,7 +613,6 @@ impl Renderer {
             self.gl_state.pushed = true;
             print_gl_errors("after glEnables");
         }
-        self.profiler.end("gl state push");
     }
 
     /// Restores the OpenGL state saved in [`Renderer::gl_push`].
@@ -655,7 +621,6 @@ impl Renderer {
             return;
         }
 
-        self.profiler.start("gl state pop");
         if self.gl_state.pushed {
             unsafe {
                 if !self.gl_state.depth_test {
@@ -683,7 +648,6 @@ impl Renderer {
             self.gl_state.pushed = false;
             print_gl_errors("after restoring OpenGL state");
         }
-        self.profiler.end("gl state pop");
     }
 }
 
@@ -1015,69 +979,4 @@ fn error_buffer_into_string(raw: Vec<i8>) -> String {
         .map(|&i| unsafe { mem::transmute::<i8, u8>(i) })
         .collect();
     String::from_utf8_lossy(&info).to_string()
-}
-
-use renderer_profiler::Profiler;
-
-#[cfg(feature = "profiler")]
-mod renderer_profiler {
-    use std::cell::RefCell;
-    use std::collections::HashMap;
-    use std::time::Instant;
-
-    #[derive(Clone, Debug)]
-    pub struct Profiler {
-        should_profile: bool,
-        starts: RefCell<HashMap<String, Instant>>,
-    }
-
-    impl Profiler {
-        pub fn new() -> Profiler {
-            Profiler {
-                should_profile: false,
-                starts: RefCell::new(HashMap::new()),
-            }
-        }
-
-        pub fn toggle(&mut self, should_profile: bool) {
-            self.should_profile = should_profile;
-        }
-
-        pub fn start<S: Into<String>>(&self, name: S) {
-            if self.should_profile {
-                let mut starts = self.starts.borrow_mut();
-                starts.insert(name.into(), Instant::now());
-            }
-        }
-
-        pub fn end<S: Into<String>>(&self, name: S) {
-            if self.should_profile {
-                let end_time = Instant::now();
-                let mut starts = self.starts.borrow_mut();
-                let name = name.into();
-                if let Some(start_time) = starts.remove(&name) {
-                    crate::profiler::insert_profiling_data(
-                        name.to_string(),
-                        format!("{:?}", end_time - start_time),
-                    );
-                }
-            }
-        }
-    }
-}
-
-#[cfg(not(feature = "profiler"))]
-mod renderer_profiler {
-    #[derive(Clone, Debug)]
-    pub struct Profiler {}
-
-    impl Profiler {
-        pub fn new() -> Profiler {
-            Profiler {}
-        }
-
-        pub fn toggle(&mut self, _should_profile: bool) {}
-        pub fn start<S: Into<String>>(&self, _name: S) {}
-        pub fn end<S: Into<String>>(&self, _name: S) {}
-    }
 }
