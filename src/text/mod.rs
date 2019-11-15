@@ -125,6 +125,7 @@ impl TextRenderer {
 
         self.glyphs.reserve(text.len());
         let line_height = self.font.get_line_height(font_size);
+        let mut line_height_fract_sum = 0.0;
         let mut cursor = PositionPx { x, y };
         let mut text_left = text;
         while !text_left.is_empty() {
@@ -174,10 +175,17 @@ impl TextRenderer {
                 }
             }
             text_left = chars.as_str();
-            cursor = PositionPx {
-                x,
-                y: cursor.y + line_height,
+
+            line_height_fract_sum += line_height.fract();
+            let fract_offset = if line_height_fract_sum >= 1.0 {
+                let offset = line_height_fract_sum.trunc();
+                line_height_fract_sum -= offset;
+                offset as i32
+            } else {
+                0
             };
+            cursor.x = x;
+            cursor.y = cursor.y + line_height as i32 + fract_offset;
         }
 
         if let Some((clip_min_x, clip_min_y, clip_max_x, clip_max_y)) =

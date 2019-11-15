@@ -2,28 +2,90 @@ use crate::text::glyph_cache::GlyphCache;
 use crate::text::types::*;
 use crate::text::*;
 
+use std::cell::RefCell;
+use std::collections::HashMap;
+
+fn scale(i: i32, font_size: f32) -> i32 {
+    (i as f32 * font_size / 8.0) as i32
+}
+
 pub struct Font8x8Provider {
     cache: GlyphCache,
+    metrics: RefCell<HashMap<u32, RectPx>>,
 }
 
 impl Font8x8Provider {
     pub fn new(cache: GlyphCache) -> Font8x8Provider {
-        Font8x8Provider { cache }
+        Font8x8Provider {
+            cache,
+            metrics: RefCell::new(HashMap::new()),
+        }
     }
 }
 
-#[inline]
-fn get_size(font_size: f32) -> i32 {
-    font_size as i32
-}
+impl Font8x8Provider {
+    fn get_raw_metrics(&self, id: u32) -> RectPx {
+        if id == ' ' as u32 {
+            (0, 8, 3, 0).into()
+        } else {
+            *self.metrics.borrow_mut().entry(id).or_insert_with(|| {
+                let (left, right) = get_empty_pixels_left_right(id).unwrap_or((0, 0));
+                let (top, bottom) = get_empty_pixels_top_bottom(id).unwrap_or((0, 0));
+                RectPx {
+                    x: left,
+                    y: top,
+                    width: 8 - (left + right),
+                    height: 8 - (top + bottom),
+                }
+            })
+        }
+    }
 
-#[inline]
-fn get_width(id: u32, font_size: f32) -> f32 {
-    let (left, right) = get_empty_pixels_left_right(id).unwrap_or((0, 0));
-    if id == ' ' as u32 {
-        font_size * 2.0 / 3.0 - 2.0
-    } else {
-        font_size - (left + right) as f32 * font_size / 8.0
+    fn render_bitmap(&mut self, id: u32, bitmap: [u8; 8]) -> Option<RectPx> {
+        let metric = self.get_raw_metrics(id);
+
+        use std::convert::TryFrom;
+        let id = CacheIdentifier::new(char::try_from(id).ok()?);
+        let tex = self.cache.get_texture();
+        if let Some((spot, new)) = self.cache.reserve_uvs(id, metric.width, metric.height) {
+            if new {
+                let mut data = Vec::with_capacity((metric.width * metric.height) as usize);
+                for y in metric.y..(metric.y + metric.height) {
+                    let color = bitmap[y as usize];
+                    for x in metric.x..(metric.x + metric.width) {
+                        if (color & (1 << x)) == 0 {
+                            data.push(0x00u8);
+                        } else {
+                            data.push(0xFFu8);
+                        }
+                    }
+                }
+
+                unsafe {
+                    use crate::gl;
+                    use crate::gl::types::*;
+                    gl::BindTexture(gl::TEXTURE_2D, tex);
+                    gl::PixelStorei(gl::UNPACK_ALIGNMENT, 1);
+                    gl::TexSubImage2D(
+                        gl::TEXTURE_2D,            // target
+                        0,                         // level
+                        spot.x,                    // xoffset
+                        spot.y,                    // yoffset
+                        spot.width,                // width
+                        spot.height,               // height
+                        gl::RED as GLuint,         // format
+                        gl::UNSIGNED_BYTE,         // type
+                        data.as_ptr() as *const _, // pixels
+                    );
+                    crate::renderer::print_gl_errors("after font8x8 render_bitmap texsubimage2d");
+                }
+                crate::profiler::modify_profiler_value_i32("glyphs drawn", |i| i + 1);
+            }
+            crate::profiler::modify_profiler_value_i32("glyphs rendered", |i| i + 1);
+            Some(spot)
+        } else {
+            None
+        }
     }
 }
 
@@ -32,22 +94,24 @@ impl FontProvider for Font8x8Provider {
         c as u32
     }
 
-    fn get_line_height(&self, font_size: f32) -> i32 {
-        get_size(font_size) * 4 / 3
+    fn get_line_height(&self, font_size: f32) -> f32 {
+        font_size * 4.0 / 3.0
     }
 
     fn get_advance(&self, from: u32, _to: u32, font_size: f32) -> Option<i32> {
-        Some((get_width(from, font_size) + 1.0).round() as i32)
+        let RectPx { width, .. } = self.get_raw_metrics(from);
+        Some((width as f32 * font_size / 8.0 + 1.0) as i32)
     }
 
     fn get_metric(&self, id: u32, font_size: f32) -> RectPx {
-        let size = get_size(font_size);
-        let (top, bottom) = get_empty_pixels_top_bottom(id)
-            .map(|(t, b)| (t as f32 * font_size / 8.0, b as f32 * font_size / 8.0))
-            .unwrap_or((0.0, 0.0));
-        let height = (font_size - (top + bottom)) as i32;
-        let y = ((self.get_line_height(font_size) - size) as f32 / 2.0 + top) as i32;
-        (0, y, get_width(id, font_size).round() as i32, height).into()
+        let metrics = self.get_raw_metrics(id);
+        let y_offset = (self.get_line_height(font_size) as i32 - scale(8, font_size)) / 2;
+        RectPx {
+            x: 0,
+            y: y_offset + scale(metrics.y, font_size),
+            width: scale(metrics.width, font_size),
+            height: scale(metrics.height, font_size),
+        }
     }
 
     fn render_glyph(&mut self, id: u32, _font_size: f32) -> Option<RectPx> {
@@ -55,61 +119,12 @@ impl FontProvider for Font8x8Provider {
             None
         } else {
             let bitmap = get_bitmap(id)?;
-            render_bitmap(id, bitmap, &mut self.cache)
+            self.render_bitmap(id, bitmap)
         }
     }
 
     fn update_glyph_cache_expiration(&mut self) {
         self.cache.expire_one_step();
-    }
-}
-
-fn render_bitmap(id: u32, bitmap: [u8; 8], cache: &mut GlyphCache) -> Option<RectPx> {
-    let (left, right) = get_empty_pixels_left_right(id).unwrap_or((0, 0));
-    let (top, bottom) = get_empty_pixels_top_bottom(id).unwrap_or((0, 0));
-    let (width, height) = ((8 - (left + right)), 8 - (top + bottom));
-
-    use std::convert::TryFrom;
-    let c = char::try_from(id).ok()?;
-    let tex = cache.get_texture();
-    if let Some((spot, new)) = cache.reserve_uvs(CacheIdentifier::new(c), width, height) {
-        if new {
-            let mut data = Vec::with_capacity((width * height) as usize);
-            for y in top..(8 - bottom) {
-                let color = bitmap[y as usize];
-                for x in left..(8 - right) {
-                    if (color & (1 << x)) == 0 {
-                        data.push(0x00u8);
-                    } else {
-                        data.push(0xFFu8);
-                    }
-                }
-            }
-
-            unsafe {
-                use crate::gl;
-                use crate::gl::types::*;
-                gl::BindTexture(gl::TEXTURE_2D, tex);
-                gl::PixelStorei(gl::UNPACK_ALIGNMENT, 1);
-                gl::TexSubImage2D(
-                    gl::TEXTURE_2D,            // target
-                    0,                         // level
-                    spot.x,                    // xoffset
-                    spot.y,                    // yoffset
-                    spot.width,                // width
-                    spot.height,               // height
-                    gl::RED as GLuint,         // format
-                    gl::UNSIGNED_BYTE,         // type
-                    data.as_ptr() as *const _, // pixels
-                );
-                crate::renderer::print_gl_errors("after font8x8 render_bitmap texsubimage2d");
-            }
-            crate::profiler::modify_profiler_value_i32("glyphs drawn", |i| i + 1);
-        }
-        crate::profiler::modify_profiler_value_i32("glyphs rendered", |i| i + 1);
-        Some(spot)
-    } else {
-        None
     }
 }
 
