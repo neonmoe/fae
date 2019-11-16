@@ -219,7 +219,7 @@ impl GlyphCache {
         height: i32,
         smoothed: bool,
     ) -> (GlyphCache, DrawCallHandle) {
-        let cache_image = Image::from_color(width as i32, height as i32, &[0, 0, 0, 0]);
+        let cache_image = Image::from_color(width as i32, height as i32, &[0]);
         let call = renderer.create_draw_call(DrawCallParameters {
             image: Some(cache_image),
             shaders: Shaders {
@@ -231,6 +231,7 @@ impl GlyphCache {
             minification_smoothing: true,
             magnification_smoothing: smoothed,
             wrap: (TextureWrapping::Clamp, TextureWrapping::Clamp),
+            srgb: false,
         });
         let cache = GlyphCache {
             out_of_memory: false,

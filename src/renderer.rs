@@ -51,6 +51,7 @@ struct DrawCall {
     program: ShaderProgram,
     attributes: Attributes,
     blend: bool,
+    srgb: bool,
     highest_depth: f32,
 }
 
@@ -64,6 +65,7 @@ struct OpenGLState {
     // alongside it.
     pushed: bool,
     depth_test: bool,
+    srgb: bool,
     depth_func: GLint,
     blend: bool,
     blend_func: (GLint, GLint),
@@ -109,9 +111,9 @@ pub enum TextureWrapping {
 /// [`Renderer::draw`](struct.Renderer.html#method.draw) with.
 #[derive(Debug, Clone)]
 pub struct DrawCallParameters {
-    /// The texture used when drawing with this draw call.
+    /// The texture used when drawing with this handle.
     pub image: Option<Image>,
-    /// The shaders used when drawing with this draw call.
+    /// The shaders used when drawing with this handle.
     pub shaders: Shaders,
     /// Whether to blend with previously drawn pixels when drawing
     /// over them, or just replace the color. (In technical terms:
@@ -131,6 +133,11 @@ pub struct DrawCallParameters {
     /// boundaries. (Corresponds to `GL_TEXTURE_WRAP_S` and
     /// `GL_TEXTURE_WRAP_T`, in that order.)
     pub wrap: (TextureWrapping, TextureWrapping),
+    /// Controls whether or not `GL_FRAMEBUFFER_SRGB` is enabled when
+    /// drawing with this handle. If you want to render in linear
+    /// space, set this to false. You probably don't though, unless
+    /// you know what you're doing.
+    pub srgb: bool,
 }
 
 impl Default for DrawCallParameters {
@@ -142,6 +149,7 @@ impl Default for DrawCallParameters {
             minification_smoothing: true,
             magnification_smoothing: false,
             wrap: (TextureWrapping::Clamp, TextureWrapping::Clamp),
+            srgb: true,
         }
     }
 }
@@ -181,6 +189,7 @@ impl Renderer {
                 version,
                 pushed: false,
                 depth_test: false,
+                srgb: false,
                 depth_func: 0,
                 blend: false,
                 blend_func: (0, 0),
@@ -254,6 +263,7 @@ impl Renderer {
             program,
             attributes,
             blend: params.alpha_blending,
+            srgb: params.srgb,
             highest_depth: -1.0,
         });
 
@@ -261,6 +271,7 @@ impl Renderer {
             insert_texture(
                 self.calls[index].texture,
                 image.format,
+                image.pixel_type,
                 image.width,
                 image.height,
                 &image.pixels,
@@ -466,6 +477,11 @@ impl Renderer {
                     gl::Disable(gl::BLEND);
                     gl::DepthFunc(gl::LESS);
                 }
+                if call.srgb {
+                    gl::Enable(gl::FRAMEBUFFER_SRGB);
+                } else {
+                    gl::Disable(gl::FRAMEBUFFER_SRGB);
+                }
                 gl::UseProgram(call.program.program);
                 gl::UniformMatrix4fv(
                     call.program.projection_matrix_location,
@@ -602,6 +618,7 @@ impl Renderer {
             unsafe {
                 self.gl_state.depth_test = gl::IsEnabled(gl::DEPTH_TEST) != 0;
                 self.gl_state.blend = gl::IsEnabled(gl::BLEND) != 0;
+                self.gl_state.srgb = gl::IsEnabled(gl::FRAMEBUFFER_SRGB) != 0;
                 gl::GetIntegerv(gl::DEPTH_FUNC, &mut self.gl_state.depth_func);
                 let mut src = 0;
                 let mut dst = 0;
@@ -635,9 +652,18 @@ impl Renderer {
             unsafe {
                 if !self.gl_state.depth_test {
                     gl::Disable(gl::DEPTH_TEST);
+                } else {
+                    gl::Enable(gl::DEPTH_TEST);
                 }
                 if !self.gl_state.blend {
                     gl::Disable(gl::BLEND);
+                } else {
+                    gl::Enable(gl::BLEND);
+                }
+                if !self.gl_state.srgb {
+                    gl::Disable(gl::FRAMEBUFFER_SRGB);
+                } else {
+                    gl::Enable(gl::FRAMEBUFFER_SRGB);
                 }
                 gl::DepthFunc(self.gl_state.depth_func as GLuint);
                 gl::BlendFunc(
@@ -932,18 +958,29 @@ fn create_texture(min_filter: GLint, mag_filter: GLint, wrap_s: GLint, wrap_t: G
 }
 
 #[inline]
-fn insert_texture(tex: GLuint, format: GLuint, w: GLint, h: GLint, pixels: &[u8]) {
+fn insert_texture(
+    tex: GLuint,
+    format: GLuint,
+    pixel_type: GLuint,
+    w: GLint,
+    h: GLint,
+    pixels: &[u8],
+) {
     unsafe {
         gl::BindTexture(gl::TEXTURE_2D, tex);
         gl::TexImage2D(
             gl::TEXTURE_2D,
             0,
-            format as i32,
+            format as GLint,
             w,
             h,
             0,
-            format,
-            gl::UNSIGNED_BYTE,
+            match format {
+                gl::SRGB => gl::RGB,
+                gl::SRGB_ALPHA => gl::RGBA,
+                format => format,
+            },
+            pixel_type,
             pixels.as_ptr() as *const _,
         );
     }

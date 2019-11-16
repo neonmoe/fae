@@ -4,7 +4,6 @@
 #[cfg(feature = "font8x8")]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     use fae::{
-        profiler,
         text::{self, Alignment, TextRenderer},
         Renderer, Window, WindowSettings,
     };
@@ -93,7 +92,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             window.width as f32 - 20.0 - cache_size,
             window.height as f32 - 20.0 - cache_size,
         );
-        text.debug_draw_glyph_cache(&mut renderer, (x, y, cache_size, cache_size), -1.0);
+        text.debug_draw_glyph_cache(&mut renderer, (x, y, cache_size, cache_size), -0.8);
         renderer
             .draw(&call, -0.9)
             .with_coordinates((x, y, cache_size, cache_size))

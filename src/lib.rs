@@ -13,6 +13,7 @@ pub mod gl {
     include!(concat!(env!("OUT_DIR"), "/gl_bindings.rs"));
 }
 
+pub mod error;
 pub mod gl_version;
 mod image;
 mod renderer;
