@@ -9,9 +9,52 @@ fn scale(i: i32, font_size: f32) -> i32 {
     (i as f32 * font_size / 8.0) as i32
 }
 
+fn scale_round(i: i32, font_size: f32) -> i32 {
+    (i as f32 * font_size / 8.0).round() as i32
+}
+
 pub struct Font8x8Provider {
     cache: GlyphCache,
     metrics: RefCell<HashMap<u32, RectPx>>,
+}
+
+impl FontProvider for Font8x8Provider {
+    fn get_glyph_id(&self, c: char) -> u32 {
+        c as u32
+    }
+
+    fn get_line_height(&self, font_size: f32) -> f32 {
+        font_size * 4.0 / 3.0
+    }
+
+    fn get_advance(&self, from: u32, _to: u32, font_size: f32) -> Option<i32> {
+        let RectPx { width, .. } = self.get_raw_metrics(from);
+        Some((width as f32 * font_size / 8.0 + 1.0) as i32)
+    }
+
+    fn get_metric(&self, id: u32, font_size: f32) -> RectPx {
+        let metrics = self.get_raw_metrics(id);
+        let y_offset = (self.get_line_height(font_size) as i32 - scale(8, font_size)) / 2;
+        RectPx {
+            x: 0,
+            y: y_offset + scale_round(metrics.y, font_size),
+            width: scale(metrics.width, font_size),
+            height: scale(metrics.height, font_size),
+        }
+    }
+
+    fn render_glyph(&mut self, id: u32, _font_size: f32) -> Option<RectPx> {
+        if id == ' ' as u32 {
+            None
+        } else {
+            let bitmap = get_bitmap(id)?;
+            self.render_bitmap(id, bitmap)
+        }
+    }
+
+    fn update_glyph_cache_expiration(&mut self) {
+        self.cache.expire_one_step();
+    }
 }
 
 impl Font8x8Provider {
@@ -88,46 +131,6 @@ impl Font8x8Provider {
         } else {
             None
         }
-    }
-}
-
-impl FontProvider for Font8x8Provider {
-    fn get_glyph_id(&self, c: char) -> u32 {
-        c as u32
-    }
-
-    fn get_line_height(&self, font_size: f32) -> f32 {
-        font_size * 4.0 / 3.0
-    }
-
-    fn get_advance(&self, from: u32, _to: u32, font_size: f32) -> Option<i32> {
-        let RectPx { width, .. } = self.get_raw_metrics(from);
-        Some((width as f32 * font_size / 8.0 + 1.0) as i32)
-    }
-
-    fn get_metric(&self, id: u32, font_size: f32) -> RectPx {
-        let metrics = self.get_raw_metrics(id);
-        let y_offset = (self.get_line_height(font_size) as i32 - scale(8, font_size)) / 2;
-        RectPx {
-            x: 0,
-            // TODO: Something is still wrong with this y
-            y: y_offset + scale(metrics.y, font_size),
-            width: scale(metrics.width, font_size),
-            height: scale(metrics.height, font_size),
-        }
-    }
-
-    fn render_glyph(&mut self, id: u32, _font_size: f32) -> Option<RectPx> {
-        if id == ' ' as u32 {
-            None
-        } else {
-            let bitmap = get_bitmap(id)?;
-            self.render_bitmap(id, bitmap)
-        }
-    }
-
-    fn update_glyph_cache_expiration(&mut self) {
-        self.cache.expire_one_step();
     }
 }
 
