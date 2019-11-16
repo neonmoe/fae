@@ -29,7 +29,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let params = DrawCallParameters {
         image: {
             #[cfg(feature = "png")]
-            let image = Image::from_png(&std::fs::read("examples/res/sprite.png")?)?;
+            let image = Image::from_png(include_bytes!("res/sprite.png"))?;
             #[cfg(not(feature = "png"))]
             let image = Image::from_color(16, 16, &[0xFF, 0xFF, 0x00, 0xFF]);
             Some(image)

@@ -10,12 +10,8 @@ fn scale(i: i32, font_size: f32) -> i32 {
     (i as f32 * font_size / 8.0) as i32
 }
 
-fn scale_round(i: i32, font_size: f32) -> i32 {
-    (i as f32 * font_size / 8.0).round() as i32
-}
-
 pub struct Font8x8Provider {
-    metrics: RefCell<HashMap<u32, RectPx>>,
+    metrics: RefCell<HashMap<GlyphId, RectPx>>,
 }
 
 impl Font8x8Provider {
@@ -27,25 +23,25 @@ impl Font8x8Provider {
 }
 
 impl FontProvider for Font8x8Provider {
-    fn get_glyph_id(&self, c: char) -> u32 {
-        c as u32
+    fn get_glyph_id(&self, c: char) -> Option<GlyphId> {
+        Some(c as GlyphId)
     }
 
     fn get_line_height(&self, font_size: f32) -> f32 {
         font_size * 4.0 / 3.0
     }
 
-    fn get_advance(&self, from: u32, _to: u32, font_size: f32) -> Option<i32> {
+    fn get_advance(&self, from: GlyphId, _to: GlyphId, font_size: f32) -> Option<i32> {
         let RectPx { width, .. } = self.get_raw_metrics(from);
         Some((width as f32 * font_size / 8.0 + 1.0) as i32)
     }
 
-    fn get_metric(&self, id: u32, font_size: f32) -> RectPx {
+    fn get_metric(&self, id: GlyphId, font_size: f32) -> RectPx {
         let metrics = self.get_raw_metrics(id);
-        let y_offset = (self.get_line_height(font_size) as i32 - scale(8, font_size)) / 2;
+        let y_offset = (self.get_line_height(font_size) / font_size * 8.0 - 8.0) / 2.0;
         RectPx {
             x: 0,
-            y: y_offset + scale_round(metrics.y, font_size),
+            y: scale(y_offset as i32 + metrics.y, font_size),
             width: scale(metrics.width, font_size),
             height: scale(metrics.height, font_size),
         }
@@ -54,24 +50,20 @@ impl FontProvider for Font8x8Provider {
     fn render_glyph(
         &mut self,
         cache: &mut GlyphCache,
-        id: u32,
+        id: GlyphId,
         _font_size: f32,
     ) -> Result<RectPx, GlyphNotRenderedError> {
-        if id == ' ' as u32 {
-            Err(GlyphNotRenderedError::GlyphIsWhitespace)
+        if let Some(bitmap) = get_bitmap(id) {
+            self.render_bitmap(cache, id, bitmap)
         } else {
-            if let Some(bitmap) = get_bitmap(id) {
-                self.render_bitmap(cache, id, bitmap)
-            } else {
-                Err(GlyphNotRenderedError::GlyphMissing)
-            }
+            Err(GlyphNotRenderedError::GlyphInvisible)
         }
     }
 }
 
 impl Font8x8Provider {
-    fn get_raw_metrics(&self, id: u32) -> RectPx {
-        if id == ' ' as u32 {
+    fn get_raw_metrics(&self, id: GlyphId) -> RectPx {
+        if id == ' ' as GlyphId {
             (0, 8, 3, 0).into()
         } else {
             *self.metrics.borrow_mut().entry(id).or_insert_with(|| {
@@ -90,13 +82,12 @@ impl Font8x8Provider {
     fn render_bitmap(
         &mut self,
         cache: &mut GlyphCache,
-        id: u32,
+        id: GlyphId,
         bitmap: [u8; 8],
     ) -> Result<RectPx, GlyphNotRenderedError> {
         let metric = self.get_raw_metrics(id);
 
-        use std::convert::TryFrom;
-        let id = CacheIdentifier::new(char::try_from(id).unwrap_or('\0'));
+        let id = CacheIdentifier::new(id, 0);
         let tex = cache.get_texture();
         let (spot, new) = cache.reserve_uvs(id, metric.width, metric.height)?;
         if new {
@@ -139,7 +130,7 @@ impl Font8x8Provider {
     }
 }
 
-fn get_empty_pixels_left_right(id: u32) -> Option<(i32, i32)> {
+fn get_empty_pixels_left_right(id: GlyphId) -> Option<(i32, i32)> {
     let bitmap = get_bitmap(id)?;
     let mut left = None;
     let mut right = None;
@@ -158,7 +149,7 @@ fn get_empty_pixels_left_right(id: u32) -> Option<(i32, i32)> {
     Some((left?, 7 - right?))
 }
 
-fn get_empty_pixels_top_bottom(id: u32) -> Option<(i32, i32)> {
+fn get_empty_pixels_top_bottom(id: GlyphId) -> Option<(i32, i32)> {
     let bitmap = get_bitmap(id)?;
     let mut top = None;
     let mut bottom = None;
@@ -178,7 +169,7 @@ fn get_empty_pixels_top_bottom(id: u32) -> Option<(i32, i32)> {
 // This function provides glyphs for 558 characters (for calculating
 // the cache texture size)
 #[doc(hidden)]
-pub fn get_bitmap(id: u32) -> Option<[u8; 8]> {
+pub fn get_bitmap(id: GlyphId) -> Option<[u8; 8]> {
     let u = id as usize;
     let bitmap = match u {
         0..=0x7F => Some(font8x8::legacy::BASIC_LEGACY[u]),
@@ -216,7 +207,7 @@ pub fn get_bitmap(id: u32) -> Option<[u8; 8]> {
 
 #[test]
 fn get_font8x8_bitmap_works() {
-    for u in 0..0xFFFF as u32 {
+    for u in 0..0xFFFF as GlyphId {
         get_bitmap(u);
     }
 }

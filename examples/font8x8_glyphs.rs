@@ -21,7 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for u in 0..0xFFFF {
         if text::get_bitmap(u).is_some() {
             use std::convert::TryFrom;
-            if let Ok(c) = char::try_from(u) {
+            if let Ok(c) = char::try_from(u as u32) {
                 all_characters.push(c);
             }
         }

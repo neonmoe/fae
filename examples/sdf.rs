@@ -11,7 +11,7 @@ static SHADER: &'static str = include_str!("res/sdf_shader.frag");
 fn main() -> Result<(), Box<dyn Error>> {
     env_logger::from_env(env_logger::Env::default().default_filter_or("trace")).init();
 
-    let image = generate_sdf(Image::from_png(&std::fs::read("examples/res/letter.png")?)?);
+    let image = generate_sdf(Image::from_png(include_bytes!("res/letter.png"))?);
     let mut window = Window::create(&WindowSettings::default()).unwrap();
     let mut renderer = Renderer::new(&window);
     let params = DrawCallParameters {

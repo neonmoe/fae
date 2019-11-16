@@ -12,9 +12,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut window = Window::create(&WindowSettings::default()).unwrap();
     let mut renderer = Renderer::new(&window);
     let params = DrawCallParameters {
-        image: Some(Image::from_png(&std::fs::read(
-            "examples/res/transparent_sprite.png",
-        )?)?),
+        image: Some(Image::from_png(include_bytes!(
+            "res/transparent_sprite.png",
+        ))?),
         ..Default::default()
     };
     let call_below = renderer.create_draw_call(params.clone());

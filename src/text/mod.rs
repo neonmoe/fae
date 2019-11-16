@@ -113,7 +113,15 @@ impl TextRenderer {
                 continue;
             }
 
-            let glyph_id = self.font.get_glyph_id(c);
+            let glyph_id = if let Some(id) = self
+                .font
+                .get_glyph_id(c)
+                .or_else(|| self.font.get_glyph_id('\u{FFFD}'))
+            {
+                id
+            } else {
+                continue;
+            };
             let size = self.font.get_metric(glyph_id, font_size);
             let glyph = Metric { glyph_id, size };
             metrics.insert(c, glyph);
@@ -263,18 +271,9 @@ impl TextRenderer {
             match self.font.render_glyph(&mut self.cache, glyph.id, font_size) {
                 Ok(texcoords) => finish_sprite(texcoords),
                 Err(err) => match err {
-                    GlyphNotRenderedError::GlyphMissing => {
-                        let id = self.font.get_glyph_id('\u{FFFD}');
-                        match self.font.render_glyph(&mut self.cache, id, font_size) {
-                            Ok(texcoords) => finish_sprite(texcoords),
-                            _ => {}
-                        }
-                    }
-
                     // TODO: Report this to the crate user somehow
                     GlyphNotRenderedError::GlyphCacheFull => continue,
-
-                    GlyphNotRenderedError::GlyphIsWhitespace => continue,
+                    GlyphNotRenderedError::GlyphInvisible => continue,
                 },
             }
         }

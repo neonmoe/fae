@@ -10,11 +10,8 @@ pub(crate) enum GlyphNotRenderedError {
     /// rendered. This is usually caused by trying to draw too
     /// high-resolution text.
     GlyphCacheFull,
-    /// The available fonts did not provide a graphical representation
-    /// of the glyph.
-    GlyphMissing,
-    /// The glyph is whitespace.
-    GlyphIsWhitespace,
+    /// The glyph just doesn't have anything to render.
+    GlyphInvisible,
 }
 
 /// Describes errors related to parsing image files.

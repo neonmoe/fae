@@ -2,6 +2,8 @@ use crate::error::GlyphNotRenderedError;
 use crate::text::GlyphCache;
 use crate::types::*;
 
+pub(crate) type GlyphId = u16;
+
 /// Defines the alignment of text.
 #[derive(Clone, Copy, Debug)]
 pub enum Alignment {
@@ -15,14 +17,14 @@ pub enum Alignment {
 
 #[derive(Clone, Copy)]
 pub(crate) struct Metric {
-    pub glyph_id: u32,
+    pub glyph_id: GlyphId,
     pub size: RectPx,
 }
 
 #[derive(Clone, Copy)]
 pub(crate) struct Glyph {
     pub screen_location: RectPx,
-    pub id: u32,
+    pub id: GlyphId,
     pub draw_data: usize,
 }
 
@@ -35,25 +37,26 @@ pub(crate) struct TextDrawData {
 }
 
 pub(crate) trait FontProvider {
-    fn get_glyph_id(&self, c: char) -> u32;
+    fn get_glyph_id(&self, c: char) -> Option<GlyphId>;
     fn get_line_height(&self, font_size: f32) -> f32;
-    fn get_advance(&self, from: u32, to: u32, font_size: f32) -> Option<i32>;
-    fn get_metric(&self, id: u32, font_size: f32) -> RectPx;
+    fn get_advance(&self, from: GlyphId, to: GlyphId, font_size: f32) -> Option<i32>;
+    fn get_metric(&self, id: GlyphId, font_size: f32) -> RectPx;
     fn render_glyph(
         &mut self,
         cache: &mut GlyphCache,
-        id: u32,
+        id: GlyphId,
         font_size: f32,
     ) -> Result<RectPx, GlyphNotRenderedError>;
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct CacheIdentifier {
-    c: char,
+    id: u16,
+    size: i32,
 }
 
 impl CacheIdentifier {
-    pub fn new(c: char) -> CacheIdentifier {
-        CacheIdentifier { c }
+    pub fn new(id: u16, size: i32) -> CacheIdentifier {
+        CacheIdentifier { id, size }
     }
 }
