@@ -12,11 +12,11 @@ type TextureHandle = GLuint;
 type VBOHandle = GLuint;
 type VAOHandle = GLuint;
 
-/// A handle with which you can draw during a specific draw call.
+/// A handle to a draw call. Parameter for
+/// [`Renderer::draw`](struct.Renderer.html#method.draw).
 ///
-/// Created during
-/// [`Renderer::create_draw_call`](struct.Renderer.html#method.create_draw_call),
-/// used in [`Renderer::draw`](struct.Renderer.html#method.draw).
+/// Created with
+/// [`Renderer::create_draw_call`](struct.Renderer.html#method.create_draw_call).
 pub struct DrawCallHandle(usize);
 
 #[derive(Clone, Copy, Debug)]
@@ -51,7 +51,7 @@ struct DrawCall {
     program: ShaderProgram,
     attributes: Attributes,
     blend: bool,
-    lowest_depth: f32,
+    highest_depth: f32,
 }
 
 #[derive(Clone, Debug)]
@@ -76,20 +76,6 @@ struct OpenGLState {
 
 /// Contains the data and functionality needed to draw rectangles with
 /// OpenGL.
-///
-/// ## Optimization tips
-/// - Draw the sprites in front first. This way you'll avoid rendering
-///   over already drawn pixels. If you're rendering *lots* of sprites,
-///   this is a good place to start optimizing.
-///   - Note: try to constrain your Z-values to small ranges within
-///     individual draw calls; draw call rendering order is decided by
-///     the lowest z-coordinate that each draw call has to draw. This
-///     can even cause visual glitches in alpha-blended draw calls, if
-///     their sprites overlap and have overlapping ranges of
-///     Z-coordinates.
-/// - If possible, make your textures without using alpha values
-///   between 1 and 0 (ie. use only 100% and 0% opacity), and disable
-///   `alpha_blending` in your draw call.
 #[derive(Debug)]
 pub struct Renderer {
     calls: Vec<DrawCall>,
@@ -268,7 +254,7 @@ impl Renderer {
             program,
             attributes,
             blend: params.alpha_blending,
-            lowest_depth: 1.0,
+            highest_depth: -1.0,
         });
 
         if let Some(image) = params.image {
@@ -287,7 +273,30 @@ impl Renderer {
     }
 
     /// Creates a Sprite struct, which you can render after specifying
-    /// your parameters.
+    /// your parameters by modifying it.
+    ///
+    /// Higher Z sprites are drawn over the lower ones (with the
+    /// exception of the case described below).
+    ///
+    /// ## Weird Z-coordinate behavior note
+    ///
+    /// Try to constrain your z-coordinates to small ranges within
+    /// individual draw calls; draw call rendering order is decided by
+    /// the highest z-coordinate that each draw call has to draw. This
+    /// can even cause visual glitches in alpha-blended draw calls, if
+    /// their sprites overlap and have overlapping ranges of
+    /// z-coordinates. For an example of this, see the `drawing_order`
+    /// example.
+    ///
+    /// ## Optimization tips
+    /// - Draw the sprites in front first. This way you'll avoid
+    ///   rendering over already drawn pixels. If you're rendering
+    ///   *lots* of sprites, this is a good place to start optimizing.
+    /// - If possible, make your textures without using alpha values
+    ///   between 1 and 0 (ie. use only 100% and 0% opacity), and
+    ///   disable `alpha_blending` in your draw call. These kinds of
+    ///   sprites can be drawn much more efficiently when it comes to
+    ///   overdraw.
     ///
     /// # Usage
     /// ```no_run
@@ -357,7 +366,8 @@ impl Renderer {
         let (red, green, blue, alpha) = color;
         let (rads, pivot_x, pivot_y) = rotation;
 
-        self.calls[call_handle.0].lowest_depth = self.calls[call_handle.0].lowest_depth.min(depth);
+        self.calls[call_handle.0].highest_depth =
+            self.calls[call_handle.0].highest_depth.max(depth);
         if self.gl_state.legacy {
             let (pivot_x, pivot_y) = (pivot_x + x0, pivot_y + y0);
 
@@ -415,7 +425,7 @@ impl Renderer {
         let m00 = 2.0 / width;
         let m11 = -2.0 / height;
         let matrix = [
-            m00, 0.0, 0.0, -1.0, 0.0, m11, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+            m00, 0.0, 0.0, -1.0, 0.0, m11, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
         ];
 
         unsafe {
@@ -434,11 +444,11 @@ impl Renderer {
         call_indices.sort_unstable_by(|a, b| {
             let call_a = &self.calls[*a];
             let call_b = &self.calls[*b];
-            let a = call_a.lowest_depth;
-            let a = if call_a.blend { a } else { 2.0 - a };
-            let b = call_b.lowest_depth;
-            let b = if call_b.blend { b } else { 2.0 - b };
-            b.partial_cmp(&a).unwrap()
+            let a = call_a.highest_depth;
+            let a = if call_a.blend { a } else { -2.0 - a };
+            let b = call_b.highest_depth;
+            let b = if call_b.blend { b } else { -2.0 - b };
+            a.partial_cmp(&b).unwrap()
         });
 
         for i in call_indices {
@@ -519,7 +529,7 @@ impl Renderer {
             }
 
             call.attributes.vbo_data.clear();
-            call.lowest_depth = 1.0;
+            call.highest_depth = -1.0;
 
             print_gl_errors(&*format!("after render #{}", i));
         }
