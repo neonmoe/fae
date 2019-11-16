@@ -45,7 +45,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             None,
         ) {
             renderer
-                .draw(&bgs, 0.1)
+                .draw(&bgs, -0.1)
                 .with_coordinates(rect)
                 .with_color(0.9, 0.9, 0.5, 1.0)
                 .finish();
@@ -71,7 +71,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 Some(rect),
             ) {
                 renderer
-                    .draw(&bgs, 0.1)
+                    .draw(&bgs, -0.1)
                     .with_coordinates(rect)
                     .with_color(0.9, 0.9, 0.5, 1.0)
                     .finish();
@@ -95,12 +95,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             was_mouse_in[0] = mouse_in;
             let col = if mouse_in { 0.9 } else { 1.0 };
             renderer
-                .draw(&bgs, 0.1)
+                .draw(&bgs, -0.1)
                 .with_coordinates((10.0 + px, y + px, 200.0 - 2.0 * px, 40.0 - 2.0 * px))
                 .with_color(col, col, col, 1.0)
                 .finish();
             renderer
-                .draw(&bgs, 0.1)
+                .draw(&bgs, -0.1)
                 .with_coordinates((10.0, y, 200.0, 40.0))
                 .with_color(0.2, 0.2, 0.2, 1.0)
                 .finish();
@@ -128,12 +128,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             was_mouse_in[1] = mouse_in;
             let col = if mouse_in { 0.9 } else { 1.0 };
             renderer
-                .draw(&bgs, 0.1)
+                .draw(&bgs, -0.1)
                 .with_coordinates((10.0 + px, y + px, 200.0 - 2.0 * px, 40.0 - 2.0 * px))
                 .with_color(col, col, col, 1.0)
                 .finish();
             renderer
-                .draw(&bgs, 0.1)
+                .draw(&bgs, -0.1)
                 .with_coordinates((10.0, y, 200.0, 40.0))
                 .with_color(0.2, 0.2, 0.2, 1.0)
                 .finish();
@@ -161,12 +161,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             was_mouse_in[2] = mouse_in;
             let col = if mouse_in { 0.9 } else { 1.0 };
             renderer
-                .draw(&bgs, 0.1)
+                .draw(&bgs, -0.1)
                 .with_coordinates((10.0 + px, y + px, 200.0 - 2.0 * px, 40.0 - 2.0 * px))
                 .with_color(col, col, col, 1.0)
                 .finish();
             renderer
-                .draw(&bgs, 0.1)
+                .draw(&bgs, -0.1)
                 .with_coordinates((10.0, y, 200.0, 40.0))
                 .with_color(0.2, 0.2, 0.2, 1.0)
                 .finish();
@@ -255,7 +255,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             window.width as f32 - 20.0 - cache_size,
             window.height as f32 - 20.0 - cache_size,
         );
-        text.debug_draw_glyph_cache(&mut renderer, (x, y, x + cache_size, y + cache_size), -1.0);
+        text.debug_draw_glyph_cache(&mut renderer, (x, y, cache_size, cache_size), -0.8);
         renderer
             .draw(&call, -0.9)
             .with_coordinates((x, y, cache_size, cache_size))

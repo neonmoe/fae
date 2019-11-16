@@ -251,8 +251,8 @@ impl TextRenderer {
                 None => continue,
             };
 
-            debug_assert_eq!(screen_location.x.fract(), texcoords.x.fract());
-            debug_assert_eq!(screen_location.y.fract(), texcoords.y.fract());
+            debug_assert_eq!(screen_location.x.fract().abs(), texcoords.x.fract().abs());
+            debug_assert_eq!(screen_location.y.fract().abs(), texcoords.y.fract().abs());
             debug_assert_eq!(screen_location.width.fract(), texcoords.width.fract());
             debug_assert_eq!(screen_location.height.fract(), texcoords.height.fract());
 

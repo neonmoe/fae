@@ -59,10 +59,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                 ),
                 (
                     x + size + 10.0,
-                    y + (size - 16.0 / window.dpi_factor) / 2.0,
+                    y + (size - 8.0 / window.dpi_factor) / 2.0,
                     0.0,
                 ),
-                16.0 / window.dpi_factor,
+                8.0 / window.dpi_factor,
                 Alignment::Left,
                 (0.0, 0.0, 0.0, 1.0),
                 None,
@@ -86,7 +86,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         text.draw_text(
             "with pixel align =",
             (175.0, 30.0, 0.0),
-            16.0 / window.dpi_factor,
+            8.0 / window.dpi_factor,
             Alignment::Left,
             (0.0, 0.0, 0.0, 1.0),
             None,

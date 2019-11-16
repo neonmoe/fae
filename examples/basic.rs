@@ -42,7 +42,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         text.draw_text(
             "Some cool text!",    // The displayed text
-            (10.0, 10.0, -0.6),   // The position (x, y, z)
+            (10.0, 10.0, 0.6),    // The position (x, y, z)
             16.0,                 // The font size
             Alignment::Left,      // The text alignment (only applied if max_row_width is specified)
             (0.0, 0.0, 0.0, 1.0), // The text color

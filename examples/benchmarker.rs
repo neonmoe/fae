@@ -120,7 +120,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         timers["quad calls"][timer_index].start();
         // Background
         renderer
-            .draw(&call, 0.6)
+            .draw(&call, -0.6)
             .with_coordinates((0.0, 0.0, 640.0, 480.0))
             .with_texture_coordinates((0, 0, 1240, 920))
             .finish();
@@ -128,7 +128,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         // Bottom right corned (for testing smooth resize)
         let (w, h) = (window.width, window.height);
         renderer
-            .draw(&call, 0.5)
+            .draw(&call, -0.5)
             .with_coordinates((w - 100.0, h - 100.0, 100.0, 100.0))
             .with_texture_coordinates((0, 0, 1240, 920))
             .finish();
@@ -139,7 +139,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             let x = (f * 3.1415 * 8.0 + time).cos() * 150.0 * f.max(0.3) + 270.0;
             let y = (f * 3.1415 * 8.0 + time).sin() * 150.0 * f.max(0.3) + 190.0;
             renderer
-                .draw(&call, f - 0.5)
+                .draw(&call, 0.5 - f)
                 .with_coordinates((x, y, 100.0, 100.0))
                 .with_texture_coordinates((0, 0, 1240, 920))
                 .with_color(1.0, 0.7, 0.9, 1.0)
@@ -156,7 +156,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         if cfg!(feature = "flame") {
             text.draw_text(
                 "Press R to record a frame with flame, see results in flame-graph.html after exiting the application",
-                (20.0, y, -0.6),
+                (20.0, y, 0.6),
                 11.0,
                 Alignment::Left, text_color,
                 None,
@@ -172,7 +172,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     duration_name,
                     get_avg_timer_mcs(duration_name)
                 ),
-                (10.0, y, -0.6),
+                (10.0, y, 0.6),
                 11.0,
                 Alignment::Left,
                 text_color,
@@ -184,7 +184,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         y += 20.0;
         text.draw_text(
             &format!("Quad count: {}", quad_count),
-            (10.0, y, -0.6),
+            (10.0, y, 0.6),
             11.0,
             Alignment::Left,
             text_color,
@@ -195,7 +195,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         y += 20.0;
         text.draw_text(
             &format!("Pressed keys: {:?}", window.held_keys),
-            (10.0, y, -0.6),
+            (10.0, y, 0.6),
             11.0,
             Alignment::Left,
             text_color,
@@ -206,7 +206,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         y += 20.0;
         text.draw_text(
             &format!("Scaling factor: {:.1}", window.dpi_factor),
-            (10.0, y, -0.6),
+            (10.0, y, 0.6),
             11.0,
             Alignment::Left,
             text_color,
@@ -219,7 +219,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         y += 20.0;
         text.draw_text(
             &format!("Type some text: {}", customizable_text),
-            (200.0, y, -0.6),
+            (200.0, y, 0.6),
             11.0,
             Alignment::Left,
             text_color,
@@ -230,7 +230,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         y += 20.0;
         text.draw_text(
             &format!("Mouse held: {:?}", window.mouse_held),
-            (200.0, y, -0.6),
+            (200.0, y, 0.6),
             11.0,
             Alignment::Left,
             text_color,
@@ -253,7 +253,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         y += 20.0;
         text.draw_text(
             &format!("Mouse in window: {}", window.mouse_inside),
-            (200.0, y, -0.6),
+            (200.0, y, 0.6),
             11.0,
             Alignment::Left,
             text_color,
@@ -269,7 +269,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             y += 20.0;
             text.draw_text(
                 &format!("OpenGL version: {}.{}", major, minor),
-                (200.0, y, -0.6),
+                (200.0, y, 0.6),
                 11.0,
                 Alignment::Left,
                 text_color,
@@ -281,7 +281,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         y += 20.0;
         text.draw_text(
             &format!("OpenGL 3.3+ optimizations: {}", !renderer.is_legacy()),
-            (200.0, y, -0.6),
+            (200.0, y, 0.6),
             11.0,
             Alignment::Left,
             text_color,
@@ -291,7 +291,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         if let Some(mut rect) = text.draw_text(
             &format!("profiling information:\n{:#?}", profiler::read()),
-            (30.0, 310.0, -0.6),
+            (30.0, 310.0, 0.6),
             11.0,
             Alignment::Left,
             text_color,
