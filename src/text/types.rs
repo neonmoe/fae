@@ -1,3 +1,5 @@
+use crate::error::GlyphNotRenderedError;
+use crate::text::GlyphCache;
 use crate::types::*;
 
 /// Defines the alignment of text.
@@ -37,8 +39,12 @@ pub(crate) trait FontProvider {
     fn get_line_height(&self, font_size: f32) -> f32;
     fn get_advance(&self, from: u32, to: u32, font_size: f32) -> Option<i32>;
     fn get_metric(&self, id: u32, font_size: f32) -> RectPx;
-    fn render_glyph(&mut self, id: u32, font_size: f32) -> Option<RectPx>;
-    fn update_glyph_cache_expiration(&mut self);
+    fn render_glyph(
+        &mut self,
+        cache: &mut GlyphCache,
+        id: u32,
+        font_size: f32,
+    ) -> Result<RectPx, GlyphNotRenderedError>;
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

@@ -1,3 +1,4 @@
+use crate::error::GlyphNotRenderedError;
 use crate::text::glyph_cache::GlyphCache;
 use crate::text::types::*;
 use crate::text::*;
@@ -14,8 +15,15 @@ fn scale_round(i: i32, font_size: f32) -> i32 {
 }
 
 pub struct Font8x8Provider {
-    cache: GlyphCache,
     metrics: RefCell<HashMap<u32, RectPx>>,
+}
+
+impl Font8x8Provider {
+    pub fn new() -> Font8x8Provider {
+        Font8x8Provider {
+            metrics: RefCell::new(HashMap::new()),
+        }
+    }
 }
 
 impl FontProvider for Font8x8Provider {
@@ -43,25 +51,20 @@ impl FontProvider for Font8x8Provider {
         }
     }
 
-    fn render_glyph(&mut self, id: u32, _font_size: f32) -> Option<RectPx> {
+    fn render_glyph(
+        &mut self,
+        cache: &mut GlyphCache,
+        id: u32,
+        _font_size: f32,
+    ) -> Result<RectPx, GlyphNotRenderedError> {
         if id == ' ' as u32 {
-            None
+            Err(GlyphNotRenderedError::GlyphIsWhitespace)
         } else {
-            let bitmap = get_bitmap(id)?;
-            self.render_bitmap(id, bitmap)
-        }
-    }
-
-    fn update_glyph_cache_expiration(&mut self) {
-        self.cache.expire_one_step();
-    }
-}
-
-impl Font8x8Provider {
-    pub fn new(cache: GlyphCache) -> Font8x8Provider {
-        Font8x8Provider {
-            cache,
-            metrics: RefCell::new(HashMap::new()),
+            if let Some(bitmap) = get_bitmap(id) {
+                self.render_bitmap(cache, id, bitmap)
+            } else {
+                Err(GlyphNotRenderedError::GlyphMissing)
+            }
         }
     }
 }
@@ -84,53 +87,55 @@ impl Font8x8Provider {
         }
     }
 
-    fn render_bitmap(&mut self, id: u32, bitmap: [u8; 8]) -> Option<RectPx> {
+    fn render_bitmap(
+        &mut self,
+        cache: &mut GlyphCache,
+        id: u32,
+        bitmap: [u8; 8],
+    ) -> Result<RectPx, GlyphNotRenderedError> {
         let metric = self.get_raw_metrics(id);
 
         use std::convert::TryFrom;
-        let id = CacheIdentifier::new(char::try_from(id).ok()?);
-        let tex = self.cache.get_texture();
-        if let Some((spot, new)) = self.cache.reserve_uvs(id, metric.width, metric.height) {
-            if new {
-                let mut data = Vec::with_capacity((metric.width * metric.height) as usize);
-                for y in metric.y..(metric.y + metric.height) {
-                    let color = bitmap[y as usize];
-                    for x in metric.x..(metric.x + metric.width) {
-                        if (color & (1 << x)) == 0 {
-                            data.push(0x00u8);
-                        } else {
-                            data.push(0xFFu8);
-                        }
+        let id = CacheIdentifier::new(char::try_from(id).unwrap_or('\0'));
+        let tex = cache.get_texture();
+        let (spot, new) = cache.reserve_uvs(id, metric.width, metric.height)?;
+        if new {
+            let mut data = Vec::with_capacity((metric.width * metric.height) as usize);
+            for y in metric.y..(metric.y + metric.height) {
+                let color = bitmap[y as usize];
+                for x in metric.x..(metric.x + metric.width) {
+                    if (color & (1 << x)) == 0 {
+                        data.push(0x00u8);
+                    } else {
+                        data.push(0xFFu8);
                     }
                 }
-
-                unsafe {
-                    use crate::gl;
-                    use crate::gl::types::*;
-                    gl::BindTexture(gl::TEXTURE_2D, tex);
-                    gl::PixelStorei(gl::UNPACK_ALIGNMENT, 1);
-                    gl::TexSubImage2D(
-                        gl::TEXTURE_2D,            // target
-                        0,                         // level
-                        spot.x,                    // xoffset
-                        spot.y,                    // yoffset
-                        spot.width,                // width
-                        spot.height,               // height
-                        gl::RED as GLuint,         // format
-                        gl::UNSIGNED_BYTE,         // type
-                        data.as_ptr() as *const _, // pixels
-                    );
-                    crate::renderer::print_gl_errors("after font8x8 render_bitmap texsubimage2d");
-                }
-                crate::profiler::write(|p| p.glyph_cache_misses += 1);
-            } else {
-                crate::profiler::write(|p| p.glyph_cache_hits += 1);
             }
-            crate::profiler::write(|p| p.glyphs_drawn += 1);
-            Some(spot)
+
+            unsafe {
+                use crate::gl;
+                use crate::gl::types::*;
+                gl::BindTexture(gl::TEXTURE_2D, tex);
+                gl::PixelStorei(gl::UNPACK_ALIGNMENT, 1);
+                gl::TexSubImage2D(
+                    gl::TEXTURE_2D,            // target
+                    0,                         // level
+                    spot.x,                    // xoffset
+                    spot.y,                    // yoffset
+                    spot.width,                // width
+                    spot.height,               // height
+                    gl::RED as GLuint,         // format
+                    gl::UNSIGNED_BYTE,         // type
+                    data.as_ptr() as *const _, // pixels
+                );
+                crate::renderer::print_gl_errors("after font8x8 render_bitmap texsubimage2d");
+            }
+            crate::profiler::write(|p| p.glyph_cache_misses += 1);
         } else {
-            None
+            crate::profiler::write(|p| p.glyph_cache_hits += 1);
         }
+        crate::profiler::write(|p| p.glyphs_drawn += 1);
+        Ok(spot)
     }
 }
 

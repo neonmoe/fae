@@ -290,7 +290,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         );
 
         if let Some(mut rect) = text.draw_text(
-            &format!("profiling information:\n{:#?}", profiler::read()),
+            &format!("{:#?}", profiler::read()),
             (30.0, 310.0, 0.6),
             11.0,
             Alignment::Left,

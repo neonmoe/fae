@@ -1,3 +1,4 @@
+use crate::error::GlyphNotRenderedError;
 use crate::gl::types::*;
 use crate::image::Image;
 use crate::renderer::{DrawCallHandle, DrawCallParameters, Renderer, Shaders, TextureWrapping};
@@ -204,7 +205,6 @@ impl GlyphLine {
 }
 
 pub struct GlyphCache {
-    out_of_memory: bool,
     texture: GLuint,
     width: i32,
     height: i32,
@@ -234,7 +234,6 @@ impl GlyphCache {
             srgb: false,
         });
         let cache = GlyphCache {
-            out_of_memory: false,
             texture: renderer.get_texture(&call),
             width,
             height,
@@ -251,12 +250,12 @@ impl GlyphCache {
         id: CacheIdentifier,
         width: i32,
         height: i32,
-    ) -> Option<(RectPx, bool)> {
+    ) -> Result<(RectPx, bool), GlyphNotRenderedError> {
         if let Some(uvs) = self
             // First try to find the uvs from the cache
             .get_uvs_from_cache(&id)
         {
-            Some((uvs.texcoords.clone(), false))
+            Ok((uvs.texcoords.clone(), false))
         } else if let Some(uvs) = self
             // Then try to find space in the existing lines
             .reserve_uvs_from_existing(width, height, false)
@@ -267,15 +266,9 @@ impl GlyphCache {
         // TODO: Add glyph cache texture re-sizing as a last resort
         {
             self.cache.insert(id, Rc::downgrade(&uvs));
-            Some((uvs.texcoords.clone(), true))
+            Ok((uvs.texcoords.clone(), true))
         } else {
-            if !self.out_of_memory {
-                // TODO: Add a TextRenderingError type
-                // with variants for glyph cache oom and glyph missing from font
-                log::warn!("glyph cache ran out of space: {:?}", id);
-            }
-            self.out_of_memory = true;
-            None
+            Err(GlyphNotRenderedError::GlyphCacheFull)
         }
     }
 

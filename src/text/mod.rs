@@ -7,28 +7,30 @@
 // rasterized.
 
 mod fonts;
-#[cfg(feature = "font8x8" /* or font-kit, in the future */)]
 mod glyph_cache;
 mod layout;
 pub(crate) mod types;
 
 // This is here for the font8x8_glyphs example
+#[cfg(feature = "font8x8")]
 #[doc(hidden)]
 pub use crate::text::fonts::font8x8::get_bitmap;
 
 pub use crate::text::types::Alignment;
 
-#[cfg(feature = "font8x8" /* or font-kit, in the future */)]
+use crate::error::GlyphNotRenderedError;
 use crate::text::glyph_cache::*;
 use crate::text::layout::*;
 use crate::text::types::*;
 use crate::types::*;
 use crate::{DrawCallHandle, Renderer};
+
 use std::collections::HashMap;
 
 /// Holds the state required for text rendering, such as the font, and
 /// a text draw call queue.
 pub struct TextRenderer {
+    cache: GlyphCache,
     call: DrawCallHandle,
     glyphs: Vec<Glyph>,
     draw_datas: Vec<TextDrawData>,
@@ -46,14 +48,13 @@ impl TextRenderer {
     /// interpolation is used (crisp but pixelated).
     #[cfg(feature = "font8x8")]
     pub fn with_font8x8(renderer: &mut Renderer, smoothed: bool) -> TextRenderer {
-        let (glyph_cache, call) =
-            GlyphCache::create_cache_and_draw_call(renderer, 128, 128, smoothed);
-
+        let (cache, call) = GlyphCache::create_cache_and_draw_call(renderer, 128, 128, smoothed);
         TextRenderer {
+            cache,
             call,
             glyphs: Vec::new(),
             draw_datas: Vec::new(),
-            font: Box::new(fonts::Font8x8Provider::new(glyph_cache)),
+            font: Box::new(fonts::Font8x8Provider::new()),
             dpi_factor: 1.0,
         }
     }
@@ -105,7 +106,9 @@ impl TextRenderer {
         });
 
         let mut metrics = HashMap::new();
+        let mut char_count = 0;
         for c in text.chars() {
+            char_count += 1;
             if metrics.get(&c).is_some() {
                 continue;
             }
@@ -123,7 +126,7 @@ impl TextRenderer {
             std::f32::NEG_INFINITY,
         );
 
-        self.glyphs.reserve(text.len());
+        self.glyphs.reserve(char_count);
         let line_height = self.font.get_line_height(font_size);
         let mut line_height_fract_sum = 0.0;
         let mut cursor = PositionPx { x, y };
@@ -209,7 +212,8 @@ impl TextRenderer {
     }
 
     /// Sends all the glyphs to the Renderer. Should be called every
-    /// frame before [`Renderer::render`](../struct.Renderer.html#method.render).
+    /// frame before
+    /// [`Renderer::render`](../struct.Renderer.html#method.render).
     pub fn compose_draw_call(&mut self, renderer: &mut Renderer) {
         for glyph in &self.glyphs {
             let font_size = self.draw_datas[glyph.draw_data].font_size;
@@ -228,7 +232,8 @@ impl TextRenderer {
             // glyph: if the glyph texture is stretched, this will
             // preserve the linear blending around the border of the
             // glyph, and does nothing if the texture is not
-            // stretched.
+            // stretched. Note that the glyph cache keeps gaps between
+            // glyphs to avoid leaking because of this.
 
             let screen_location = Rect {
                 x: glyph.screen_location.x as f32 - 0.5,
@@ -236,40 +241,47 @@ impl TextRenderer {
                 width: glyph.screen_location.width as f32 + 1.0,
                 height: glyph.screen_location.height as f32 + 1.0,
             };
-            let texcoords = match self.font.render_glyph(glyph.id, font_size) {
-                Some(RectPx {
-                    x,
-                    y,
-                    width,
-                    height,
-                }) => Rect {
-                    x: x as f32 - 0.5,
-                    y: y as f32 - 0.5,
-                    width: width as f32 + 1.0,
-                    height: height as f32 + 1.0,
-                },
-                None => continue,
+
+            let mut sprite = renderer
+                .draw(&self.call, z)
+                .with_physical_coordinates(screen_location)
+                .with_color(color.0, color.1, color.2, color.3);
+            if let Some(area) = self.draw_datas[glyph.draw_data].clip_area {
+                sprite = sprite.with_clip_area(area);
+            }
+
+            let finish_sprite = |texcoords: RectPx| {
+                let texcoords = Rect {
+                    x: texcoords.x as f32 - 0.5,
+                    y: texcoords.y as f32 - 0.5,
+                    width: texcoords.width as f32 + 1.0,
+                    height: texcoords.height as f32 + 1.0,
+                };
+                sprite.with_texture_coordinates(texcoords).finish();
             };
 
-            debug_assert_eq!(screen_location.x.fract().abs(), texcoords.x.fract().abs());
-            debug_assert_eq!(screen_location.y.fract().abs(), texcoords.y.fract().abs());
-            debug_assert_eq!(screen_location.width.fract(), texcoords.width.fract());
-            debug_assert_eq!(screen_location.height.fract(), texcoords.height.fract());
+            match self.font.render_glyph(&mut self.cache, glyph.id, font_size) {
+                Ok(texcoords) => finish_sprite(texcoords),
+                Err(err) => match err {
+                    GlyphNotRenderedError::GlyphMissing => {
+                        let id = self.font.get_glyph_id('\u{FFFD}');
+                        match self.font.render_glyph(&mut self.cache, id, font_size) {
+                            Ok(texcoords) => finish_sprite(texcoords),
+                            _ => {}
+                        }
+                    }
 
-            let mut renderable = renderer.draw(&self.call, z);
-            if let Some(area) = self.draw_datas[glyph.draw_data].clip_area {
-                renderable = renderable.with_clip_area(area);
+                    // TODO: Report this to the crate user somehow
+                    GlyphNotRenderedError::GlyphCacheFull => continue,
+
+                    GlyphNotRenderedError::GlyphIsWhitespace => continue,
+                },
             }
-            renderable
-                .with_physical_coordinates(screen_location)
-                .with_texture_coordinates(texcoords)
-                .with_color(color.0, color.1, color.2, color.3)
-                .finish();
         }
 
         self.glyphs.clear();
         self.draw_datas.clear();
-        self.font.update_glyph_cache_expiration();
+        self.cache.expire_one_step();
     }
 
     /// Draws the glyph cache texture in the given screen-space quad,

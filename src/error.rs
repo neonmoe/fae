@@ -3,6 +3,20 @@
 use std::error::Error;
 use std::fmt;
 
+/// Describes different reasons for why a certain glyph was not drawn.
+#[derive(Debug)]
+pub(crate) enum GlyphNotRenderedError {
+    /// The glyph cache texture could not fit the glyph being
+    /// rendered. This is usually caused by trying to draw too
+    /// high-resolution text.
+    GlyphCacheFull,
+    /// The available fonts did not provide a graphical representation
+    /// of the glyph.
+    GlyphMissing,
+    /// The glyph is whitespace.
+    GlyphIsWhitespace,
+}
+
 /// Describes errors related to parsing image files.
 #[cfg(feature = "png")]
 #[derive(Debug)]
