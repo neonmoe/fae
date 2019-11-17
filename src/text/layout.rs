@@ -1,5 +1,5 @@
 use crate::text::{Alignment, FontProvider, Metric};
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 
 // Sources for the following two arrays: https://en.wikipedia.org/wiki/Whitespace_character#Unicode
 // Characters that must break lines when encountered:
@@ -35,9 +35,9 @@ pub(crate) fn get_line_start_x(
 }
 
 // FIXME: There seems to be a problem when rendering lines that end in <micro>s
-pub(crate) fn get_line_length_and_width(
-    font: &dyn FontProvider,
-    metrics: &HashMap<char, Metric>,
+pub(crate) fn get_line_length_and_width<F: Fn(&mut dyn FontProvider, char) -> Option<Metric>>(
+    font: &mut dyn FontProvider,
+    get_metric: &F,
     font_size: i32,
     max_width: Option<i32>,
     s: &str,
@@ -53,12 +53,12 @@ pub(crate) fn get_line_length_and_width(
         len += 1;
         let mut width = 0;
         if let Some(previous_character) = previous_character {
-            if let Some(a) = get_char_advance(font, metrics, font_size, c, previous_character) {
-                width -= get_char_width(metrics, previous_character);
+            if let Some(a) = get_char_advance(font, font_size, c, previous_character) {
+                width -= get_char_width(font, get_metric, previous_character);
                 width += a;
             }
         }
-        width += get_char_width(metrics, c);
+        width += get_char_width(font, get_metric, c);
         widths.push_back(width);
         total_width += width;
         previous_character = Some(c);
@@ -94,19 +94,20 @@ pub(crate) fn get_line_length_and_width(
 }
 
 pub(crate) fn get_char_advance(
-    font: &dyn FontProvider,
-    metrics: &HashMap<char, Metric>,
+    font: &mut dyn FontProvider,
     font_size: i32,
     current_char: char,
     previous_char: char,
 ) -> Option<i32> {
-    font.get_advance(
-        metrics.get(&previous_char)?.glyph_id,
-        metrics.get(&current_char)?.glyph_id,
-        font_size,
-    )
+    let previous_id = font.get_glyph_id(previous_char)?;
+    let current_id = font.get_glyph_id(current_char)?;
+    font.get_advance(previous_id, current_id, font_size)
 }
 
-pub(crate) fn get_char_width(metrics: &HashMap<char, Metric>, c: char) -> i32 {
-    metrics.get(&c).unwrap().size.width
+pub(crate) fn get_char_width<F: Fn(&mut dyn FontProvider, char) -> Option<Metric>>(
+    font: &mut dyn FontProvider,
+    get_metric: &F,
+    c: char,
+) -> i32 {
+    get_metric(font, c).map(|m| m.size.width).unwrap_or(0)
 }

@@ -2,7 +2,7 @@ use crate::error::GlyphNotRenderedError;
 use crate::text::GlyphCache;
 use crate::types::*;
 
-pub(crate) type GlyphId = u16;
+pub(crate) type GlyphId = u32;
 
 /// Defines the alignment of text.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -40,7 +40,7 @@ pub(crate) trait FontProvider {
     fn get_glyph_id(&self, c: char) -> Option<GlyphId>;
     fn get_line_height(&self, font_size: i32) -> i32;
     fn get_advance(&self, from: GlyphId, to: GlyphId, font_size: i32) -> Option<i32>;
-    fn get_metric(&self, id: GlyphId, font_size: i32) -> RectPx;
+    fn get_metric(&mut self, id: GlyphId, font_size: i32) -> RectPx;
     fn render_glyph(
         &mut self,
         cache: &mut GlyphCache,
@@ -51,12 +51,12 @@ pub(crate) trait FontProvider {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct CacheIdentifier {
-    id: u16,
+    id: GlyphId,
     font_size: i32,
 }
 
 impl CacheIdentifier {
-    pub fn new(id: u16, font_size: i32) -> CacheIdentifier {
+    pub fn new(id: GlyphId, font_size: i32) -> CacheIdentifier {
         CacheIdentifier { id, font_size }
     }
 }

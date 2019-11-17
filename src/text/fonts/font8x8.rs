@@ -36,7 +36,7 @@ impl FontProvider for Font8x8Provider {
         Some((width * font_size / 8 + 1) as i32)
     }
 
-    fn get_metric(&self, id: GlyphId, font_size: i32) -> RectPx {
+    fn get_metric(&mut self, id: GlyphId, font_size: i32) -> RectPx {
         let metrics = self.get_raw_metrics(id);
         let y_offset = (self.get_line_height(font_size) / font_size * 8 - 8) / 2;
         RectPx {

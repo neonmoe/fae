@@ -59,11 +59,13 @@ impl TextRenderer {
     /// Creates a new text renderer with the given font, rasterized
     /// with `rusttype`.
     #[cfg(feature = "rusttype")]
-    pub fn with_ttf(renderer: &mut Renderer, _ttf_data: Vec<u8>) -> TextRenderer {
+    pub fn with_ttf(
+        renderer: &mut Renderer,
+        ttf_data: Vec<u8>,
+    ) -> Result<TextRenderer, rusttype::Error> {
         let (cache, call) = GlyphCache::create_cache_and_draw_call(renderer, 512, 512, true);
-
-        // TODO: Implement a RustTypeProvider
-        TextRenderer::with_params(cache, call, Box::new(fonts::Font8x8Provider::new()))
+        let font = Box::new(fonts::RustTypeProvider::from_ttf(ttf_data)?);
+        Ok(TextRenderer::with_params(cache, call, font))
     }
 
     fn with_params(
@@ -159,28 +161,6 @@ impl TextRenderer {
         let alignment = data.alignment;
         let text: &str = &data.text;
 
-        let mut metrics = HashMap::new();
-        let mut char_count = 0;
-        for c in text.chars() {
-            char_count += 1;
-            if metrics.get(&c).is_some() {
-                continue;
-            }
-
-            let glyph_id = if let Some(id) = self
-                .font
-                .get_glyph_id(c)
-                .or_else(|| self.font.get_glyph_id('\u{FFFD}'))
-            {
-                id
-            } else {
-                continue;
-            };
-            let size = self.font.get_metric(glyph_id, font_size);
-            let glyph = Metric { glyph_id, size };
-            metrics.insert(c, glyph);
-        }
-
         let (mut min_x, mut min_y, mut max_x, mut max_y) = (
             std::f32::INFINITY,
             std::f32::INFINITY,
@@ -188,14 +168,24 @@ impl TextRenderer {
             std::f32::NEG_INFINITY,
         );
 
+        let get_metric = |font: &mut dyn FontProvider, c| {
+            font.get_glyph_id(c)
+                .or_else(|| font.get_glyph_id('\u{FFFD}'))
+                .map(|id| Metric {
+                    glyph_id: id,
+                    size: font.get_metric(id, font_size),
+                })
+        };
+
+        let char_count = text.chars().count();
         let mut glyphs = Vec::with_capacity(char_count);
         let line_height = self.font.get_line_height(font_size);
         let mut cursor = PositionPx { x, y };
         let mut text_left = text;
         while !text_left.is_empty() {
             let (line_len, line_width) = get_line_length_and_width(
-                &*self.font,
-                &metrics,
+                &mut *self.font,
+                &get_metric,
                 font_size,
                 max_line_width,
                 text_left,
@@ -207,16 +197,12 @@ impl TextRenderer {
             let mut previous_character = None;
             let mut chars = text_left.chars();
             for (chars_processed, c) in (&mut chars).enumerate() {
-                if let Some(metric) = metrics.get(&c).copied() {
+                if let Some(metric) = get_metric(&mut *self.font, c) {
                     // Advance the cursor, if this is not the first character
                     if let Some(previous_character) = previous_character {
-                        if let Some(advance) = get_char_advance(
-                            &*self.font,
-                            &metrics,
-                            font_size,
-                            c,
-                            previous_character,
-                        ) {
+                        if let Some(advance) =
+                            get_char_advance(&mut *self.font, font_size, c, previous_character)
+                        {
                             cursor.x += advance;
                         }
                     }

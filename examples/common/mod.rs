@@ -8,6 +8,7 @@ pub fn create_renderers(window: &Window) -> (Renderer, TextRenderer) {
     let text = TextRenderer::with_ttf(
         &mut renderer,
         include_bytes!("../res/FiraSans.ttf").to_vec(),
-    );
+    )
+    .unwrap();
     (renderer, text)
 }
