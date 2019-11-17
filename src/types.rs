@@ -87,7 +87,7 @@ impl From<Rect> for (f32, f32, f32, f32) {
 /// let rect_ = (0, 0, 16, 16).into();
 /// assert_eq!(rect, rect_);
 /// ```
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct RectPx {
     /// The x-coordinate of the top-left corner of this rectangle.
     pub x: i32,

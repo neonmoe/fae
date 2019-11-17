@@ -39,52 +39,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .take(len)
             .collect();
 
-        text.draw_text(
-            &s,
-            (10.0, 30.0, 0.0),
-            12.0,
-            Alignment::Left,
-            (0.0, 0.0, 0.0, 1.0),
-            Some(window.width - 20.0),
-            None,
-        );
+        text.draw(s, 10.0, 30.0, 0.0, 12.0)
+            .with_max_width(window.width - 20.0)
+            .finish();
 
-        text.draw_text(
-            "Every character in font8x8:",
-            (10.0, 10.0, 0.0),
-            10.0,
-            Alignment::Left,
-            (0.0, 0.0, 0.0, 1.0),
-            None,
-            None,
-        );
+        text.draw("Every character in font8x8:", 10.0, 10.0, 0.0, 10.0)
+            .with_cacheable(true)
+            .finish();
 
         let profiling_data = fae::profiler::read();
-        text.draw_text(
-            &format!("{:#?}", profiling_data),
-            (10.0, 340.0, 0.0),
-            10.0,
-            Alignment::Left,
-            (0.0, 0.0, 0.0, 1.0),
-            None,
-            None,
-        );
+        text.draw(format!("{:#?}", profiling_data), 10.0, 340.0, 0.0, 10.0)
+            .finish();
 
         let misses = profiling_data.glyph_cache_misses;
         let total = profiling_data.glyphs_drawn;
         if total > 0 {
-            text.draw_text(
-                &format!(
-                    "Glyph cache miss ratio: {:3.1} %",
-                    (misses as f32 / total as f32 * 100.0)
-                ),
-                (10.0, 310.0, 0.0),
-                10.0,
-                Alignment::Left,
-                (0.0, 0.0, 0.0, 1.0),
-                None,
-                None,
+            let s = format!(
+                "Glyph cache miss ratio: {:3.1} %",
+                (misses as f32 / total as f32 * 100.0)
             );
+            text.draw(s, 10.0, 310.0, 0.0, 10.0).finish();
         }
 
         let cache_size = 256.0 / window.dpi_factor;

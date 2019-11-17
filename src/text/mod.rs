@@ -9,6 +9,7 @@
 mod fonts;
 mod glyph_cache;
 mod layout;
+mod text;
 pub(crate) mod types;
 
 // This is here for the font8x8_glyphs example
@@ -16,7 +17,8 @@ pub(crate) mod types;
 #[doc(hidden)]
 pub use crate::text::fonts::font8x8::get_bitmap;
 
-pub use crate::text::types::Alignment;
+pub use self::text::*;
+pub use self::types::Alignment;
 
 use crate::error::GlyphNotRenderedError;
 use crate::text::glyph_cache::*;
@@ -36,6 +38,8 @@ pub struct TextRenderer {
     draw_datas: Vec<TextDrawData>,
     font: Box<dyn FontProvider>,
     dpi_factor: f32,
+    // TODO: Add a timer for cached draws to be cleared every now and then?
+    draw_cache: HashMap<TextCacheable, (Vec<Glyph>, Option<Rect>)>,
 }
 
 impl TextRenderer {
@@ -56,6 +60,7 @@ impl TextRenderer {
             draw_datas: Vec::new(),
             font: Box::new(fonts::Font8x8Provider::new()),
             dpi_factor: 1.0,
+            draw_cache: HashMap::new(),
         }
     }
 
@@ -64,38 +69,56 @@ impl TextRenderer {
         self.dpi_factor = dpi_factor;
     }
 
-    /// Draws text, and returns a bounding box `(min_x, min_y, max_x,
-    /// max_y)` of all glyphs drawn, if any were.
+    /// Creates a Sprite struct, which you can render after specifying
+    /// your parameters by modifying it.
     ///
-    /// - `text`: The rendered text.
-    /// - `(x, y, z)`: The position (top-left) of the rendered text
-    /// area. TODO: The y should be the baseline of the text
-    /// - `font_size`: The size of the font.
-    /// - `max_line_width`: The width at which the text will wrap. An
-    /// effort is made to break lines at word boundaries.
-    /// - `clip_area`: The area which defines where the text will be
-    /// rendered. Text outside the area will be cut off. For an
-    /// example use case, think editable text boxes: the clip area
-    /// would be the text box's inner are.
-    // TODO: Switch draw_text to a Renderable-like api
-    pub fn draw_text(
-        &mut self,
-        text: &str,
-        (x, y, z): (f32, f32, f32),
+    /// ## Optimization tips
+    ///
+    /// - Set the "cacheability" of the text to `true` with
+    ///   [`Text::with_cacheable`](struct.Text.html#with_cacheable) if
+    ///   your text (or its parameters) don't change much. Note:
+    ///   individual glyphs are always cached. This affects the
+    ///   caching of the whole span of text.
+    ///
+    /// # Usage
+    /// ```no_run
+    /// # fn main() {
+    /// # use fae::{TextRenderer, Text, Renderer, Window, WindowSettings};
+    /// # let mut renderer = Renderer::new(&Window::create(&WindowSettings::default()).unwrap());
+    /// # let mut text_renderer = TextRenderer::with_font8x8(&mut renderer, true);
+    /// text_renderer.draw("Hello, World!", 10.0, 10.0, 0.0, 12.0)
+    ///     .with_color((0.8, 0.5, 0.1, 1.0)) // Orange!
+    ///     .with_cacheable(true) // Hello world never changes...
+    ///     .finish();
+    /// # }
+    /// ```
+    pub fn draw<'a, S: Into<String>>(
+        &'a mut self,
+        text: S,
+        x: f32,
+        y: f32,
+        z: f32,
         font_size: f32,
-        alignment: Alignment,
-        color: (f32, f32, f32, f32),
-        max_line_width: Option<f32>,
+    ) -> Text<'a> {
+        let x = (x * self.dpi_factor) as i32;
+        let y = (y * self.dpi_factor) as i32;
+        let font_size = (font_size * self.dpi_factor) as i32;
+        Text::new(self, text.into(), x, y, z, font_size)
+    }
+
+    pub(crate) fn draw_text(
+        &mut self,
+        data: TextCacheable,
+        z: f32,
         clip_area: Option<Rect>,
+        color: (f32, f32, f32, f32),
+        cacheable: bool,
     ) -> Option<Rect> {
-        if text.len() == 0 {
+        if data.text.len() == 0 {
             return None;
         }
 
-        let dpi_factor = self.dpi_factor;
-        let (x, y) = ((x * dpi_factor) as i32, (y * dpi_factor) as i32);
-        let max_line_width = max_line_width.map(|f| (f * dpi_factor) as i32);
-        let font_size = font_size * self.dpi_factor;
+        let font_size = data.font_size;
 
         let draw_data_index = self.draw_datas.len();
         self.draw_datas.push(TextDrawData {
@@ -104,6 +127,19 @@ impl TextRenderer {
             font_size,
             z,
         });
+
+        if let Some((glyphs, bounds)) = self.draw_cache.get(&data) {
+            // Append the cached glyphs into the queue if they have been
+            // cached, and stop here.
+            self.glyphs.extend(glyphs);
+            crate::profiler::write(|p| p.glyph_layout_cache_hits += glyphs.len() as u32);
+            return *bounds;
+        }
+
+        let max_line_width = data.max_line_width;
+        let (x, y) = (data.x, data.y);
+        let alignment = data.alignment;
+        let text: &str = &data.text;
 
         let mut metrics = HashMap::new();
         let mut char_count = 0;
@@ -134,9 +170,8 @@ impl TextRenderer {
             std::f32::NEG_INFINITY,
         );
 
-        self.glyphs.reserve(char_count);
+        let mut glyphs = Vec::with_capacity(char_count);
         let line_height = self.font.get_line_height(font_size);
-        let mut line_height_fract_sum = 0.0;
         let mut cursor = PositionPx { x, y };
         let mut text_left = text;
         while !text_left.is_empty() {
@@ -166,13 +201,13 @@ impl TextRenderer {
                     }
 
                     let screen_location = metric.size + cursor;
-                    min_x = min_x.min(screen_location.x as f32 / dpi_factor);
-                    min_y = min_y.min(screen_location.y as f32 / dpi_factor);
-                    max_x =
-                        max_x.max((screen_location.x + screen_location.width) as f32 / dpi_factor);
-                    max_y =
-                        max_y.max((screen_location.y + screen_location.height) as f32 / dpi_factor);
-                    self.glyphs.push(Glyph {
+                    min_x = min_x.min(screen_location.x as f32 / self.dpi_factor);
+                    min_y = min_y.min(screen_location.y as f32 / self.dpi_factor);
+                    max_x = max_x
+                        .max((screen_location.x + screen_location.width) as f32 / self.dpi_factor);
+                    max_y = max_y
+                        .max((screen_location.y + screen_location.height) as f32 / self.dpi_factor);
+                    glyphs.push(Glyph {
                         screen_location,
                         draw_data: draw_data_index,
                         id: metric.glyph_id,
@@ -187,17 +222,9 @@ impl TextRenderer {
             }
             text_left = chars.as_str();
 
-            line_height_fract_sum += line_height.fract();
-            let fract_offset = if line_height_fract_sum >= 1.0 {
-                let offset = line_height_fract_sum.trunc();
-                line_height_fract_sum -= offset;
-                offset as i32
-            } else {
-                0
-            };
-            cursor.x = x;
-            cursor.y = cursor.y + line_height as i32 + fract_offset;
+            cursor = (x, cursor.y + line_height).into();
         }
+        self.glyphs.extend(&glyphs);
 
         if let Some((clip_min_x, clip_min_y, clip_max_x, clip_max_y)) =
             clip_area.map(|a| a.into_corners())
@@ -208,7 +235,7 @@ impl TextRenderer {
             max_y = max_y.min(clip_max_y);
         }
 
-        if min_x == std::f32::INFINITY
+        let bounds = if min_x == std::f32::INFINITY
             || min_y == std::f32::INFINITY
             || max_x == std::f32::NEG_INFINITY
             || max_y == std::f32::NEG_INFINITY
@@ -216,7 +243,17 @@ impl TextRenderer {
             None
         } else {
             Some((min_x, min_y, max_x - min_x, max_y - min_y).into())
+        };
+
+        let len = glyphs.len() as u32;
+        crate::profiler::write(|p| p.glyph_layout_cache_misses += len);
+
+        if cacheable {
+            crate::profiler::write(|p| p.glyph_layout_cache_count += len);
+            self.draw_cache.insert(data, (glyphs, bounds.clone()));
         }
+
+        bounds
     }
 
     /// Sends all the glyphs to the Renderer. Should be called every

@@ -35,15 +35,12 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         let mut y = 10.0;
 
-        if let Some(rect) = text.draw_text(
-            "First test, no limits, should be on one line.",
-            (10.0, y, 0.0),
-            16.0,
-            Alignment::Left,
-            (0.0, 0.0, 0.0, 1.0),
-            None,
-            None,
-        ) {
+        let s = "First test, no limits, should be on one line.";
+        if let Some(rect) = text
+            .draw(s, 10.0, y, 0.0, 16.0)
+            .with_cacheable(true)
+            .finish()
+        {
             renderer
                 .draw(&bgs, -0.1)
                 .with_coordinates(rect)
@@ -52,24 +49,18 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
         y += 20.0;
 
-        if let Some(rect) = text.draw_text(
-            "Cut off at |, like so |",
-            (10.0, y, 0.0),
-            14.0,
-            Alignment::Left,
-            (0.0, 0.0, 0.0, 1.0),
-            None,
-            None,
-        ) {
-            if let Some(rect) = text.draw_text(
-                "Cut off at |, like so |...and here's text that should not appear",
-                (10.0, y, 0.0),
-                14.0,
-                Alignment::Left,
-                (0.0, 0.0, 0.0, 1.0),
-                None,
-                Some(rect),
-            ) {
+        if let Some(rect) = text
+            .draw("Cut off at |, like so |", 10.0, y, 0.0, 14.0)
+            .with_cacheable(true)
+            .finish()
+        {
+            let s = "Cut off at |, like so |...and here's text that should not appear";
+            if let Some(rect) = text
+                .draw(s, 10.0, y, 0.0, 14.0)
+                .with_cacheable(true)
+                .with_clip_area(rect)
+                .finish()
+            {
                 renderer
                     .draw(&bgs, -0.1)
                     .with_coordinates(rect)
@@ -104,15 +95,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .with_coordinates((10.0, y, 200.0, 40.0))
                 .with_color(0.2, 0.2, 0.2, 1.0)
                 .finish();
-            text.draw_text(
-                " Left",
-                (10.0, y + 10.0, 0.0),
-                20.0,
-                Alignment::Left,
-                (0.0, 0.0, 0.0, 1.0),
-                Some(200.0),
-                None,
-            );
+            text.draw(" Left", 10.0, y + 10.0, 0.0, 20.0)
+                .with_max_width(200.0)
+                .with_alignment(Alignment::Left)
+                .with_cacheable(true)
+                .finish();
             y += 50.0;
 
             let mouse_in = is_mouse_in(&window, (10.0, y, 210.0, y + 40.0));
@@ -137,15 +124,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .with_coordinates((10.0, y, 200.0, 40.0))
                 .with_color(0.2, 0.2, 0.2, 1.0)
                 .finish();
-            text.draw_text(
-                "Center",
-                (10.0, y + 10.0, 0.0),
-                20.0,
-                Alignment::Center,
-                (0.0, 0.0, 0.0, 1.0),
-                Some(200.0),
-                None,
-            );
+            text.draw("Center", 10.0, y + 10.0, 0.0, 20.0)
+                .with_max_width(200.0)
+                .with_alignment(Alignment::Center)
+                .with_cacheable(true)
+                .finish();
             y += 50.0;
 
             let mouse_in = is_mouse_in(&window, (10.0, y, 210.0, y + 40.0));
@@ -170,15 +153,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .with_coordinates((10.0, y, 200.0, 40.0))
                 .with_color(0.2, 0.2, 0.2, 1.0)
                 .finish();
-            text.draw_text(
-                "Right ",
-                (10.0, y + 10.0, 0.0),
-                20.0,
-                Alignment::Right,
-                (0.0, 0.0, 0.0, 1.0),
-                Some(200.0),
-                None,
-            );
+            text.draw("Right ", 10.0, y + 10.0, 0.0, 20.0)
+                .with_max_width(200.0)
+                .with_alignment(Alignment::Right)
+                .with_cacheable(true)
+                .finish();
             y += 50.0;
 
             if window.mouse_pressed.contains(&Mouse::Left) {
@@ -207,16 +186,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         {
             // Size comparisons
-            for i in 0..8 {
-                if let Some(rect) = text.draw_text(
-                    "The quick brown fox jumps over the lazy dog",
-                    (10.0, y, 0.0),
-                    (8 + i) as f32,
-                    Alignment::Left,
-                    (0.0, 0.0, 0.0, 1.0),
-                    None,
-                    None,
-                ) {
+            for i in 0..12 {
+                let s = "The quick brown fox jumps over the lazy dog";
+                if let Some(rect) = text
+                    .draw(s, 10.0, y, 0.0, (8 + i) as f32 / window.dpi_factor)
+                    .with_cacheable(true)
+                    .finish()
+                {
                     y += rect.height + 1.0;
                 }
             }
@@ -226,27 +202,21 @@ fn main() -> Result<(), Box<dyn Error>> {
         {
             // Lorem ipsum
             let font_size = 8.0;
-            text.draw_text(
-                &format!(
-                    "Font size of lorem ipsum: {} px",
-                    (font_size * window.dpi_factor) as i32
-                ),
-                (300.0, 30.0, 0.0),
-                font_size / window.dpi_factor,
-                lipsum_alignment,
-                (0.1, 0.1, 0.1, 1.0),
-                Some(320.0),
-                None,
+            let s = format!(
+                "Font size of lorem ipsum: {} px",
+                (font_size * window.dpi_factor) as i32
             );
-            text.draw_text(
-                LOREM_IPSUM,
-                (300.0, 40.0, 0.0),
-                font_size,
-                lipsum_alignment,
-                (0.0, 0.0, 0.0, 1.0),
-                Some(320.0),
-                None,
-            );
+            text.draw(s, 300.0, 30.0, 0.0, font_size / window.dpi_factor)
+                .with_alignment(lipsum_alignment)
+                .with_color((0.1, 0.1, 0.1, 1.0))
+                .with_max_width(320.0)
+                .with_cacheable(true)
+                .finish();
+            text.draw(LOREM_IPSUM, 300.0, 40.0, 0.0, font_size)
+                .with_alignment(lipsum_alignment)
+                .with_max_width(320.0)
+                .with_cacheable(true)
+                .finish();
             // Lorem ipsum
         }
 

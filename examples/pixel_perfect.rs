@@ -1,9 +1,8 @@
 //! This example is used to debug that fae renders textures pixel-perfectly if the texture's resolution matches the quad's coordinates.
 
 use fae::{
-    glutin::dpi::LogicalSize,
-    text::{Alignment, TextRenderer},
-    DrawCallParameters, Image, Renderer, Window, WindowSettings,
+    glutin::dpi::LogicalSize, text::TextRenderer, DrawCallParameters, Image, Renderer, Window,
+    WindowSettings,
 };
 use std::error::Error;
 
@@ -37,6 +36,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     while window.refresh() {
         renderer.set_dpi_factor(window.dpi_factor);
         text.set_dpi_factor(window.dpi_factor);
+        let font_size = 8.0 / window.dpi_factor;
 
         let mut y = 0.0;
         let x = 0.0;
@@ -47,27 +47,26 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .with_coordinates((x, y, size, size))
                 .with_texture_coordinates((0, 0, 8, 8))
                 .finish();
-            text.draw_text(
-                &format!(
-                    "<- x{} zoom{}",
-                    i + 1,
-                    if i == 0 {
-                        ", should be 1:1 with examples/res/sprite_8x8.png"
-                    } else {
-                        ""
-                    }
-                ),
-                (
-                    x + size + 10.0,
-                    y + (size - 8.0 / window.dpi_factor) / 2.0,
-                    0.0,
-                ),
-                8.0 / window.dpi_factor,
-                Alignment::Left,
-                (0.0, 0.0, 0.0, 1.0),
-                None,
-                None,
+
+            let s = format!(
+                "<- x{} zoom{}",
+                i + 1,
+                if i == 0 {
+                    ", should be 1:1 with examples/res/sprite_8x8.png"
+                } else {
+                    ""
+                }
             );
+            text.draw(
+                s,
+                x + size + 10.0,
+                y + (size - font_size) / 2.0,
+                0.0,
+                font_size,
+            )
+            .with_cacheable(true)
+            .finish();
+
             y += 10.0 + size;
         }
 
@@ -83,15 +82,9 @@ fn main() -> Result<(), Box<dyn Error>> {
             y += 10.0 + size;
         }
 
-        text.draw_text(
-            "with pixel align =",
-            (175.0, 30.0, 0.0),
-            8.0 / window.dpi_factor,
-            Alignment::Left,
-            (0.0, 0.0, 0.0, 1.0),
-            None,
-            None,
-        );
+        text.draw("with pixel align =", 175.0, 30.0, 0.0, font_size)
+            .with_cacheable(true)
+            .finish();
 
         let mut y = 20.0;
         let x = 314.0;

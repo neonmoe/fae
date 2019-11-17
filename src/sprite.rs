@@ -1,9 +1,9 @@
 use crate::renderer::{DrawCallHandle, Renderer};
 use crate::types::*;
 
-/// Sprite builder struct. Call [`finish()`](struct.Sprite.html#method.finish) to draw the sprite.
+/// Sprite builder struct. Call [`finish`](struct.Sprite.html#method.finish) to draw the sprite.
 ///
-/// Created by [`Renderer::draw()`](struct.Renderer.html#method.draw).
+/// Created by [`Renderer::draw`](struct.Renderer.html#method.draw).
 pub struct Sprite<'a, 'b> {
     renderer: &'a mut Renderer,
     call: &'b DrawCallHandle,

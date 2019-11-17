@@ -38,7 +38,7 @@ pub(crate) fn get_line_start_x(
 pub(crate) fn get_line_length_and_width(
     font: &Box<dyn FontProvider>,
     metrics: &HashMap<char, Metric>,
-    font_size: f32,
+    font_size: i32,
     max_width: Option<i32>,
     s: &str,
 ) -> (usize, i32) {
@@ -96,7 +96,7 @@ pub(crate) fn get_line_length_and_width(
 pub(crate) fn get_char_advance(
     font: &Box<dyn FontProvider>,
     metrics: &HashMap<char, Metric>,
-    font_size: f32,
+    font_size: i32,
     current_char: char,
     previous_char: char,
 ) -> Option<i32> {

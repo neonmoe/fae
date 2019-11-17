@@ -6,8 +6,8 @@ use crate::text::*;
 use std::cell::RefCell;
 use std::collections::HashMap;
 
-fn scale(i: i32, font_size: f32) -> i32 {
-    (i as f32 * font_size / 8.0) as i32
+fn scale(i: i32, font_size: i32) -> i32 {
+    i * font_size / 8
 }
 
 pub struct Font8x8Provider {
@@ -27,21 +27,21 @@ impl FontProvider for Font8x8Provider {
         Some(c as GlyphId)
     }
 
-    fn get_line_height(&self, font_size: f32) -> f32 {
-        font_size * 4.0 / 3.0
+    fn get_line_height(&self, font_size: i32) -> i32 {
+        font_size * 4 / 3
     }
 
-    fn get_advance(&self, from: GlyphId, _to: GlyphId, font_size: f32) -> Option<i32> {
+    fn get_advance(&self, from: GlyphId, _to: GlyphId, font_size: i32) -> Option<i32> {
         let RectPx { width, .. } = self.get_raw_metrics(from);
-        Some((width as f32 * font_size / 8.0 + 1.0) as i32)
+        Some((width * font_size / 8 + 1) as i32)
     }
 
-    fn get_metric(&self, id: GlyphId, font_size: f32) -> RectPx {
+    fn get_metric(&self, id: GlyphId, font_size: i32) -> RectPx {
         let metrics = self.get_raw_metrics(id);
-        let y_offset = (self.get_line_height(font_size) / font_size * 8.0 - 8.0) / 2.0;
+        let y_offset = (self.get_line_height(font_size) / font_size * 8 - 8) / 2;
         RectPx {
             x: 0,
-            y: scale(y_offset as i32 + metrics.y, font_size),
+            y: scale(y_offset + metrics.y, font_size),
             width: scale(metrics.width, font_size),
             height: scale(metrics.height, font_size),
         }
@@ -51,7 +51,7 @@ impl FontProvider for Font8x8Provider {
         &mut self,
         cache: &mut GlyphCache,
         id: GlyphId,
-        _font_size: f32,
+        _font_size: i32,
     ) -> Result<RectPx, GlyphNotRenderedError> {
         if let Some(bitmap) = get_bitmap(id) {
             self.render_bitmap(cache, id, bitmap)

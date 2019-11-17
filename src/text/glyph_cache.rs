@@ -219,7 +219,8 @@ impl GlyphCache {
         height: i32,
         smoothed: bool,
     ) -> (GlyphCache, DrawCallHandle) {
-        let cache_image = Image::from_color(width as i32, height as i32, &[0]);
+        let cache_image =
+            Image::from_color(width as i32, height as i32, &[0]).with_format(crate::gl::RED);
         let call = renderer.create_draw_call(DrawCallParameters {
             image: Some(cache_image),
             shaders: Shaders {

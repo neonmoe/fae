@@ -4,7 +4,7 @@
 //! some API has been decided on. Currently it's just doing the calls
 //! as they happen to be ordered in the codebase.
 
-use fae::text::{Alignment, TextRenderer};
+use fae::text::TextRenderer;
 use fae::{profiler, DrawCallParameters, Image, Renderer, Window, WindowSettings};
 use std::collections::HashMap;
 use std::error::Error;
@@ -153,113 +153,63 @@ fn main() -> Result<(), Box<dyn Error>> {
         let text_color = (1.0, 0.0, 0.0, 1.0);
         let mut y = 5.0;
 
-        if cfg!(feature = "flame") {
-            text.draw_text(
-                "Press R to record a frame with flame, see results in flame-graph.html after exiting the application",
-                (20.0, y, 0.6),
-                11.0,
-                Alignment::Left, text_color,
-                None,
-                None,
-            );
-        }
-
         for duration_name in &timer_names {
             y += 20.0;
-            text.draw_text(
-                &format!(
-                    "{}: {:4.1} \u{03bc}s",
-                    duration_name,
-                    get_avg_timer_mcs(duration_name)
-                ),
-                (10.0, y, 0.6),
-                11.0,
-                Alignment::Left,
-                text_color,
-                None,
-                None,
+            let s = format!(
+                "{}: {:4.1} \u{03bc}s",
+                duration_name,
+                get_avg_timer_mcs(duration_name)
             );
+            text.draw(s, 10.0, y, 0.6, 11.0)
+                .with_color(text_color)
+                .finish();
         }
 
         y += 20.0;
-        text.draw_text(
-            &format!("Quad count: {}", quad_count),
-            (10.0, y, 0.6),
-            11.0,
-            Alignment::Left,
-            text_color,
-            None,
-            None,
-        );
+        let s = format!("Quad count: {}", quad_count);
+        text.draw(s, 10.0, y, 0.6, 11.0)
+            .with_color(text_color)
+            .finish();
 
         y += 20.0;
-        text.draw_text(
-            &format!("Pressed keys: {:?}", window.held_keys),
-            (10.0, y, 0.6),
-            11.0,
-            Alignment::Left,
-            text_color,
-            None,
-            None,
-        );
+        let s = format!("Pressed keys: {:?}", window.held_keys);
+        text.draw(s, 10.0, y, 0.6, 11.0)
+            .with_color(text_color)
+            .finish();
 
         y += 20.0;
-        text.draw_text(
-            &format!("Scaling factor: {:.1}", window.dpi_factor),
-            (10.0, y, 0.6),
-            11.0,
-            Alignment::Left,
-            text_color,
-            None,
-            None,
-        );
+        let s = format!("Scaling factor: {:.1}", window.dpi_factor);
+        text.draw(s, 10.0, y, 0.6, 11.0)
+            .with_color(text_color)
+            .with_cacheable(true)
+            .finish();
 
         y = 5.0;
 
         y += 20.0;
-        text.draw_text(
-            &format!("Type some text: {}", customizable_text),
-            (200.0, y, 0.6),
-            11.0,
-            Alignment::Left,
-            text_color,
-            None,
-            None,
-        );
+        let s = format!("Type some text: {}", customizable_text);
+        text.draw(s, 200.0, y, 0.6, 11.0)
+            .with_color(text_color)
+            .finish();
 
         y += 20.0;
-        text.draw_text(
-            &format!("Mouse held: {:?}", window.mouse_held),
-            (200.0, y, 0.6),
-            11.0,
-            Alignment::Left,
-            text_color,
-            None,
-            None,
-        );
+        let s = format!("Mouse held: {:?}", window.mouse_held);
+        text.draw(s, 200.0, y, 0.6, 11.0)
+            .with_color(text_color)
+            .finish();
 
         y += 20.0;
         let (mouse_x, mouse_y) = window.mouse_coords;
-        text.draw_text(
-            &format!("Mouse position: {}, {}", mouse_x, mouse_y),
-            (200.0, y, -0.6),
-            11.0,
-            Alignment::Left,
-            text_color,
-            None,
-            None,
-        );
+        let s = format!("Mouse position: {}, {}", mouse_x, mouse_y);
+        text.draw(s, 200.0, y, 0.6, 11.0)
+            .with_color(text_color)
+            .finish();
 
         y += 20.0;
-        text.draw_text(
-            &format!("Mouse in window: {}", window.mouse_inside),
-            (200.0, y, 0.6),
-            11.0,
-            Alignment::Left,
-            text_color,
-            None,
-            None,
-        );
+        let s = format!("Mouse in window: {}", window.mouse_inside);
+        text.draw(s, 200.0, y, 0.6, 11.0)
+            .with_color(text_color)
+            .finish();
 
         y += 10.0;
 
@@ -267,39 +217,30 @@ fn main() -> Result<(), Box<dyn Error>> {
             renderer.get_opengl_version()
         {
             y += 20.0;
-            text.draw_text(
-                &format!("OpenGL version: {}.{}", major, minor),
-                (200.0, y, 0.6),
-                11.0,
-                Alignment::Left,
-                text_color,
-                None,
-                None,
-            );
+            let s = format!("OpenGL version: {}.{}", major, minor);
+            text.draw(s, 200.0, y, 0.6, 11.0)
+                .with_color(text_color)
+                .with_cacheable(true)
+                .finish();
         }
 
         y += 20.0;
-        text.draw_text(
-            &format!("OpenGL 3.3+ optimizations: {}", !renderer.is_legacy()),
-            (200.0, y, 0.6),
-            11.0,
-            Alignment::Left,
-            text_color,
-            None,
-            None,
-        );
+        let s = format!("OpenGL 3.3+ optimizations: {}", !renderer.is_legacy());
+        text.draw(s, 200.0, y, 0.6, 11.0)
+            .with_color(text_color)
+            .with_cacheable(true)
+            .finish();
 
-        if let Some(mut rect) = text.draw_text(
-            &format!("{:#?}", profiler::read()),
-            (30.0, 310.0, 0.6),
-            11.0,
-            Alignment::Left,
-            text_color,
-            Some(380.0),
-            Some((20.0, 300.0, 420.0, 600.0).into()),
-        ) {
+        let s = format!("{:#?}", profiler::read());
+        if let Some(mut rect) = text
+            .draw(s, 30.0, 310.0, 0.6, 11.0)
+            .with_color(text_color)
+            .with_max_width(380.0)
+            .with_clip_area((20.0, 300.0, 420.0, 600.0))
+            .finish()
+        {
             rect.width = 380.0;
-            renderer.draw(&call, -0.55).with_coordinates(rect).finish();
+            renderer.draw(&call, 0.55).with_coordinates(rect).finish();
         }
 
         timers["text calls"][timer_index].end();

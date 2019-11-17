@@ -35,15 +35,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
 
         {
-            text.draw_text(
-                "Correct: The draw call of the sprite in front is drawn last:",
-                (10.0, 10.0, 0.6),
-                10.0,
-                Alignment::Left,
-                (0.0, 0.0, 0.0, 1.0),
-                Some(280.0),
-                None,
-            );
+            let s = "Correct: The draw call of the sprite in front is drawn last:";
+            text.draw(s, 10.0, 10.0, 0.6, 10.0)
+                .with_max_width(280.0)
+                .with_cacheable(true)
+                .finish();
 
             renderer
                 .draw(&call_below, -0.5)
@@ -58,15 +54,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
 
         {
-            text.draw_text(
-                "Not correct: The draw call of the sprite in front is drawn first:",
-                (330.0, 10.0, 0.6),
-                10.0,
-                Alignment::Left,
-                (0.0, 0.0, 0.0, 1.0),
-                Some(280.0),
-                None,
-            );
+            let s = "Not correct: The draw call of the sprite in front is drawn first:";
+            text.draw(s, 330.0, 10.0, 0.6, 10.0)
+                .with_max_width(280.0)
+                .with_cacheable(true)
+                .finish();
 
             renderer
                 .draw(&call_above, -0.4)
@@ -80,15 +72,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .finish();
         }
 
-        text.draw_text(
-            "The draw call drawing order is decided by the highest Z-coordinate of each call, ascending.\n\nIn this example, call_below's highest Z coordinate is 0.4, and call_above's is 0.5. Therefore, call_below is drawn first.\n(In the right example, call_below is the one in front.)",
-            (80.0, 250.0, 0.6),
-            10.0,
-            Alignment::Center,
-            (0.0, 0.0, 0.0, 1.0),
-            Some(400.0),
-            None,
-        );
+        let s = "The draw call drawing order is decided by the highest Z-coordinate of each call, ascending.\n\nIn this example, call_below's highest Z coordinate is 0.4, and call_above's is 0.5. Therefore, call_below is drawn first.\n(In the right example, call_below is the one in front.)";
+        text.draw(s, 80.0, 250.0, 0.6, 10.0)
+            .with_max_width(400.0)
+            .with_alignment(Alignment::Center)
+            .with_cacheable(true)
+            .finish();
 
         text.compose_draw_call(&mut renderer);
         renderer.render(window.width, window.height);
