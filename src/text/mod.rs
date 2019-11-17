@@ -9,7 +9,7 @@
 mod fonts;
 mod glyph_cache;
 mod layout;
-mod text;
+mod text_builder;
 pub(crate) mod types;
 
 // This is here for the font8x8_glyphs example
@@ -17,7 +17,7 @@ pub(crate) mod types;
 #[doc(hidden)]
 pub use crate::text::fonts::font8x8::get_bitmap;
 
-pub use self::text::*;
+pub use self::text_builder::*;
 pub use self::types::Alignment;
 
 use crate::error::GlyphNotRenderedError;
@@ -92,14 +92,14 @@ impl TextRenderer {
     ///     .finish();
     /// # }
     /// ```
-    pub fn draw<'a, S: Into<String>>(
-        &'a mut self,
+    pub fn draw<S: Into<String>>(
+        &mut self,
         text: S,
         x: f32,
         y: f32,
         z: f32,
         font_size: f32,
-    ) -> Text<'a> {
+    ) -> Text<'_> {
         let x = (x * self.dpi_factor) as i32;
         let y = (y * self.dpi_factor) as i32;
         let font_size = (font_size * self.dpi_factor) as i32;
@@ -114,7 +114,7 @@ impl TextRenderer {
         color: (f32, f32, f32, f32),
         cacheable: bool,
     ) -> Option<Rect> {
-        if data.text.len() == 0 {
+        if data.text.is_empty() {
             return None;
         }
 
@@ -132,7 +132,7 @@ impl TextRenderer {
             // Append the cached glyphs into the queue if they have been
             // cached, and stop here.
             self.glyphs.extend(glyphs);
-            crate::profiler::write(|p| p.glyph_layout_cache_hits += glyphs.len() as u32);
+            crate::profiler::write(|p| p.layout_cache_hits += glyphs.len() as u32);
             return *bounds;
         }
 
@@ -176,7 +176,7 @@ impl TextRenderer {
         let mut text_left = text;
         while !text_left.is_empty() {
             let (line_len, line_width) = get_line_length_and_width(
-                &self.font,
+                &*self.font,
                 &metrics,
                 font_size,
                 max_line_width,
@@ -188,14 +188,17 @@ impl TextRenderer {
 
             let mut previous_character = None;
             let mut chars = text_left.chars();
-            let mut chars_processed = 0;
-            for c in &mut chars {
-                if let Some(metric) = metrics.get(&c).map(|m| m.clone()) {
+            for (chars_processed, c) in (&mut chars).enumerate() {
+                if let Some(metric) = metrics.get(&c).copied() {
                     // Advance the cursor, if this is not the first character
                     if let Some(previous_character) = previous_character {
-                        if let Some(advance) =
-                            get_char_advance(&self.font, &metrics, font_size, c, previous_character)
-                        {
+                        if let Some(advance) = get_char_advance(
+                            &*self.font,
+                            &metrics,
+                            font_size,
+                            c,
+                            previous_character,
+                        ) {
                             cursor.x += advance;
                         }
                     }
@@ -215,8 +218,7 @@ impl TextRenderer {
                 }
                 previous_character = Some(c);
 
-                chars_processed += 1;
-                if chars_processed >= line_len {
+                if chars_processed + 1 >= line_len {
                     break;
                 }
             }
@@ -246,11 +248,11 @@ impl TextRenderer {
         };
 
         let len = glyphs.len() as u32;
-        crate::profiler::write(|p| p.glyph_layout_cache_misses += len);
+        crate::profiler::write(|p| p.layout_cache_misses += len);
 
         if cacheable {
-            crate::profiler::write(|p| p.glyph_layout_cache_count += len);
-            self.draw_cache.insert(data, (glyphs, bounds.clone()));
+            crate::profiler::write(|p| p.layout_cache_count += len);
+            self.draw_cache.insert(data, (glyphs, bounds));
         }
 
         bounds

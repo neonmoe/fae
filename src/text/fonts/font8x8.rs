@@ -153,17 +153,15 @@ fn get_empty_pixels_top_bottom(id: GlyphId) -> Option<(i32, i32)> {
     let bitmap = get_bitmap(id)?;
     let mut top = None;
     let mut bottom = None;
-    for i in 0..bitmap.len() {
-        let (i, y) = (i as i32, bitmap[i]);
-
-        if y != 0 {
+    for (i, y) in bitmap.iter().enumerate() {
+        if *y != 0 {
             if top.is_none() {
                 top = Some(i);
             }
             bottom = Some(i);
         }
     }
-    Some((top?, 7 - bottom?))
+    Some((top? as i32, 7 - bottom? as i32))
 }
 
 // This function provides glyphs for 558 characters (for calculating

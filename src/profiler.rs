@@ -18,13 +18,13 @@ pub struct ProfilingData {
     /// The amount of glyphs in the "layout cache," which is the
     /// uppermost level of caching: typeset, ready-to-draw sets of
     /// glyphs.
-    pub glyph_layout_cache_count: u32,
+    pub layout_cache_count: u32,
     /// The amount of glyphs that missed the layout cache, ie. had to
     /// be typeset.
-    pub glyph_layout_cache_misses: u32,
+    pub layout_cache_misses: u32,
     /// The amount of glyphs that hit the layout cache, ie. didn't
     /// have to be typeset.
-    pub glyph_layout_cache_hits: u32,
+    pub layout_cache_hits: u32,
     /// The amount of glyphs that were drawn during this frame
     /// overall.
     pub quads_drawn: u32,
@@ -36,9 +36,9 @@ impl ProfilingData {
             glyph_cache_misses: 0,
             glyph_cache_hits: 0,
             glyphs_drawn: 0,
-            glyph_layout_cache_count: 0,
-            glyph_layout_cache_misses: 0,
-            glyph_layout_cache_hits: 0,
+            layout_cache_count: 0,
+            layout_cache_misses: 0,
+            layout_cache_hits: 0,
             quads_drawn: 0,
         }
     }
@@ -88,10 +88,10 @@ mod actual {
         if let Ok(ref mut front) = FRONT.lock() {
             if let Ok(ref mut back) = BACK.lock() {
                 // Some data needs to persist
-                let temp = [back.glyph_layout_cache_count];
+                let temp = [back.layout_cache_count];
                 front.copy_from(back);
                 back.clear();
-                back.glyph_layout_cache_count = temp[0];
+                back.layout_cache_count = temp[0];
             }
         }
     }

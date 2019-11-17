@@ -14,8 +14,8 @@ const GLYPH_CACHE_MARGIN: i32 = 1;
 // How far the glyphs are from each other
 const GLYPH_CACHE_GAP: i32 = 1;
 
-const TEXT_FRAGMENT_SHADER_110: &'static str = include_str!("../shaders/legacy/text.frag");
-const TEXT_FRAGMENT_SHADER_330: &'static str = include_str!("../shaders/text.frag");
+const TEXT_FRAGMENT_SHADER_110: &str = include_str!("../shaders/legacy/text.frag");
+const TEXT_FRAGMENT_SHADER_330: &str = include_str!("../shaders/text.frag");
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum ExpiryStatus {
@@ -82,6 +82,7 @@ impl GlyphLine {
     /// \*\* Which will be GLYPH_CACHE_GAP away from the empty space's
     ///      left neighbor, or GLYPH_CACHE_MARGIN away from the cache
     ///      texture's left side, if there is no neighbor.
+    #[allow(clippy::len_zero)]
     fn evict_width(&mut self, width: i32) -> Option<i32> {
         let mut left = 0;
         let mut right = 0;
@@ -141,7 +142,7 @@ impl GlyphLine {
 
         // Compare distances between the left border of each spot and
         // the right border of the previous one.
-        for i in 0..self.reserved.len() + 1 {
+        for i in 0..=self.reserved.len() {
             let previous_spot_right = if i > 0 {
                 let previous = self.reserved[i - 1].texcoords;
                 previous.x + previous.width + GLYPH_CACHE_GAP
@@ -254,9 +255,9 @@ impl GlyphCache {
     ) -> Result<(RectPx, bool), GlyphNotRenderedError> {
         if let Some(uvs) = self
             // First try to find the uvs from the cache
-            .get_uvs_from_cache(&id)
+            .get_uvs_from_cache(id)
         {
-            Ok((uvs.texcoords.clone(), false))
+            Ok((uvs.texcoords, false))
         } else if let Some(uvs) = self
             // Then try to find space in the existing lines
             .reserve_uvs_from_existing(width, height, false)
@@ -267,19 +268,19 @@ impl GlyphCache {
         // TODO: Add glyph cache texture re-sizing as a last resort
         {
             self.cache.insert(id, Rc::downgrade(&uvs));
-            Ok((uvs.texcoords.clone(), true))
+            Ok((uvs.texcoords, true))
         } else {
             Err(GlyphNotRenderedError::GlyphCacheFull)
         }
     }
 
-    fn get_uvs_from_cache(&mut self, id: &CacheIdentifier) -> Option<Rc<GlyphSpot>> {
-        if let Some(spot) = self.cache.get(id) {
+    fn get_uvs_from_cache(&mut self, id: CacheIdentifier) -> Option<Rc<GlyphSpot>> {
+        if let Some(spot) = self.cache.get(&id) {
             if let Some(spot) = spot.upgrade() {
                 spot.status.set(ExpiryStatus::UsedDuringThisFrame);
                 return Some(spot);
             } else {
-                self.cache.remove(id);
+                self.cache.remove(&id);
             }
         }
         None

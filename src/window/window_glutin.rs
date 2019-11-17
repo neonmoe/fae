@@ -91,7 +91,7 @@ impl Window {
                 let (w, h): (f64, f64) = size.into();
                 context
                     .window()
-                    .set_inner_size((w * multiplier as f64, h * multiplier as f64).into());
+                    .set_inner_size((w * f64::from(multiplier), h * f64::from(multiplier)).into());
             }
             multiplier
         };

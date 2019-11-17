@@ -13,12 +13,12 @@ static WORD_BREAKERS: [char; 19] = [
     '\u{200B}', '\u{200C}', '\u{200D}',
 ];
 
-fn can_break(c: &char) -> bool {
-    WORD_BREAKERS.contains(c) || LINE_BREAKERS.contains(c)
+fn can_break(c: char) -> bool {
+    WORD_BREAKERS.contains(&c) || LINE_BREAKERS.contains(&c)
 }
 
-fn must_break(c: &char) -> bool {
-    LINE_BREAKERS.contains(c)
+fn must_break(c: char) -> bool {
+    LINE_BREAKERS.contains(&c)
 }
 
 pub(crate) fn get_line_start_x(
@@ -36,7 +36,7 @@ pub(crate) fn get_line_start_x(
 
 // FIXME: There seems to be a problem when rendering lines that end in <micro>s
 pub(crate) fn get_line_length_and_width(
-    font: &Box<dyn FontProvider>,
+    font: &dyn FontProvider,
     metrics: &HashMap<char, Metric>,
     font_size: i32,
     max_width: Option<i32>,
@@ -63,11 +63,11 @@ pub(crate) fn get_line_length_and_width(
         total_width += width;
         previous_character = Some(c);
 
-        if can_break(&c) {
+        if can_break(c) {
             can_break_len = Some(len);
         }
 
-        if must_break(&c) {
+        if must_break(c) {
             widths.pop_back(); // Pop off the breaking character
             break;
         } else if let Some(max_width) = max_width {
@@ -88,13 +88,13 @@ pub(crate) fn get_line_length_and_width(
         }
     }
 
-    let total_width = widths.into_iter().fold(0, |acc, x| acc + x);
+    let total_width = widths.into_iter().sum();
 
     (len, total_width)
 }
 
 pub(crate) fn get_char_advance(
-    font: &Box<dyn FontProvider>,
+    font: &dyn FontProvider,
     metrics: &HashMap<char, Metric>,
     font_size: i32,
     current_char: char,

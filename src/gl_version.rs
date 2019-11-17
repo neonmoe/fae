@@ -90,7 +90,7 @@ fn parse_version(version_str: &str) -> Option<(bool, u8, u8)> {
     let rest_of_version = split.next()?; // Find the next part after the first .
     let end_of_version_num = rest_of_version
         .find(|c: char| !c.is_digit(10))
-        .unwrap_or(rest_of_version.len()); // Find where the minor version ends
+        .unwrap_or_else(|| rest_of_version.len()); // Find where the minor version ends
     let minor_str = &rest_of_version[0..end_of_version_num]; // Minor version as str
     let minor = u8::from_str_radix(minor_str, 10).ok()?; // Parse minor version
 

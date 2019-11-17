@@ -18,7 +18,7 @@ pub struct Shaders {
     pub fragment_shader_110: &'static str,
 }
 
-static DEFAULT_SHADERS: [&'static str; 4] = [
+static DEFAULT_SHADERS: [&str; 4] = [
     include_str!("legacy/texquad.vert"),
     include_str!("legacy/texquad.frag"),
     include_str!("texquad.vert"),
