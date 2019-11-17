@@ -3,9 +3,9 @@
 //! Note: this example will be pretty much entirely rewritten once
 //! some API has been decided on. Currently it's just doing the calls
 //! as they happen to be ordered in the codebase.
+mod common;
 
-use fae::text::TextRenderer;
-use fae::{profiler, DrawCallParameters, Image, Renderer, Window, WindowSettings};
+use fae::{profiler, DrawCallParameters, Image, Window, WindowSettings};
 use std::collections::HashMap;
 use std::error::Error;
 use std::time::{Duration, Instant};
@@ -21,10 +21,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Create the window
     let mut window = Window::create(&WindowSettings::default()).unwrap();
-    // Create the OpenGL renderer
-    let mut renderer = Renderer::new(&window);
-    // Create the text renderer
-    let mut text = TextRenderer::with_font8x8(&mut renderer, true);
+    // Create the OpenGL and text renderers, see common/mod.rs
+    let (mut renderer, mut text) = common::create_renderers(&window);
     // Create the draw call for the sprite
     let params = DrawCallParameters {
         image: {
@@ -249,6 +247,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         timers["glyph rendering"][timer_index].start();
         text.compose_draw_call(&mut renderer);
         timers["glyph rendering"][timer_index].end();
+
         // Render the OpenGL draw calls
         timers["opengl"][timer_index].start();
         renderer.render(window.width, window.height);

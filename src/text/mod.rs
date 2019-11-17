@@ -52,13 +52,31 @@ impl TextRenderer {
     /// interpolation is used (crisp but pixelated).
     #[cfg(feature = "font8x8")]
     pub fn with_font8x8(renderer: &mut Renderer, smoothed: bool) -> TextRenderer {
-        let (cache, call) = GlyphCache::create_cache_and_draw_call(renderer, 128, 128, smoothed);
+        let (cache, call) = GlyphCache::create_cache_and_draw_call(renderer, 256, 256, smoothed);
+        TextRenderer::with_params(cache, call, Box::new(fonts::Font8x8Provider::new()))
+    }
+
+    /// Creates a new text renderer with the given font, rasterized
+    /// with `rusttype`.
+    #[cfg(feature = "rusttype")]
+    pub fn with_ttf(renderer: &mut Renderer, _ttf_data: Vec<u8>) -> TextRenderer {
+        let (cache, call) = GlyphCache::create_cache_and_draw_call(renderer, 512, 512, true);
+
+        // TODO: Implement a RustTypeProvider
+        TextRenderer::with_params(cache, call, Box::new(fonts::Font8x8Provider::new()))
+    }
+
+    fn with_params(
+        cache: GlyphCache,
+        call: DrawCallHandle,
+        font: Box<dyn FontProvider>,
+    ) -> TextRenderer {
         TextRenderer {
             cache,
             call,
             glyphs: Vec::new(),
             draw_datas: Vec::new(),
-            font: Box::new(fonts::Font8x8Provider::new()),
+            font,
             dpi_factor: 1.0,
             draw_cache: HashMap::new(),
         }

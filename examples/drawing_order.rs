@@ -2,15 +2,17 @@
 /// drawing alpha-blended sprites on top of each other in the wrong
 /// order. For multiple sprites to properly blend, the ones in the
 /// back have to be drawn before the ones in the front.
-use fae::text::{Alignment, TextRenderer};
-use fae::{DrawCallParameters, Image, Renderer, Window, WindowSettings};
+mod common;
+
+use fae::text::Alignment;
+use fae::{DrawCallParameters, Image, Window, WindowSettings};
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
     env_logger::from_env(env_logger::Env::default().default_filter_or("trace")).init();
 
     let mut window = Window::create(&WindowSettings::default()).unwrap();
-    let mut renderer = Renderer::new(&window);
+    let (mut renderer, mut text) = common::create_renderers(&window);
     let params = DrawCallParameters {
         image: Some(Image::from_png(include_bytes!(
             "res/transparent_sprite.png",
@@ -19,8 +21,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
     let call_below = renderer.create_draw_call(params.clone());
     let call_above = renderer.create_draw_call(params.clone());
-
-    let mut text = TextRenderer::with_font8x8(&mut renderer, true);
 
     let mut should_quit = false;
     while window.refresh() && !should_quit {

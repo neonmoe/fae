@@ -1,10 +1,9 @@
 //! This example writes text in varying ways to test that the layout
 //! functionality works correctly.
 
-use fae::{
-    text::{Alignment, TextRenderer},
-    DrawCallParameters, Mouse, Renderer, Window, WindowSettings,
-};
+mod common;
+
+use fae::{text::Alignment, DrawCallParameters, Mouse, Window, WindowSettings};
 use std::error::Error;
 
 static LOREM_IPSUM: &'static str = "Perferendis officiis ut provident sit eveniet ipsa eos. Facilis delectus at laudantium nemo. Sed ipsa natus perferendis dignissimos odio deserunt omnis.
@@ -18,8 +17,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     env_logger::from_env(env_logger::Env::default().default_filter_or("trace")).init();
 
     let mut window = Window::create(&WindowSettings::default())?;
-    let mut renderer = Renderer::new(&window);
-    let mut text = TextRenderer::with_font8x8(&mut renderer, true);
+    let (mut renderer, mut text) = common::create_renderers(&window);
     let bgs = renderer.create_draw_call(DrawCallParameters {
         alpha_blending: false,
         ..Default::default()

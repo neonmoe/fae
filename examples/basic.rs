@@ -1,12 +1,14 @@
-use fae::text::{Alignment, TextRenderer};
-use fae::{DrawCallParameters, Image, Renderer, Window, WindowSettings};
+mod common;
+
+use fae::text::Alignment;
+use fae::{DrawCallParameters, Image, Window, WindowSettings};
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
     env_logger::from_env(env_logger::Env::default().default_filter_or("trace")).init();
 
     let mut window = Window::create(&WindowSettings::default()).unwrap();
-    let mut renderer = Renderer::new(&window);
+    let (mut renderer, mut text) = common::create_renderers(&window);
     let params = DrawCallParameters {
         image: {
             #[cfg(feature = "png")]
@@ -19,8 +21,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         ..Default::default()
     };
     let call = renderer.create_draw_call(params);
-
-    let mut text = TextRenderer::with_font8x8(&mut renderer, true);
 
     let mut should_quit = false;
     while window.refresh() && !should_quit {
