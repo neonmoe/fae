@@ -218,7 +218,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             // Lorem ipsum
         }
 
-        let cache_size = 128.0 / window.dpi_factor;
+        let cache_size = 256.0 / window.dpi_factor;
         let (x, y) = (
             window.width as f32 - 20.0 - cache_size,
             window.height as f32 - 20.0 - cache_size,

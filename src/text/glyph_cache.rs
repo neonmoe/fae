@@ -1,3 +1,5 @@
+// TODO: Line eviction to allow font size changes
+
 use crate::error::GlyphNotRenderedError;
 use crate::gl::types::*;
 use crate::image::Image;

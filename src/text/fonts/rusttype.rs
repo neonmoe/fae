@@ -33,6 +33,20 @@ impl<'a> RustTypeProvider<'a> {
             font_size as f32 * (self.ascent - self.descent) as f32 / self.units_per_em as f32,
         )
     }
+
+    fn get_metric_from_glyph(&self, glyph: &PositionedGlyph) -> RectPx {
+        if let Some(rect) = glyph.pixel_bounding_box() {
+            let ascent = self.font.v_metrics(glyph.scale()).ascent;
+            RectPx {
+                x: rect.min.x,
+                y: rect.min.y + ascent as i32,
+                width: rect.width(),
+                height: rect.height(),
+            }
+        } else {
+            (0, 0, 0, 0).into()
+        }
+    }
 }
 
 impl<'a> FontProvider for RustTypeProvider<'a> {
@@ -75,7 +89,7 @@ impl<'a> FontProvider for RustTypeProvider<'a> {
                 .scaled(scale)
                 // TODO: Add some subpixel accuracy?
                 .positioned(rusttype::point(0.0, 0.0));
-            let metric = get_metric_from_glyph(&glyph);
+            let metric = self.get_metric_from_glyph(&glyph);
             self.metrics.insert(key, metric);
             metric
         }
@@ -84,23 +98,23 @@ impl<'a> FontProvider for RustTypeProvider<'a> {
     fn render_glyph(
         &mut self,
         cache: &mut GlyphCache,
-        id: GlyphId,
+        glyph_id: GlyphId,
         font_size: i32,
     ) -> Result<RectPx, GlyphNotRenderedError> {
-        let scale = self.font_size_to_scale(font_size);
-        let glyph = self
-            .font
-            .glyph(rusttype::GlyphId(id))
-            .scaled(scale)
-            // TODO: Add some subpixel accuracy?
-            .positioned(rusttype::point(0.0, 0.0));
-        let metric = get_metric_from_glyph(&glyph);
+        let metric = self.get_metric(glyph_id, font_size);
 
-        let id = CacheIdentifier::new(id, 0);
+        let id = CacheIdentifier::new(glyph_id, 0);
         let tex = cache.get_texture();
         let (spot, new) = cache.reserve_uvs(id, metric.width, metric.height)?;
         if new {
             // TODO: Add borders around glyphs in the glyph cache when rendering to avoid needing to clear the texture
+            let scale = self.font_size_to_scale(font_size);
+            let glyph = self
+                .font
+                .glyph(rusttype::GlyphId(glyph_id))
+                .scaled(scale)
+                // TODO: Add some subpixel accuracy?
+                .positioned(rusttype::point(0.0, 0.0));
             let mut data = vec![0; (metric.width * metric.height) as usize];
             let stride = metric.width as u32;
             glyph.draw(|x, y, c| {
@@ -131,18 +145,5 @@ impl<'a> FontProvider for RustTypeProvider<'a> {
         }
         crate::profiler::write(|p| p.glyphs_drawn += 1);
         Ok(spot)
-    }
-}
-
-fn get_metric_from_glyph(glyph: &PositionedGlyph) -> RectPx {
-    if let Some(rect) = glyph.pixel_bounding_box() {
-        RectPx {
-            x: rect.min.x,
-            y: rect.min.y,
-            width: rect.width(),
-            height: rect.height(),
-        }
-    } else {
-        (0, 0, 0, 0).into()
     }
 }

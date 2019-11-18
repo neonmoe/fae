@@ -63,7 +63,7 @@ impl TextRenderer {
         renderer: &mut Renderer,
         ttf_data: Vec<u8>,
     ) -> Result<TextRenderer, rusttype::Error> {
-        let (cache, call) = GlyphCache::create_cache_and_draw_call(renderer, 512, 512, true);
+        let (cache, call) = GlyphCache::create_cache_and_draw_call(renderer, 256, 256, true);
         let font = Box::new(fonts::RustTypeProvider::from_ttf(ttf_data)?);
         Ok(TextRenderer::with_params(cache, call, font))
     }
