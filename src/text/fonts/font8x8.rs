@@ -27,18 +27,28 @@ impl FontProvider for Font8x8Provider {
         Some(c as GlyphId)
     }
 
-    fn get_line_height(&self, font_size: i32) -> i32 {
-        font_size * 4 / 3
+    fn get_line_advance(&self, cursor: Cursor, font_size: i32) -> Advance {
+        let leftover_y = cursor.leftover_y.fract();
+        let line_height = font_size * 4 / 3 + cursor.leftover_y.trunc() as i32;
+        Advance::new(0, line_height, cursor.leftover_x, leftover_y)
     }
 
-    fn get_advance(&self, from: GlyphId, _to: GlyphId, font_size: i32) -> Option<i32> {
+    fn get_advance(&self, from: GlyphId, _to: GlyphId, cursor: Cursor, font_size: i32) -> Advance {
         let RectPx { width, .. } = self.get_raw_metrics(from);
-        Some((width * font_size / 8 + 1) as i32)
+        let mut advance = (width * font_size / 8 + 1) as i32;
+        let mut leftover_x = cursor.leftover_x;
+        if from == ' ' as GlyphId && leftover_x >= 1.0 {
+            advance += leftover_x.trunc() as i32;
+            leftover_x = leftover_x.fract();
+        } else {
+            leftover_x += ((width * font_size) as f32 / 8.0 + 1.0) - advance as f32;
+        }
+        Advance::new(advance, 0, leftover_x, cursor.leftover_y)
     }
 
-    fn get_metric(&mut self, id: GlyphId, font_size: i32) -> RectPx {
+    fn get_metric(&mut self, id: GlyphId, cursor: Cursor, font_size: i32) -> RectPx {
         let metrics = self.get_raw_metrics(id);
-        let y_offset = (self.get_line_height(font_size) / font_size * 8 - 8) / 2;
+        let y_offset = (self.get_line_advance(cursor, font_size).y / font_size * 8 - 8) / 2;
         RectPx {
             x: 0,
             y: scale(y_offset + metrics.y, font_size),
@@ -51,6 +61,7 @@ impl FontProvider for Font8x8Provider {
         &mut self,
         cache: &mut GlyphCache,
         id: GlyphId,
+        _cursor: Cursor,
         _font_size: i32,
     ) -> Result<RectPx, GlyphNotRenderedError> {
         if let Some(bitmap) = get_bitmap(id) {

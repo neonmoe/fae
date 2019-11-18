@@ -1,4 +1,6 @@
-use crate::text::{Alignment, FontProvider, Metric};
+use crate::text::types::*;
+use crate::text::{Alignment, FontProvider};
+use crate::types::*;
 use std::collections::VecDeque;
 
 // Sources for the following two arrays: https://en.wikipedia.org/wiki/Whitespace_character#Unicode
@@ -34,14 +36,17 @@ pub(crate) fn get_line_start_x(
     }
 }
 
-// FIXME: There seems to be a problem when rendering lines that end in <micro>s
-pub(crate) fn get_line_length_and_width<F: Fn(&mut dyn FontProvider, char) -> Option<Metric>>(
+pub(crate) fn get_line_length_and_width<F>(
     font: &mut dyn FontProvider,
+    mut cursor: Cursor,
     get_metric: &F,
     font_size: i32,
     max_width: Option<i32>,
     s: &str,
-) -> (usize, i32) {
+) -> (usize, i32)
+where
+    F: Fn(&mut dyn FontProvider, Cursor, char) -> Option<(GlyphId, RectPx)>,
+{
     let mut widths = VecDeque::new();
     let mut total_width = 0; // See the end of the function: this is re-calculated there
     let mut previous_character = None;
@@ -53,12 +58,13 @@ pub(crate) fn get_line_length_and_width<F: Fn(&mut dyn FontProvider, char) -> Op
         len += 1;
         let mut width = 0;
         if let Some(previous_character) = previous_character {
-            if let Some(a) = get_char_advance(font, font_size, c, previous_character) {
-                width -= get_char_width(font, get_metric, previous_character);
-                width += a;
+            if let Some(a) = get_char_advance(font, cursor, font_size, c, previous_character) {
+                width -= get_char_width(font, cursor, get_metric, previous_character);
+                cursor = cursor + a;
+                width += a.x;
             }
         }
-        width += get_char_width(font, get_metric, c);
+        width += get_char_width(font, cursor, get_metric, c);
         widths.push_back(width);
         total_width += width;
         previous_character = Some(c);
@@ -95,19 +101,24 @@ pub(crate) fn get_line_length_and_width<F: Fn(&mut dyn FontProvider, char) -> Op
 
 pub(crate) fn get_char_advance(
     font: &mut dyn FontProvider,
+    cursor: Cursor,
     font_size: i32,
     current_char: char,
     previous_char: char,
-) -> Option<i32> {
+) -> Option<Advance> {
     let previous_id = font.get_glyph_id(previous_char)?;
     let current_id = font.get_glyph_id(current_char)?;
-    font.get_advance(previous_id, current_id, font_size)
+    Some(font.get_advance(previous_id, current_id, cursor, font_size))
 }
 
-pub(crate) fn get_char_width<F: Fn(&mut dyn FontProvider, char) -> Option<Metric>>(
+pub(crate) fn get_char_width<F>(
     font: &mut dyn FontProvider,
+    cursor: Cursor,
     get_metric: &F,
     c: char,
-) -> i32 {
-    get_metric(font, c).map(|m| m.size.width).unwrap_or(0)
+) -> i32
+where
+    F: Fn(&mut dyn FontProvider, Cursor, char) -> Option<(GlyphId, RectPx)>,
+{
+    get_metric(font, cursor, c).map(|m| m.1.width).unwrap_or(0)
 }

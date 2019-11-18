@@ -1,5 +1,3 @@
-use std::ops::Add;
-
 /// Represents a rectangle.
 ///
 /// # Usage
@@ -113,29 +111,5 @@ impl From<(i32, i32, i32, i32)> for RectPx {
 impl From<RectPx> for (i32, i32, i32, i32) {
     fn from(from: RectPx) -> Self {
         (from.x, from.y, from.width, from.height)
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct PositionPx {
-    pub x: i32,
-    pub y: i32,
-}
-
-impl From<(i32, i32)> for PositionPx {
-    fn from(from: (i32, i32)) -> Self {
-        PositionPx {
-            x: from.0,
-            y: from.1,
-        }
-    }
-}
-
-impl Add<PositionPx> for RectPx {
-    type Output = RectPx;
-    fn add(mut self, other: PositionPx) -> Self::Output {
-        self.x += other.x;
-        self.y += other.y;
-        self
     }
 }

@@ -168,23 +168,20 @@ impl TextRenderer {
             std::f32::NEG_INFINITY,
         );
 
-        let get_metric = |font: &mut dyn FontProvider, c| {
+        let get_metric = |font: &mut dyn FontProvider, cursor, c| {
             font.get_glyph_id(c)
                 .or_else(|| font.get_glyph_id('\u{FFFD}'))
-                .map(|id| Metric {
-                    glyph_id: id,
-                    size: font.get_metric(id, font_size),
-                })
+                .map(|id| (id, font.get_metric(id, cursor, font_size)))
         };
 
         let char_count = text.chars().count();
         let mut glyphs = Vec::with_capacity(char_count);
-        let line_height = self.font.get_line_height(font_size);
-        let mut cursor = PositionPx { x, y };
+        let mut cursor = Cursor::new(x, y);
         let mut text_left = text;
         while !text_left.is_empty() {
             let (line_len, line_width) = get_line_length_and_width(
                 &mut *self.font,
+                cursor,
                 &get_metric,
                 font_size,
                 max_line_width,
@@ -197,17 +194,17 @@ impl TextRenderer {
             let mut previous_character = None;
             let mut chars = text_left.chars();
             for (chars_processed, c) in (&mut chars).enumerate() {
-                if let Some(metric) = get_metric(&mut *self.font, c) {
+                if let Some((glyph_id, metrics)) = get_metric(&mut *self.font, cursor, c) {
                     // Advance the cursor, if this is not the first character
-                    if let Some(previous_character) = previous_character {
+                    if let Some(prev_char) = previous_character {
                         if let Some(advance) =
-                            get_char_advance(&mut *self.font, font_size, c, previous_character)
+                            get_char_advance(&mut *self.font, cursor, font_size, c, prev_char)
                         {
-                            cursor.x += advance;
+                            cursor = cursor + advance;
                         }
                     }
 
-                    let screen_location = metric.size + cursor;
+                    let screen_location = metrics + cursor;
                     min_x = min_x.min(screen_location.x as f32 / self.dpi_factor);
                     min_y = min_y.min(screen_location.y as f32 / self.dpi_factor);
                     max_x = max_x
@@ -215,9 +212,10 @@ impl TextRenderer {
                     max_y = max_y
                         .max((screen_location.y + screen_location.height) as f32 / self.dpi_factor);
                     glyphs.push(Glyph {
-                        screen_location,
+                        cursor,
+                        metrics: metrics,
                         draw_data: draw_data_index,
-                        id: metric.glyph_id,
+                        id: glyph_id,
                     });
                 }
                 previous_character = Some(c);
@@ -228,7 +226,9 @@ impl TextRenderer {
             }
             text_left = chars.as_str();
 
-            cursor = (x, cursor.y + line_height).into();
+            cursor.x = x;
+            cursor.leftover_x = 0.0;
+            cursor = cursor + self.font.get_line_advance(cursor, font_size);
         }
         self.glyphs.extend(&glyphs);
 
@@ -287,10 +287,10 @@ impl TextRenderer {
             // glyphs to avoid leaking because of this.
 
             let screen_location = Rect {
-                x: glyph.screen_location.x as f32 - 0.5,
-                y: glyph.screen_location.y as f32 - 0.5,
-                width: glyph.screen_location.width as f32 + 1.0,
-                height: glyph.screen_location.height as f32 + 1.0,
+                x: (glyph.cursor.x + glyph.metrics.x) as f32 - 0.5,
+                y: (glyph.cursor.y + glyph.metrics.y) as f32 - 0.5,
+                width: glyph.metrics.width as f32 + 1.0,
+                height: glyph.metrics.height as f32 + 1.0,
             };
 
             let mut sprite = renderer
@@ -311,7 +311,10 @@ impl TextRenderer {
                 sprite.with_texture_coordinates(texcoords).finish();
             };
 
-            match self.font.render_glyph(&mut self.cache, glyph.id, font_size) {
+            match self
+                .font
+                .render_glyph(&mut self.cache, glyph.id, glyph.cursor, font_size)
+            {
                 Ok(texcoords) => finish_sprite(texcoords),
                 Err(err) => match err {
                     // TODO: Report this to the crate user somehow

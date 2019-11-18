@@ -60,24 +60,29 @@ impl<'a> FontProvider for RustTypeProvider<'a> {
         }
     }
 
-    fn get_line_height(&self, font_size: i32) -> i32 {
+    fn get_line_advance(&self, cursor: Cursor, font_size: i32) -> Advance {
         // Note: this does take about a microsecond, so it would be
         // faster with a cache, but this isn't called that often.
         let metrics = self.font.v_metrics(self.font_size_to_scale(font_size));
-        (metrics.ascent - metrics.descent + metrics.line_gap) as i32
+        let advance = (metrics.ascent - metrics.descent
+            + metrics.line_gap
+            + cursor.leftover_y.trunc()) as i32;
+        Advance::new(0, advance, cursor.leftover_x, cursor.leftover_y.fract())
     }
 
-    fn get_advance(&self, from: GlyphId, to: GlyphId, font_size: i32) -> Option<i32> {
+    fn get_advance(&self, from: GlyphId, to: GlyphId, cursor: Cursor, font_size: i32) -> Advance {
         let from = rusttype::GlyphId(from);
         let to = rusttype::GlyphId(to);
         let scale = self.font_size_to_scale(font_size);
         let glyph = self.font.glyph(from).scaled(scale);
         let from_width = glyph.h_metrics().advance_width;
         let kern = self.font.pair_kerning(scale, from, to);
-        Some((from_width + kern).round() as i32)
+        let advance = from_width + kern + cursor.leftover_x;
+        let (adv, leftover) = (advance.trunc() as i32, advance.fract());
+        Advance::new(adv, 0, leftover, cursor.leftover_y)
     }
 
-    fn get_metric(&mut self, id: GlyphId, font_size: i32) -> RectPx {
+    fn get_metric(&mut self, id: GlyphId, cursor: Cursor, font_size: i32) -> RectPx {
         let key = (id, font_size);
         if let Some(metric) = self.metrics.get(&key) {
             *metric
@@ -87,8 +92,7 @@ impl<'a> FontProvider for RustTypeProvider<'a> {
                 .font
                 .glyph(rusttype::GlyphId(id))
                 .scaled(scale)
-                // TODO: Add some subpixel accuracy?
-                .positioned(rusttype::point(0.0, 0.0));
+                .positioned(rusttype::point(cursor.leftover_x, cursor.leftover_y));
             let metric = self.get_metric_from_glyph(&glyph);
             self.metrics.insert(key, metric);
             metric
@@ -99,22 +103,23 @@ impl<'a> FontProvider for RustTypeProvider<'a> {
         &mut self,
         cache: &mut GlyphCache,
         glyph_id: GlyphId,
+        cursor: Cursor,
         font_size: i32,
     ) -> Result<RectPx, GlyphNotRenderedError> {
-        let metric = self.get_metric(glyph_id, font_size);
+        let metric = self.get_metric(glyph_id, cursor, font_size);
 
         let id = CacheIdentifier::new(glyph_id, 0);
         let tex = cache.get_texture();
         let (spot, new) = cache.reserve_uvs(id, metric.width, metric.height)?;
         if new {
             // TODO: Add borders around glyphs in the glyph cache when rendering to avoid needing to clear the texture
+            // FIXME: For some reason, rusttype glyphs seem blurry on 2.0 dpi factor
             let scale = self.font_size_to_scale(font_size);
             let glyph = self
                 .font
                 .glyph(rusttype::GlyphId(glyph_id))
                 .scaled(scale)
-                // TODO: Add some subpixel accuracy?
-                .positioned(rusttype::point(0.0, 0.0));
+                .positioned(rusttype::point(cursor.leftover_x, cursor.leftover_y));
             let mut data = vec![0; (metric.width * metric.height) as usize];
             let stride = metric.width as u32;
             glyph.draw(|x, y, c| {
