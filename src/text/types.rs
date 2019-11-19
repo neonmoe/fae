@@ -50,17 +50,26 @@ pub(crate) trait FontProvider {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct CacheIdentifier {
     id: GlyphId,
-    font_size: i32,
+    font_size: Option<i32>,
+    subpixel: Option<SubpixelOffset>,
 }
 
 impl CacheIdentifier {
-    pub fn new(id: GlyphId, font_size: i32) -> CacheIdentifier {
-        CacheIdentifier { id, font_size }
+    pub fn new(
+        id: GlyphId,
+        font_size: Option<i32>,
+        subpixel: Option<SubpixelOffset>,
+    ) -> CacheIdentifier {
+        CacheIdentifier {
+            id,
+            font_size,
+            subpixel,
+        }
     }
 }
 
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct Advance {
+pub struct Advance {
     pub x: i32,
     pub y: i32,
     pub leftover_x: f32,
@@ -78,8 +87,25 @@ impl Advance {
     }
 }
 
+// TODO: Making subpixel offset granularity a runtime option might be good
+const SUBPIXEL_RESOLUTION: f32 = 4.0;
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct SubpixelOffset {
+    x: i32,
+    y: i32,
+}
+
+impl From<SubpixelOffset> for rusttype::Point<f32> {
+    fn from(src: SubpixelOffset) -> Self {
+        rusttype::point(
+            src.x as f32 / SUBPIXEL_RESOLUTION,
+            src.y as f32 / SUBPIXEL_RESOLUTION,
+        )
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct Cursor {
+pub struct Cursor {
     pub x: i32,
     pub y: i32,
     pub leftover_x: f32,
@@ -93,6 +119,13 @@ impl Cursor {
             y,
             leftover_x: 0.0,
             leftover_y: 0.0,
+        }
+    }
+
+    pub fn subpixel_offset(self) -> SubpixelOffset {
+        SubpixelOffset {
+            x: (self.leftover_x * SUBPIXEL_RESOLUTION) as i32,
+            y: (self.leftover_y * SUBPIXEL_RESOLUTION) as i32,
         }
     }
 }

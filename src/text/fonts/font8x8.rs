@@ -98,7 +98,7 @@ impl Font8x8Provider {
     ) -> Result<RectPx, GlyphNotRenderedError> {
         let metric = self.get_raw_metrics(id);
 
-        let id = CacheIdentifier::new(id, 0);
+        let id = CacheIdentifier::new(id, None, None);
         let tex = cache.get_texture();
         let (spot, new) = cache.reserve_uvs(id, metric.width, metric.height)?;
         if new {

@@ -4,7 +4,7 @@
 #[cfg(feature = "font8x8")]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     use fae::{
-        text::{self, Alignment, TextRenderer},
+        text::{self, TextRenderer},
         Renderer, Window, WindowSettings,
     };
 

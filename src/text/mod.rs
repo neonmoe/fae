@@ -17,9 +17,10 @@ pub(crate) mod types;
 #[doc(hidden)]
 pub use crate::text::fonts::font8x8::get_bitmap;
 
-pub use self::text_builder::*;
+pub use self::text_builder::Text;
 pub use self::types::Alignment;
 
+use self::text_builder::TextCacheable;
 use crate::error::GlyphNotRenderedError;
 use crate::text::glyph_cache::*;
 use crate::text::layout::*;
@@ -103,7 +104,7 @@ impl TextRenderer {
     /// # Usage
     /// ```no_run
     /// # fn main() {
-    /// # use fae::{TextRenderer, Text, Renderer, Window, WindowSettings};
+    /// # use fae::{text::{TextRenderer, Text}, Renderer, Window, WindowSettings};
     /// # let mut renderer = Renderer::new(&Window::create(&WindowSettings::default()).unwrap());
     /// # let mut text_renderer = TextRenderer::with_font8x8(&mut renderer, true);
     /// text_renderer.draw("Hello, World!", 10.0, 10.0, 0.0, 12.0)
@@ -213,7 +214,7 @@ impl TextRenderer {
                         .max((screen_location.y + screen_location.height) as f32 / self.dpi_factor);
                     glyphs.push(Glyph {
                         cursor,
-                        metrics: metrics,
+                        metrics,
                         draw_data: draw_data_index,
                         id: glyph_id,
                     });

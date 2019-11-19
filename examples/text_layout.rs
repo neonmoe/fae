@@ -93,8 +93,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .with_coordinates((10.0, y, 200.0, 40.0))
                 .with_color(0.2, 0.2, 0.2, 1.0)
                 .finish();
-            text.draw(" Left", 10.0, y + 10.0, 0.0, 20.0)
-                .with_max_width(200.0)
+            text.draw("Left", 20.0, y + 10.0, 0.0, 20.0)
+                .with_max_width(190.0)
                 .with_alignment(Alignment::Left)
                 .with_cacheable(true)
                 .finish();
@@ -151,8 +151,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .with_coordinates((10.0, y, 200.0, 40.0))
                 .with_color(0.2, 0.2, 0.2, 1.0)
                 .finish();
-            text.draw("Right ", 10.0, y + 10.0, 0.0, 20.0)
-                .with_max_width(200.0)
+            text.draw("Right", 10.0, y + 10.0, 0.0, 20.0)
+                .with_max_width(190.0)
                 .with_alignment(Alignment::Right)
                 .with_cacheable(true)
                 .finish();
