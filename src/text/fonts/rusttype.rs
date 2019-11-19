@@ -73,13 +73,17 @@ impl<'a> FontProvider for RustTypeProvider<'a> {
     fn get_advance(&self, from: GlyphId, to: GlyphId, cursor: Cursor, font_size: i32) -> Advance {
         let from = rusttype::GlyphId(from);
         let to = rusttype::GlyphId(to);
+        let subpixel = cursor.subpixel_offset();
         let scale = self.font_size_to_scale(font_size);
-        let glyph = self.font.glyph(from).scaled(scale);
-        let from_width = glyph.h_metrics().advance_width;
+        let from_glyph = self.font.glyph(from).scaled(scale);
+        let from_glyph = from_glyph.positioned(subpixel.into());
+        let from_advance = from_glyph
+            .pixel_bounding_box()
+            .map(|rect| (rect.min.x + rect.width()) as f32)
+            .unwrap_or_else(|| from_glyph.unpositioned().h_metrics().advance_width);
         let kern = self.font.pair_kerning(scale, from, to);
-        let advance = from_width + kern + rusttype::Point::from(cursor.subpixel_offset()).x;
-        // FIXME: Kerning seems weird in places
-        // note: passing advance.fract() to leftovers doesn't help
+        let advance = from_advance + kern;
+        // FIXME: Kerning seems weird in places (might be fixed, needs testing)
         Advance::new(advance.trunc() as i32, 0, 0.0, cursor.leftover_y)
     }
 
