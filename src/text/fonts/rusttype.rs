@@ -19,6 +19,7 @@ pub struct RustTypeProvider<'a> {
 impl<'a> RustTypeProvider<'a> {
     pub fn from_ttf(ttf_data: Vec<u8>) -> Result<RustTypeProvider<'a>, rusttype::Error> {
         let font = FontCollection::from_bytes(ttf_data)?.into_font()?;
+        log::info!("Loading font: {}", get_font_name(&font));
         let units_per_em = font.units_per_em();
         let v_metrics = font.v_metrics_unscaled();
         Ok(RustTypeProvider {
@@ -157,4 +158,39 @@ impl<'a> FontProvider for RustTypeProvider<'a> {
         crate::profiler::write(|p| p.glyphs_drawn += 1);
         Ok(spot)
     }
+}
+
+// Gets a name out of the font_name_strings
+fn get_font_name(font: &Font) -> String {
+    use stb_truetype::{MicrosoftEid, PlatformEncodingLanguageId::*};
+    let mut font_name_parts = font
+        .font_name_strings()
+        .filter_map(|(s, plat, id)| {
+            let s = std::str::from_utf8(s).ok()?;
+            if (id == 1 || id == 2)
+                && match plat? {
+                    // I'm not sure how to interpret platform
+                    // specific encodings in all situations, but
+                    // this is my best guess as to which *should*
+                    // be proper readable utf-8.
+                    //
+                    // Source: https://docs.microsoft.com/en-us/typography/opentype/spec/name#platform-ids
+                    Unicode(_, _) => true,
+                    Iso(_, _) => true,
+                    Mac(_, _) => true,
+                    Microsoft(Some(Ok(eid)), _) if eid == MicrosoftEid::UnicodeFull => true,
+                    Microsoft(Some(Err(eid)), _) if eid == 10 => true,
+                    _ => false,
+                }
+            {
+                Some((s, id))
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<(&str, u16)>>();
+    font_name_parts.sort_by(|(_, a), (_, b)| a.cmp(b));
+    font_name_parts.dedup_by(|(_, a), (_, b)| a == b);
+    debug_assert!(font_name_parts.len() <= 2);
+    format!("{} {}", font_name_parts[0].0, font_name_parts[1].0)
 }

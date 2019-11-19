@@ -15,24 +15,33 @@ repository = "https://github.com/neonmoe/fae"
 maintenance = { status = "experimental" }
 
 [dependencies]
+# Glutin depends on andrew on linux, which depends on rusttype 0.7.9,
+# which depends on rusttype ^0.8, so this should match that. No dupes.
+rusttype = { version = "0.8.1", optional = true }
+# And rusttype 0.8.1 depends on this version of stb_truetype, and
+# we need to explicitly depend on it to be able to use its types.
+stb_truetype = { version = "^0.3", optional = true}
+# *sigh*
+
+# Now, the normal [dependencies] section
 glutin = "^0.21.1"
 log = "^0.4.8"
 png = { version = "^0.15.0", optional = true }
 font8x8 = { version = "^0.2.5", optional = true, default_features = false, features = ["std"] }
-# This rusttype version is based on rusttype 0.7.9's deps, which is based on
-# andrew's deps, which is pulled in by glutin on wayland. So, no duplicates.
-rusttype = { version = "^0.8", optional = true }
 lazy_static = { version = "^1.4.0", optional = true }
 
 [features]
-# FIXME: the `profiler` feature should not be default in releases
-default = ["text", "png", "font8x8", "rusttype", "profiler"]
+# FIXME: there should be no default features
+default = ["text", "png", "font8x8", "ttf", "profiler"]
 text = []
 profiler = ["lazy_static"]
+ttf = ["rusttype", "stb_truetype"]
 
 [dev-dependencies]
 # Note: using a logger adds a lot of executable size.
 env_logger = "^0.7.1"
+cfg-if = "^0.1.10"
+font-loader = "^0.8.0"
 
 [build-dependencies]
 gl_generator = "^0.11.0"

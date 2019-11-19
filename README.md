@@ -33,8 +33,9 @@ come up with another name :)
   functionality for drawing strings, including multi-line wrapping,
   text alignment, and caching (both for individual glyphs and strings
   of text). If `font8x8` is enabled as a feature, you can draw text
-  with a simple 8x8 bitmap-based font. If `rusttype` is enabled, you
-  can draw text with any TTF font. Crate recommendation:
+  with a simple 8x8 bitmap-based font. If `ttf` is enabled, you can
+  draw text with any TTF font (which uses `rusttype`). Crate
+  recommendation for getting ttfs from the system:
   [`font-loader`](https://crates.io/crates/font-loader).
 - The **profiler** feature implements the `profiler` mod.
   Everything in the `minreq::profiler` module is a no-op if this

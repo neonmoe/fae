@@ -3,7 +3,10 @@
 
 mod common;
 
-use fae::{text::Alignment, DrawCallParameters, Mouse, Window, WindowSettings};
+use fae::{
+    text::{Alignment, TextRenderer},
+    DrawCallParameters, Image, Mouse, Window, WindowSettings,
+};
 use std::error::Error;
 
 static LOREM_IPSUM: &'static str = "Perferendis officiis ut provident sit eveniet ipsa eos. Facilis delectus at laudantium nemo. Sed ipsa natus perferendis dignissimos odio deserunt omnis.
@@ -18,8 +21,16 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut window = Window::create(&WindowSettings::default())?;
     let (mut renderer, mut text) = common::create_renderers(&window);
+    let mut fira_sans =
+        TextRenderer::with_ttf(&mut renderer, include_bytes!("res/FiraSans.ttf").to_vec()).unwrap();
     let bgs = renderer.create_draw_call(DrawCallParameters {
         alpha_blending: false,
+        ..Default::default()
+    });
+    let sample_text = renderer.create_draw_call(DrawCallParameters {
+        image: Some(Image::from_png(include_bytes!(
+            "res/fira_sans_16px_sample.png"
+        ))?),
         ..Default::default()
     });
     let call = renderer.create_draw_call(Default::default());
@@ -29,6 +40,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut lipsum_alignment = Alignment::Left;
     while window.refresh() {
         renderer.set_dpi_factor(window.dpi_factor);
+        fira_sans.set_dpi_factor(window.dpi_factor);
         text.set_dpi_factor(window.dpi_factor);
 
         let mut y = 10.0;
@@ -218,18 +230,58 @@ fn main() -> Result<(), Box<dyn Error>> {
             // Lorem ipsum
         }
 
+        {
+            // Font - GIMP comparison
+            let font_size = 16.0 / window.dpi_factor;
+            let mut y = window.height - 75.0;
+            let x = 20.0;
+            let comparison_x = 70.0;
+
+            let s = "Comparison between text laid out by Fae and by Gimp:";
+            text.draw(s, x, y, 0.0, 12.0).with_cacheable(true).finish();
+            y += 20.0;
+
+            let s = "Fae:";
+            text.draw(s, x, y, 0.0, font_size)
+                .with_cacheable(true)
+                .finish();
+
+            let s = "The quick brown fox jumps over the lazy dog.";
+            fira_sans
+                .draw(s, comparison_x, y, 0.0, font_size)
+                .with_cacheable(true)
+                .finish();
+            y += font_size * 1.25;
+
+            let s = "Gimp:";
+            text.draw(s, x, y, 0.0, font_size)
+                .with_cacheable(true)
+                .finish();
+            renderer
+                .draw(&sample_text, 0.0)
+                .with_coordinates((
+                    comparison_x,
+                    y,
+                    321.0 / window.dpi_factor,
+                    20.0 / window.dpi_factor,
+                ))
+                .with_texture_coordinates((0, 0, 321, 20))
+                .finish();
+        }
+
         let cache_size = 256.0 / window.dpi_factor;
         let (x, y) = (
             window.width as f32 - 20.0 - cache_size,
             window.height as f32 - 20.0 - cache_size,
         );
-        text.debug_draw_glyph_cache(&mut renderer, (x, y, cache_size, cache_size), -0.8);
+        text.debug_draw_glyph_cache(&mut renderer, (x, y, cache_size, cache_size), 0.9);
         renderer
-            .draw(&call, -0.9)
+            .draw(&call, 0.8)
             .with_coordinates((x, y, cache_size, cache_size))
             .with_color(0.9, 0.9, 0.9, 1.0)
             .finish();
 
+        fira_sans.compose_draw_call(&mut renderer);
         text.compose_draw_call(&mut renderer);
         renderer.render(window.width, window.height);
         window.swap_buffers(Some(&renderer));
