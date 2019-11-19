@@ -77,14 +77,11 @@ impl<'a> FontProvider for RustTypeProvider<'a> {
         let subpixel = cursor.subpixel_offset();
         let scale = self.font_size_to_scale(font_size);
         let from_glyph = self.font.glyph(from).scaled(scale);
-        let from_glyph = from_glyph.positioned(subpixel.into());
-        let from_advance = from_glyph
-            .pixel_bounding_box()
-            .map(|rect| (rect.min.x + rect.width()) as f32)
-            .unwrap_or_else(|| from_glyph.unpositioned().h_metrics().advance_width);
+        // TODO: Add distance-between-glyphs param, currently 0.4px is being used as default
+        let from_advance =
+            from_glyph.h_metrics().advance_width + rusttype::Point::from(subpixel).x + 0.4;
         let kern = self.font.pair_kerning(scale, from, to);
         let advance = from_advance + kern;
-        // FIXME: Kerning seems weird in places (might be fixed, needs testing)
         Advance::new(advance.trunc() as i32, 0, 0.0, cursor.leftover_y)
     }
 
@@ -162,12 +159,12 @@ impl<'a> FontProvider for RustTypeProvider<'a> {
 
 // Gets a name out of the font_name_strings
 fn get_font_name(font: &Font) -> String {
-    use stb_truetype::{MicrosoftEid, PlatformEncodingLanguageId::*};
+    use stb_truetype::{MicrosoftEid, PlatformEncodingLanguageId::*, UnicodeEid};
     let mut font_name_parts = font
         .font_name_strings()
         .filter_map(|(s, plat, id)| {
             let s = std::str::from_utf8(s).ok()?;
-            if (id == 1 || id == 2)
+            if id == 4
                 && match plat? {
                     // I'm not sure how to interpret platform
                     // specific encodings in all situations, but
@@ -175,11 +172,11 @@ fn get_font_name(font: &Font) -> String {
                     // be proper readable utf-8.
                     //
                     // Source: https://docs.microsoft.com/en-us/typography/opentype/spec/name#platform-ids
-                    Unicode(_, _) => true,
-                    Iso(_, _) => true,
-                    Mac(_, _) => true,
+                    Unicode(Some(Ok(eid)), _) if eid == UnicodeEid::Unicode_2_0_Full => true,
                     Microsoft(Some(Ok(eid)), _) if eid == MicrosoftEid::UnicodeFull => true,
-                    Microsoft(Some(Err(eid)), _) if eid == 10 => true,
+                    // The mac eids are just locales, and Roman works,
+                    // so maybe they're all UTF-8?
+                    Mac(_, _) => true,
                     _ => false,
                 }
             {
@@ -189,8 +186,7 @@ fn get_font_name(font: &Font) -> String {
             }
         })
         .collect::<Vec<(&str, u16)>>();
-    font_name_parts.sort_by(|(_, a), (_, b)| a.cmp(b));
     font_name_parts.dedup_by(|(_, a), (_, b)| a == b);
-    debug_assert!(font_name_parts.len() <= 2);
-    format!("{} {}", font_name_parts[0].0, font_name_parts[1].0)
+    debug_assert!(font_name_parts.len() == 1);
+    format!("{}", font_name_parts[0].0)
 }

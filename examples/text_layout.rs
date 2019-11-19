@@ -211,7 +211,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         {
             // Lorem ipsum
-            let font_size = 8.0;
+            let font_size = 11.0;
             let s = format!(
                 "Font size of lorem ipsum: {} px",
                 (font_size * window.dpi_factor) as i32
@@ -248,7 +248,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             let s = "The quick brown fox jumps over the lazy dog.";
             fira_sans
-                .draw(s, comparison_x, y, 0.0, font_size)
+                .draw(s, comparison_x + 0.5 / 1.25, y, 0.0, font_size)
                 .with_cacheable(true)
                 .finish();
             y += font_size * 1.25;
