@@ -13,6 +13,7 @@ pub struct RustTypeProvider<'a> {
     units_per_em: i32,
     ascent: i32,
     descent: i32,
+    space_glyph_id: GlyphId,
     metrics: HashMap<(GlyphId, FontSize, SubpixelOffset), RectPx>,
 }
 
@@ -22,11 +23,13 @@ impl<'a> RustTypeProvider<'a> {
         log::info!("Loading font: {}", get_font_name(&font));
         let units_per_em = font.units_per_em();
         let v_metrics = font.v_metrics_unscaled();
+        let space_glyph_id = font.glyph(' ').id().0;
         Ok(RustTypeProvider {
             font,
             units_per_em: i32::from(units_per_em),
             ascent: v_metrics.ascent as i32,
             descent: v_metrics.descent as i32,
+            space_glyph_id,
             metrics: HashMap::new(),
         })
     }
@@ -64,25 +67,34 @@ impl<'a> FontProvider for RustTypeProvider<'a> {
 
     fn get_line_advance(&self, cursor: Cursor, font_size: i32) -> Advance {
         let metrics = self.font.v_metrics(self.font_size_to_scale(font_size));
-        let advance = (metrics.ascent - metrics.descent
-            + metrics.line_gap
-            + cursor.leftover_y.trunc()) as i32;
-        Advance::new(0, advance, cursor.leftover_x, cursor.leftover_y.fract())
+        let advance_y = metrics.ascent - metrics.descent + metrics.line_gap + cursor.leftover_y;
+        Advance {
+            advance_y: advance_y.trunc() as i32,
+            leftover_y: advance_y.fract(),
+            ..Advance::from(cursor)
+        }
     }
 
     fn get_advance(&self, from: GlyphId, to: GlyphId, cursor: Cursor, font_size: i32) -> Advance {
         let from = rusttype::GlyphId(from);
         let to = rusttype::GlyphId(to);
-        let subpixel = cursor.subpixel_offset();
         let scale = self.font_size_to_scale(font_size);
         let from_glyph = self.font.glyph(from).scaled(scale);
-        // TODO: Add distance-between-glyphs param, currently 0.525px is being used as default
-        // ...because it matches what Firefox rendered for me one night on Windows.
-        let from_advance =
-            from_glyph.h_metrics().advance_width + rusttype::Point::from(subpixel).x + 0.525;
+        let from_advance = from_glyph.h_metrics().advance_width + cursor.leftover_x;
         let kern = self.font.pair_kerning(scale, from, to);
-        let advance = from_advance + kern;
-        Advance::new(advance.trunc() as i32, 0, 0.0, cursor.leftover_y)
+        let mut advance = from_advance + kern;
+        let space_accumulator = if to.0 == self.space_glyph_id {
+            advance += cursor.space_accumulator;
+            0.0
+        } else {
+            cursor.space_accumulator
+        };
+        Advance {
+            advance_x: advance.trunc() as i32,
+            leftover_x: 0.0,
+            space_accumulator: space_accumulator + advance.fract(),
+            ..Advance::from(cursor)
+        }
     }
 
     fn get_metric(&mut self, id: GlyphId, cursor: Cursor, font_size: i32) -> RectPx {

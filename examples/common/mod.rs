@@ -12,7 +12,7 @@ cfg_if::cfg_if! {
         }
     } else if #[cfg(feature = "font8x8")] {
         fn create_text_renderer(renderer: &mut Renderer) -> TextRenderer {
-            TextRenderer::with_font8x8(&mut renderer, true)
+            TextRenderer::with_font8x8(renderer, true)
         }
     } else {
         fn create_text_renderer(_renderer: &mut Renderer) -> TextRenderer {

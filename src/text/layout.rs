@@ -61,7 +61,7 @@ where
             if let Some(a) = get_char_advance(font, cursor, font_size, c, previous_character) {
                 width -= get_char_width(font, cursor, get_metric, previous_character);
                 cursor = cursor + a;
-                width += a.x;
+                width += a.advance_x;
             }
         }
         width += get_char_width(font, cursor, get_metric, c);

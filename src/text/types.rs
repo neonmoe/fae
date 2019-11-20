@@ -69,47 +69,16 @@ impl CacheIdentifier {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct Advance {
-    pub x: i32,
-    pub y: i32,
-    pub leftover_x: f32,
-    pub leftover_y: f32,
-}
-
-impl Advance {
-    pub fn new(x: i32, y: i32, leftover_x: f32, leftover_y: f32) -> Advance {
-        Advance {
-            x,
-            y,
-            leftover_x,
-            leftover_y,
-        }
-    }
-}
-
-// TODO: Making subpixel offset granularity a runtime option might be good
-const SUBPIXEL_RESOLUTION: f32 = 4.0;
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct SubpixelOffset {
-    x: i32,
-    y: i32,
-}
-
-impl From<SubpixelOffset> for rusttype::Point<f32> {
-    fn from(src: SubpixelOffset) -> Self {
-        rusttype::point(
-            src.x as f32 / SUBPIXEL_RESOLUTION,
-            src.y as f32 / SUBPIXEL_RESOLUTION,
-        )
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
 pub struct Cursor {
     pub x: i32,
     pub y: i32,
+    // The fractional parts leftover by previous advances
     pub leftover_x: f32,
     pub leftover_y: f32,
+    // The fractional parts that should be "consumed" by whitespace
+    // Generally: accumulated width should be added to a space (' ')
+    // glyph's advance, and then set to 0.
+    pub space_accumulator: f32,
 }
 
 impl Cursor {
@@ -119,6 +88,7 @@ impl Cursor {
             y,
             leftover_x: 0.0,
             leftover_y: 0.0,
+            space_accumulator: 0.0,
         }
     }
 
@@ -139,13 +109,53 @@ impl Add<Cursor> for RectPx {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct Advance {
+    pub advance_x: i32,
+    pub advance_y: i32,
+    pub space_accumulator: f32,
+    pub leftover_x: f32,
+    pub leftover_y: f32,
+}
+
+impl From<Cursor> for Advance {
+    fn from(other: Cursor) -> Advance {
+        Advance {
+            advance_x: 0,
+            advance_y: 0,
+            space_accumulator: other.space_accumulator,
+            leftover_x: other.leftover_x,
+            leftover_y: other.leftover_y,
+        }
+    }
+}
+
 impl Add<Advance> for Cursor {
     type Output = Cursor;
     fn add(mut self, other: Advance) -> Self::Output {
-        self.x += other.x;
-        self.y += other.y;
+        self.x += other.advance_x;
+        self.y += other.advance_y;
+        self.space_accumulator = other.space_accumulator;
         self.leftover_x = other.leftover_x;
         self.leftover_y = other.leftover_y;
         self
+    }
+}
+
+// TODO: Making subpixel offset granularity a runtime option might be good
+const SUBPIXEL_RESOLUTION: f32 = 4.0;
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct SubpixelOffset {
+    x: i32,
+    y: i32,
+}
+
+#[cfg(feature = "rusttype")]
+impl From<SubpixelOffset> for rusttype::Point<f32> {
+    fn from(src: SubpixelOffset) -> Self {
+        rusttype::point(
+            src.x as f32 / SUBPIXEL_RESOLUTION,
+            src.y as f32 / SUBPIXEL_RESOLUTION,
+        )
     }
 }

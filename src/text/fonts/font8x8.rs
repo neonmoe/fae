@@ -7,7 +7,11 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 
 fn scale(i: i32, font_size: i32) -> i32 {
-    i * font_size / 8
+    i * font_size / 10
+}
+
+fn unscale(i: i32, font_size: i32) -> i32 {
+    i / font_size * 10
 }
 
 pub struct Font8x8Provider {
@@ -28,28 +32,38 @@ impl FontProvider for Font8x8Provider {
     }
 
     fn get_line_advance(&self, cursor: Cursor, font_size: i32) -> Advance {
-        let leftover_y = cursor.leftover_y.fract();
-        let line_height = font_size * 4 / 3 + cursor.leftover_y.trunc() as i32;
-        Advance::new(0, line_height, cursor.leftover_x, leftover_y)
+        let advance = scale(30, font_size) as f32 / 3.0 + cursor.leftover_y;
+        Advance {
+            advance_y: advance.trunc() as i32,
+            leftover_y: advance.fract(),
+            ..Advance::from(cursor)
+        }
     }
 
     fn get_advance(&self, from: GlyphId, _to: GlyphId, cursor: Cursor, font_size: i32) -> Advance {
         let RectPx { width, .. } = self.get_raw_metrics(from);
-        let mut advance = (width * font_size / 8 + 1) as i32;
-        let mut leftover_x = cursor.leftover_x;
+        let mut advance_x = scale(width, font_size) + 1;
+        let advance_fractional = scale(width * 8, font_size) as f32 / 8.0 + 1.0 + cursor.leftover_x;
+        let fract = advance_fractional - advance_x as f32;
 
-        leftover_x += ((width * font_size) as f32 / 8.0 + 1.0) - advance as f32;
-        if from == ' ' as GlyphId && leftover_x >= 1.0 {
-            advance += leftover_x.trunc() as i32;
-            leftover_x = leftover_x.fract();
+        let mut space_accumulator = cursor.space_accumulator + fract;
+        if from == ' ' as GlyphId && cursor.space_accumulator >= 1.0 {
+            advance_x += cursor.space_accumulator.trunc() as i32;
+            space_accumulator = space_accumulator.fract();
         }
 
-        Advance::new(advance, 0, leftover_x, cursor.leftover_y)
+        Advance {
+            advance_x,
+            leftover_x: 0.0,
+            space_accumulator,
+            ..Advance::from(cursor)
+        }
     }
 
     fn get_metric(&mut self, id: GlyphId, cursor: Cursor, font_size: i32) -> RectPx {
         let metrics = self.get_raw_metrics(id);
-        let y_offset = (self.get_line_advance(cursor, font_size).y / font_size * 8 - 8) / 2;
+        let line_height = self.get_line_advance(cursor, font_size).advance_y;
+        let y_offset = (unscale(line_height, font_size) - 8) / 2;
         RectPx {
             x: 0,
             y: scale(y_offset + metrics.y, font_size),
