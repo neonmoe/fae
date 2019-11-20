@@ -64,7 +64,8 @@ impl TextRenderer {
         renderer: &mut Renderer,
         ttf_data: Vec<u8>,
     ) -> Result<TextRenderer, rusttype::Error> {
-        let (cache, call) = GlyphCache::create_cache_and_draw_call(renderer, 256, 256, true);
+        // FIXME: Glyph cache line eviction / partitioning
+        let (cache, call) = GlyphCache::create_cache_and_draw_call(renderer, 1024, 1024, true);
         let font = Box::new(fonts::RustTypeProvider::from_ttf(ttf_data)?);
         Ok(TextRenderer::with_params(cache, call, font))
     }
@@ -180,7 +181,7 @@ impl TextRenderer {
         let mut cursor = Cursor::new(x, y);
         let mut text_left = text;
         while !text_left.is_empty() {
-            let (line_len, line_width) = get_line_length_and_width(
+            let (line_stride, line_len, line_width) = get_line_length_and_width(
                 &mut *self.font,
                 cursor,
                 &get_metric,
@@ -195,33 +196,37 @@ impl TextRenderer {
             let mut previous_character = None;
             let mut chars = text_left.chars();
             for (chars_processed, c) in (&mut chars).enumerate() {
-                if let Some((glyph_id, metrics)) = get_metric(&mut *self.font, cursor, c) {
-                    // Advance the cursor, if this is not the first character
-                    if let Some(prev_char) = previous_character {
-                        if let Some(advance) =
-                            get_char_advance(&mut *self.font, cursor, font_size, c, prev_char)
-                        {
-                            cursor = cursor + advance;
+                if chars_processed < line_len {
+                    if let Some((glyph_id, metrics)) = get_metric(&mut *self.font, cursor, c) {
+                        // Advance the cursor, if this is not the first character
+                        if let Some(prev_char) = previous_character {
+                            if let Some(advance) =
+                                get_char_advance(&mut *self.font, cursor, font_size, c, prev_char)
+                            {
+                                cursor = cursor + advance;
+                            }
                         }
+
+                        let screen_location = metrics + cursor;
+                        min_x = min_x.min(screen_location.x as f32 / self.dpi_factor);
+                        min_y = min_y.min(screen_location.y as f32 / self.dpi_factor);
+                        max_x = max_x.max(
+                            (screen_location.x + screen_location.width) as f32 / self.dpi_factor,
+                        );
+                        max_y = max_y.max(
+                            (screen_location.y + screen_location.height) as f32 / self.dpi_factor,
+                        );
+                        glyphs.push(Glyph {
+                            cursor,
+                            metrics,
+                            draw_data: draw_data_index,
+                            id: glyph_id,
+                        });
                     }
-
-                    let screen_location = metrics + cursor;
-                    min_x = min_x.min(screen_location.x as f32 / self.dpi_factor);
-                    min_y = min_y.min(screen_location.y as f32 / self.dpi_factor);
-                    max_x = max_x
-                        .max((screen_location.x + screen_location.width) as f32 / self.dpi_factor);
-                    max_y = max_y
-                        .max((screen_location.y + screen_location.height) as f32 / self.dpi_factor);
-                    glyphs.push(Glyph {
-                        cursor,
-                        metrics,
-                        draw_data: draw_data_index,
-                        id: glyph_id,
-                    });
+                    previous_character = Some(c);
                 }
-                previous_character = Some(c);
 
-                if chars_processed + 1 >= line_len {
+                if chars_processed + 1 >= line_stride {
                     break;
                 }
             }

@@ -43,7 +43,7 @@ pub(crate) fn get_line_length_and_width<F>(
     font_size: i32,
     max_width: Option<i32>,
     s: &str,
-) -> (usize, i32)
+) -> (usize, usize, i32)
 where
     F: Fn(&mut dyn FontProvider, Cursor, char) -> Option<(GlyphId, RectPx)>,
 {
@@ -52,6 +52,8 @@ where
     let mut previous_character = None;
     let mut len = 0;
     let mut can_break_len = None;
+    // Linebreakers shouldn't be rendered
+    let mut broken_by_line_breaker = false;
 
     // Find characters that fit in the given width
     for c in s.chars() {
@@ -75,6 +77,7 @@ where
 
         if must_break(c) {
             widths.pop_back(); // Pop off the breaking character
+            broken_by_line_breaker = true;
             break;
         } else if let Some(max_width) = max_width {
             if total_width > max_width {
@@ -95,8 +98,9 @@ where
     }
 
     let total_width = widths.into_iter().sum();
+    let printable_len = if broken_by_line_breaker { len - 1 } else { len };
 
-    (len, total_width)
+    (len, printable_len, total_width)
 }
 
 pub(crate) fn get_char_advance(
