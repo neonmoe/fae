@@ -78,6 +78,8 @@ pub struct Cursor {
     // The fractional parts that should be "consumed" by whitespace
     // Generally: accumulated width should be added to a space (' ')
     // glyph's advance, and then set to 0.
+    // TODO: This should be an option of the text renderer, in addition to line height and distance between characters
+    // ^ Or alternatively it would be good to actually handle the fractions where they happen. Maybe an option?
     pub space_accumulator: f32,
 }
 

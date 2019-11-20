@@ -172,7 +172,7 @@ impl TextRenderer {
 
         let get_metric = |font: &mut dyn FontProvider, cursor, c| {
             font.get_glyph_id(c)
-                .or_else(|| font.get_glyph_id('\u{FFFD}'))
+                .or(Some(0))
                 .map(|id| (id, font.get_metric(id, cursor, font_size)))
         };
 
