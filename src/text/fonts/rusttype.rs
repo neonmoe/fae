@@ -20,7 +20,9 @@ pub struct RustTypeProvider<'a> {
 impl<'a> RustTypeProvider<'a> {
     pub fn from_ttf(ttf_data: Vec<u8>) -> Result<RustTypeProvider<'a>, rusttype::Error> {
         let font = FontCollection::from_bytes(ttf_data)?.into_font()?;
-        log::info!("Loading font: {}", get_font_name(&font));
+        if log::log_enabled!(log::Level::Info) {
+            log::info!("Loading font: {}", get_font_name(&font));
+        }
         let units_per_em = font.units_per_em();
         let v_metrics = font.v_metrics_unscaled();
         let space_glyph_id = font.glyph(' ').id().0;
@@ -200,5 +202,5 @@ fn get_font_name(font: &Font) -> String {
         .collect::<Vec<(&str, u16)>>();
     font_name_parts.dedup_by(|(_, a), (_, b)| a == b);
     debug_assert!(font_name_parts.len() == 1);
-    format!("{}", font_name_parts[0].0)
+    font_name_parts[0].0.to_string()
 }
