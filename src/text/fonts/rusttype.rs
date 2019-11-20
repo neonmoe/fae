@@ -54,8 +54,7 @@ impl<'a> RustTypeProvider<'a> {
 
 impl<'a> FontProvider for RustTypeProvider<'a> {
     fn get_glyph_id(&self, c: char) -> Option<GlyphId> {
-        let glyph = self.font.glyph(c);
-        let id = glyph.id().0;
+        let id = self.font.glyph(c).id().0;
         if id == 0 {
             None
         } else {

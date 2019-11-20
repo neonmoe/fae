@@ -37,12 +37,13 @@ impl FontProvider for Font8x8Provider {
         let RectPx { width, .. } = self.get_raw_metrics(from);
         let mut advance = (width * font_size / 8 + 1) as i32;
         let mut leftover_x = cursor.leftover_x;
+
+        leftover_x += ((width * font_size) as f32 / 8.0 + 1.0) - advance as f32;
         if from == ' ' as GlyphId && leftover_x >= 1.0 {
             advance += leftover_x.trunc() as i32;
             leftover_x = leftover_x.fract();
-        } else {
-            leftover_x += ((width * font_size) as f32 / 8.0 + 1.0) - advance as f32;
         }
+
         Advance::new(advance, 0, leftover_x, cursor.leftover_y)
     }
 

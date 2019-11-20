@@ -248,7 +248,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             let s = "The quick brown fox jumps over the lazy dog.";
             fira_sans
-                .draw(s, comparison_x + 2.0 / 1.25, y, 0.0, font_size)
+                .draw(s, comparison_x + 1.5 / window.dpi_factor, y, 0.0, font_size)
                 .with_cacheable(true)
                 .finish();
             y += font_size * 1.25;
