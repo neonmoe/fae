@@ -77,9 +77,10 @@ impl<'a> FontProvider for RustTypeProvider<'a> {
         let subpixel = cursor.subpixel_offset();
         let scale = self.font_size_to_scale(font_size);
         let from_glyph = self.font.glyph(from).scaled(scale);
-        // TODO: Add distance-between-glyphs param, currently 0.4px is being used as default
+        // TODO: Add distance-between-glyphs param, currently 0.525px is being used as default
+        // ...because it matches what Firefox rendered for me one night on Windows.
         let from_advance =
-            from_glyph.h_metrics().advance_width + rusttype::Point::from(subpixel).x + 0.4;
+            from_glyph.h_metrics().advance_width + rusttype::Point::from(subpixel).x + 0.525;
         let kern = self.font.pair_kerning(scale, from, to);
         let advance = from_advance + kern;
         Advance::new(advance.trunc() as i32, 0, 0.0, cursor.leftover_y)

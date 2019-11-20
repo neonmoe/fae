@@ -235,7 +235,7 @@ impl GlyphCache {
             minification_smoothing: true,
             magnification_smoothing: smoothed,
             wrap: (TextureWrapping::Clamp, TextureWrapping::Clamp),
-            srgb: true,
+            srgb: false,
         });
         let cache = GlyphCache {
             texture: renderer.get_texture(&call),

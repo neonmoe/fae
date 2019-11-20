@@ -237,7 +237,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             let x = 20.0;
             let comparison_x = 70.0;
 
-            let s = "Comparison between text laid out by Fae and by Gimp:";
+            let s = "Comparison between text laid out by Fae and by Firefox:";
             text.draw(s, x, y, 0.0, 12.0).with_cacheable(true).finish();
             y += 20.0;
 
@@ -248,12 +248,12 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             let s = "The quick brown fox jumps over the lazy dog.";
             fira_sans
-                .draw(s, comparison_x + 0.5 / 1.25, y, 0.0, font_size)
+                .draw(s, comparison_x + 2.0 / 1.25, y, 0.0, font_size)
                 .with_cacheable(true)
                 .finish();
             y += font_size * 1.25;
 
-            let s = "Gimp:";
+            let s = "Firefox:";
             text.draw(s, x, y, 0.0, font_size)
                 .with_cacheable(true)
                 .finish();
@@ -262,10 +262,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .with_coordinates((
                     comparison_x,
                     y,
-                    321.0 / window.dpi_factor,
-                    20.0 / window.dpi_factor,
+                    329.0 / window.dpi_factor,
+                    19.0 / window.dpi_factor,
                 ))
-                .with_texture_coordinates((0, 0, 321, 20))
+                .with_texture_coordinates((0, 0, 329, 19))
                 .finish();
         }
 
