@@ -238,7 +238,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "Font size of lorem ipsum: {} px",
                 (font_size * window.dpi_factor) as i32
             );
-            text.draw(s, 300.0, 30.0, 0.0, font_size / window.dpi_factor)
+            text.draw(s, 300.0, 29.0, 0.0, 8.0)
                 .with_alignment(lipsum_alignment)
                 .with_color((0.1, 0.1, 0.1, 1.0))
                 .with_max_width(320.0)

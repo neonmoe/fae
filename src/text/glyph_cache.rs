@@ -18,9 +18,7 @@ use std::cell::Cell;
 use std::collections::HashMap;
 use std::rc::{Rc, Weak};
 
-// How far the glyphs are from the texture's edges
-const GLYPH_CACHE_MARGIN: i32 = 1;
-// How far the glyphs are from each other
+// How far the glyphs are from each other (and from the texture's edges)
 const GLYPH_CACHE_GAP: i32 = 1;
 
 const TEXT_FRAGMENT_SHADER_110: &str = include_str!("../shaders/legacy/text.frag");
@@ -51,8 +49,9 @@ pub struct GlyphSpot {
 
 struct GlyphLine {
     cache_texture: GLuint,
-    cache_width: i32,
+    x: i32,
     y: i32,
+    width: i32,
     height: i32,
     min_height: i32,
     max_height: i32,
@@ -61,19 +60,21 @@ struct GlyphLine {
 
 impl GlyphLine {
     fn new(
-        line_y: i32,
-        line_height: i32,
         cache_texture: GLuint,
-        cache_width: i32,
         cache_height: i32,
+        x: i32,
+        y: i32,
+        width: i32,
+        height: i32,
     ) -> GlyphLine {
         GlyphLine {
             cache_texture,
-            cache_width,
-            y: line_y,
-            height: line_height,
-            min_height: line_height / 2,
-            max_height: (line_height * 2).min(cache_height - GLYPH_CACHE_MARGIN - line_y),
+            x,
+            y,
+            width,
+            height,
+            min_height: height / 2,
+            max_height: (height * 2).min(cache_height - GLYPH_CACHE_GAP - y),
             reserved: Vec::new(),
         }
     }
@@ -89,8 +90,7 @@ impl GlyphLine {
     ///    being composed.
     ///
     /// \*\* Which will be GLYPH_CACHE_GAP away from the empty space's
-    ///      left neighbor, or GLYPH_CACHE_MARGIN away from the cache
-    ///      texture's left side, if there is no neighbor.
+    ///      left neighbor.
     #[allow(clippy::len_zero)]
     fn evict_width(&mut self, width: i32) -> Option<i32> {
         let mut left = 0;
@@ -107,14 +107,14 @@ impl GlyphLine {
                         let previous = self.reserved[i - 1].texcoords;
                         previous.x + previous.width + GLYPH_CACHE_GAP
                     } else {
-                        GLYPH_CACHE_MARGIN
+                        self.x + GLYPH_CACHE_GAP
                     };
                     collected_range = i..i;
                 }
                 right = if i + 1 < self.reserved.len() {
                     self.reserved[i + 1].texcoords.x - GLYPH_CACHE_GAP
                 } else {
-                    self.cache_width - GLYPH_CACHE_MARGIN
+                    self.x + self.width - GLYPH_CACHE_GAP
                 };
                 collected_range.end += 1;
             }
@@ -139,14 +139,12 @@ impl GlyphLine {
     /// `width`-wide gap in between them\*. If such a gap is found,
     /// the leftmost x-coordinate\*\* of the gap is returned.
     ///
-    /// \* With GLYPH_CACHE_GAP and GLYPH_CACHE_MARGIN taken into
-    ///    account.
+    /// \* With GLYPH_CACHE_GAP taken into account.
     /// \*\* Which, to be clear, is GLYPH_CACHE_GAP away from its
-    ///      left neighbor, or GLYPH_CACHE_MARGIN away from the cache
-    ///      texture's left side, if there is no left neighbor.
+    ///      left neighbor.
     fn reserve_width(&mut self, width: i32) -> Option<i32> {
         if self.reserved.is_empty() {
-            return Some(GLYPH_CACHE_MARGIN);
+            return Some(self.x + GLYPH_CACHE_GAP);
         }
 
         // Compare distances between the left border of each spot and
@@ -156,12 +154,12 @@ impl GlyphLine {
                 let previous = self.reserved[i - 1].texcoords;
                 previous.x + previous.width + GLYPH_CACHE_GAP
             } else {
-                GLYPH_CACHE_MARGIN
+                self.x + GLYPH_CACHE_GAP
             };
             let current_spot_left = if i < self.reserved.len() {
                 self.reserved[i].texcoords.x - GLYPH_CACHE_GAP
             } else {
-                self.cache_width - GLYPH_CACHE_MARGIN
+                self.x + self.width - GLYPH_CACHE_GAP
             };
 
             if current_spot_left >= previous_spot_right + width {
@@ -333,21 +331,22 @@ impl GlyphCache {
     }
 
     fn create_line(&mut self, height: i32) -> Option<&mut GlyphLine> {
-        let mut total_height = GLYPH_CACHE_MARGIN;
+        let mut total_height = GLYPH_CACHE_GAP;
         for line in &self.lines {
             total_height += line.height + GLYPH_CACHE_GAP;
         }
-        if total_height + height <= self.height - GLYPH_CACHE_MARGIN {
+        if total_height + height <= self.height - GLYPH_CACHE_GAP {
             if !self.lines.is_empty() {
                 let i = self.lines.len() - 1;
                 self.lines[i].max_height = self.lines[i].height;
             }
             self.lines.push(GlyphLine::new(
-                total_height,
-                height,
                 self.texture,
-                self.width,
                 self.height,
+                0,
+                total_height,
+                self.width,
+                height,
             ));
             let i = self.lines.len() - 1;
             Some(&mut self.lines[i])
