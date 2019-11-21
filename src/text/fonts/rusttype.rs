@@ -10,6 +10,8 @@ type FontSize = i32;
 
 pub struct RustTypeProvider<'a> {
     font: Font<'a>,
+    sink_overflows_into_spaces: bool,
+    glyph_padding: f32,
     units_per_em: i32,
     ascent: i32,
     descent: i32,
@@ -28,6 +30,8 @@ impl<'a> RustTypeProvider<'a> {
         let space_glyph_id = font.glyph(' ').id().0;
         Ok(RustTypeProvider {
             font,
+            sink_overflows_into_spaces: true,
+            glyph_padding: 0.3,
             units_per_em: i32::from(units_per_em),
             ascent: v_metrics.ascent as i32,
             descent: v_metrics.descent as i32,
@@ -80,21 +84,30 @@ impl<'a> FontProvider for RustTypeProvider<'a> {
     fn get_advance(&self, from: GlyphId, to: GlyphId, cursor: Cursor, font_size: i32) -> Advance {
         let from = rusttype::GlyphId(from);
         let to = rusttype::GlyphId(to);
+
         let scale = self.font_size_to_scale(font_size);
         let from_glyph = self.font.glyph(from).scaled(scale);
-        let from_advance = from_glyph.h_metrics().advance_width + cursor.leftover_x;
+        let from_advance =
+            from_glyph.h_metrics().advance_width + cursor.leftover_x + self.glyph_padding;
         let kern = self.font.pair_kerning(scale, from, to);
         let mut advance = from_advance + kern;
+
         let space_accumulator = if to.0 == self.space_glyph_id {
             advance += cursor.space_accumulator;
             0.0
         } else {
             cursor.space_accumulator
         };
+        let overflow = if self.sink_overflows_into_spaces {
+            advance.fract() - self.glyph_padding
+        } else {
+            0.0
+        };
+
         Advance {
             advance_x: advance.trunc() as i32,
             leftover_x: 0.0,
-            space_accumulator: space_accumulator + advance.fract(),
+            space_accumulator: space_accumulator + overflow,
             ..Advance::from(cursor)
         }
     }
