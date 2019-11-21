@@ -9,9 +9,11 @@ use std::collections::HashMap;
 type FontSize = i32;
 
 pub struct RustTypeProvider<'a> {
+    // These public variables are probably best to leave at defaults,
+    // but I've left them as variables for future consideration.
+    pub sink_overflows_into_spaces: bool,
+    pub glyph_padding: f32,
     font: Font<'a>,
-    sink_overflows_into_spaces: bool,
-    glyph_padding: f32,
     units_per_em: i32,
     ascent: i32,
     descent: i32,
@@ -30,8 +32,8 @@ impl<'a> RustTypeProvider<'a> {
         let space_glyph_id = font.glyph(' ').id().0;
         Ok(RustTypeProvider {
             font,
-            sink_overflows_into_spaces: true,
-            glyph_padding: 0.3,
+            sink_overflows_into_spaces: false,
+            glyph_padding: 0.0,
             units_per_em: i32::from(units_per_em),
             ascent: v_metrics.ascent as i32,
             descent: v_metrics.descent as i32,
