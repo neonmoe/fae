@@ -602,7 +602,7 @@ impl Renderer {
 
     /// Returns the OpenGL texture handle for the texture used by the
     /// draw call.
-    #[cfg(all(feature = "text", feature = "font8x8" /* or font-kit, in the future */))]
+    #[cfg(feature = "text")]
     pub(crate) fn get_texture(&self, call_handle: &DrawCallHandle) -> GLuint {
         self.calls[call_handle.0].texture
     }

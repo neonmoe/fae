@@ -233,7 +233,6 @@ impl TextRenderer {
             text_left = chars.as_str();
 
             cursor.x = x;
-            cursor.leftover_x = 0.0;
             cursor = cursor + self.font.get_line_advance(cursor, font_size);
         }
         self.glyphs.extend(&glyphs);
@@ -325,7 +324,6 @@ impl TextRenderer {
                 Err(err) => match err {
                     // TODO: Report this to the crate user somehow
                     GlyphNotRenderedError::GlyphCacheFull => continue,
-                    GlyphNotRenderedError::GlyphInvisible => continue,
                 },
             }
         }

@@ -7,8 +7,6 @@ pub(crate) enum GlyphNotRenderedError {
     /// rendered. This is usually caused by trying to draw too
     /// high-resolution text.
     GlyphCacheFull,
-    /// The glyph just doesn't have anything to render.
-    GlyphInvisible,
 }
 
 #[cfg(feature = "png")]

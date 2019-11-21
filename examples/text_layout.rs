@@ -3,7 +3,7 @@
 
 mod common;
 
-#[cfg(feature = "rusttype")]
+#[cfg(all(feature = "rusttype", feature = "png"))]
 use fae::{text::TextRenderer, Image};
 
 use fae::{text::Alignment, DrawCallParameters, Mouse, Window, WindowSettings};
@@ -22,10 +22,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut window = Window::create(&WindowSettings::default())?;
     let (mut renderer, mut text) = common::create_renderers(&window);
 
-    #[cfg(feature = "rusttype")]
+    #[cfg(all(feature = "rusttype", feature = "png"))]
     let mut fira_sans =
         TextRenderer::with_ttf(&mut renderer, include_bytes!("res/FiraSans.ttf").to_vec()).unwrap();
-    #[cfg(feature = "rusttype")]
+    #[cfg(all(feature = "rusttype", feature = "png"))]
     let sample_text = renderer.create_draw_call(DrawCallParameters {
         image: Some(Image::from_png(include_bytes!(
             "res/fira_sans_16px_sample.png"
@@ -46,7 +46,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         renderer.set_dpi_factor(window.dpi_factor);
         text.set_dpi_factor(window.dpi_factor);
 
-        #[cfg(feature = "rusttype")]
+        #[cfg(all(feature = "rusttype", feature = "png"))]
         fira_sans.set_dpi_factor(window.dpi_factor);
 
         let mut y = 10.0;
@@ -84,6 +84,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                     .finish();
             }
         }
+        y += 20.0;
+
+        let s = "Missing character (hopefully): \u{FFFF}";
+        text.draw(s, 10.0, y, 0.0, 12.0)
+            .with_cacheable(true)
+            .finish();
         y += 20.0;
 
         {
@@ -236,7 +242,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             // Lorem ipsum
         }
 
-        #[cfg(feature = "rusttype")]
+        #[cfg(all(feature = "rusttype", feature = "png"))]
         {
             // Fae/firefox text comparison
             // (it's not really fair, firefox does a lot more stuff, but as far as latin goes..)
@@ -290,7 +296,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             .with_color(0.9, 0.9, 0.9, 1.0)
             .finish();
 
-        #[cfg(feature = "rusttype")]
+        #[cfg(all(feature = "rusttype", feature = "png"))]
         fira_sans.compose_draw_call(&mut renderer);
 
         text.compose_draw_call(&mut renderer);

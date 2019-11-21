@@ -74,7 +74,7 @@ impl FontProvider for Font8x8Provider {
         if let Some(bitmap) = get_bitmap(id) {
             self.render_bitmap(cache, id, bitmap)
         } else {
-            Err(GlyphNotRenderedError::GlyphInvisible)
+            self.render_bitmap(cache, id, get_missing_bitmap())
         }
     }
 }
@@ -105,7 +105,7 @@ impl Font8x8Provider {
     ) -> Result<RectPx, GlyphNotRenderedError> {
         let metric = self.get_raw_metrics(id);
 
-        let id = CacheIdentifier::new(id, None, None);
+        let id = CacheIdentifier::new(id, None);
         let tex = cache.get_texture();
         let (spot, new) = cache.reserve_uvs(id, metric.width, metric.height)?;
         if new {
@@ -182,13 +182,27 @@ fn get_empty_pixels_top_bottom(id: GlyphId) -> Option<(i32, i32)> {
     Some((top? as i32, 7 - bottom? as i32))
 }
 
+fn get_missing_bitmap() -> [u8; 8] {
+    // Produces a bitmap of a rectangle, looks like:
+    // ........
+    // .######.
+    // .#....#.
+    // .#....#.
+    // .#....#.
+    // .######.
+    // ........
+    // ........
+    [0x7E, 0x42, 0x42, 0x42, 0x42, 0x42, 0x7E, 0x0]
+}
+
 // This function provides glyphs for 558 characters (for calculating
 // the cache texture size)
 #[doc(hidden)]
 pub fn get_bitmap(id: GlyphId) -> Option<[u8; 8]> {
     let u = id as usize;
     let bitmap = match u {
-        0..=0x7F => Some(font8x8::legacy::BASIC_LEGACY[u]),
+        0 => Some(get_missing_bitmap()), // Standard missing glyph id
+        1..=0x7F => Some(font8x8::legacy::BASIC_LEGACY[u]),
         0x80..=0x9F => Some(font8x8::legacy::CONTROL_LEGACY[u - 0x80]),
         0xA0..=0xFF => Some(font8x8::legacy::LATIN_LEGACY[u - 0xA0]),
         0x2500..=0x257F => Some(font8x8::legacy::BOX_LEGACY[u - 0x2500]),

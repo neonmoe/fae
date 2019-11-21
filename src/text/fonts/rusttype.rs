@@ -18,7 +18,7 @@ pub struct RustTypeProvider<'a> {
     ascent: i32,
     descent: i32,
     space_glyph_id: GlyphId,
-    metrics: HashMap<(GlyphId, FontSize, SubpixelOffset), RectPx>,
+    metrics: HashMap<(GlyphId, FontSize), RectPx>,
 }
 
 impl<'a> RustTypeProvider<'a> {
@@ -75,10 +75,9 @@ impl<'a> FontProvider for RustTypeProvider<'a> {
 
     fn get_line_advance(&self, cursor: Cursor, font_size: i32) -> Advance {
         let metrics = self.font.v_metrics(self.font_size_to_scale(font_size));
-        let advance_y = metrics.ascent - metrics.descent + metrics.line_gap + cursor.leftover_y;
+        let advance_y = metrics.ascent - metrics.descent + metrics.line_gap;
         Advance {
             advance_y: advance_y.trunc() as i32,
-            leftover_y: advance_y.fract(),
             ..Advance::from(cursor)
         }
     }
@@ -89,8 +88,7 @@ impl<'a> FontProvider for RustTypeProvider<'a> {
 
         let scale = self.font_size_to_scale(font_size);
         let from_glyph = self.font.glyph(from).scaled(scale);
-        let from_advance =
-            from_glyph.h_metrics().advance_width + cursor.leftover_x + self.glyph_padding;
+        let from_advance = from_glyph.h_metrics().advance_width + self.glyph_padding;
         let kern = self.font.pair_kerning(scale, from, to);
         let mut advance = from_advance + kern;
 
@@ -108,15 +106,13 @@ impl<'a> FontProvider for RustTypeProvider<'a> {
 
         Advance {
             advance_x: advance.trunc() as i32,
-            leftover_x: 0.0,
             space_accumulator: space_accumulator + overflow,
             ..Advance::from(cursor)
         }
     }
 
-    fn get_metric(&mut self, id: GlyphId, cursor: Cursor, font_size: i32) -> RectPx {
-        let subpixel = cursor.subpixel_offset();
-        let key = (id, font_size, subpixel);
+    fn get_metric(&mut self, id: GlyphId, _cursor: Cursor, font_size: i32) -> RectPx {
+        let key = (id, font_size);
         if let Some(metric) = self.metrics.get(&key) {
             *metric
         } else {
@@ -125,7 +121,7 @@ impl<'a> FontProvider for RustTypeProvider<'a> {
                 .font
                 .glyph(rusttype::GlyphId(id))
                 .scaled(scale)
-                .positioned(subpixel.into());
+                .positioned(rusttype::point(0.0, 0.0));
             let metric = self.get_metric_from_glyph(&glyph);
             self.metrics.insert(key, metric);
             metric
@@ -139,10 +135,9 @@ impl<'a> FontProvider for RustTypeProvider<'a> {
         cursor: Cursor,
         font_size: i32,
     ) -> Result<RectPx, GlyphNotRenderedError> {
-        let subpixel = cursor.subpixel_offset();
         let metric = self.get_metric(glyph_id, cursor, font_size);
 
-        let id = CacheIdentifier::new(glyph_id, Some(font_size), Some(subpixel));
+        let id = CacheIdentifier::new(glyph_id, Some(font_size));
         let tex = cache.get_texture();
         let (spot, new) = cache.reserve_uvs(id, metric.width, metric.height)?;
         if new {
@@ -152,7 +147,7 @@ impl<'a> FontProvider for RustTypeProvider<'a> {
                 .font
                 .glyph(rusttype::GlyphId(glyph_id))
                 .scaled(scale)
-                .positioned(subpixel.into());
+                .positioned(rusttype::point(0.0, 0.0));
             let mut data = vec![0; (metric.width * metric.height) as usize];
             let stride = metric.width as u32;
             glyph.draw(|x, y, c| {
