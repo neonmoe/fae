@@ -51,26 +51,36 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         let mut y = 10.0;
 
-        let s = "First test, no limits, should be on one line.";
+        let s = "The following rectangle should be red if the glyph cache has been filled:";
         if let Some(rect) = text
-            .draw(s, 10.0, y, 0.0, 16.0)
+            .draw(s, 10.0, y, 0.0, 14.0)
             .with_cacheable(true)
             .finish()
         {
+            let y = y - 1.0;
             renderer
                 .draw(&bgs, -0.1)
-                .with_coordinates(rect)
-                .with_color(0.9, 0.9, 0.5, 1.0)
+                .with_coordinates((rect.x + rect.width + 9.0, y - 1.0, 16.0, 16.0))
+                .with_color((0.1, 0.1, 0.1, 1.0))
+                .finish();
+            renderer
+                .draw(&bgs, 0.0)
+                .with_coordinates((rect.x + rect.width + 10.0, y, 14.0, 14.0))
+                .with_color(if text.is_glyph_cache_full() {
+                    (0.8, 0.2, 0.2, 1.0)
+                } else {
+                    (0.2, 0.8, 0.2, 1.0)
+                })
                 .finish();
         }
         y += 20.0;
 
         if let Some(rect) = text
-            .draw("Cut off at |, like so |", 10.0, y, 0.0, 14.0)
+            .draw("Cut off this text at |, like so |", 10.0, y, 0.0, 14.0)
             .with_cacheable(true)
             .finish()
         {
-            let s = "Cut off at |, like so |...and here's text that should not appear";
+            let s = "Cut off this text at |, like so |...and here's text that should not appear";
             if let Some(rect) = text
                 .draw(s, 10.0, y, 0.0, 14.0)
                 .with_cacheable(true)
@@ -80,7 +90,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 renderer
                     .draw(&bgs, -0.1)
                     .with_coordinates(rect)
-                    .with_color(0.9, 0.9, 0.5, 1.0)
+                    .with_color((0.9, 0.9, 0.5, 1.0))
                     .finish();
             }
         }
@@ -110,12 +120,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             renderer
                 .draw(&bgs, -0.1)
                 .with_coordinates((10.0 + px, y + px, 200.0 - 2.0 * px, 40.0 - 2.0 * px))
-                .with_color(col, col, col, 1.0)
+                .with_color((col, col, col, 1.0))
                 .finish();
             renderer
                 .draw(&bgs, -0.1)
                 .with_coordinates((10.0, y, 200.0, 40.0))
-                .with_color(0.2, 0.2, 0.2, 1.0)
+                .with_color((0.2, 0.2, 0.2, 1.0))
                 .finish();
             text.draw("Left", 20.0, y + 10.0, 0.0, 20.0)
                 .with_max_width(190.0)
@@ -139,12 +149,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             renderer
                 .draw(&bgs, -0.1)
                 .with_coordinates((10.0 + px, y + px, 200.0 - 2.0 * px, 40.0 - 2.0 * px))
-                .with_color(col, col, col, 1.0)
+                .with_color((col, col, col, 1.0))
                 .finish();
             renderer
                 .draw(&bgs, -0.1)
                 .with_coordinates((10.0, y, 200.0, 40.0))
-                .with_color(0.2, 0.2, 0.2, 1.0)
+                .with_color((0.2, 0.2, 0.2, 1.0))
                 .finish();
             text.draw("Center", 10.0, y + 10.0, 0.0, 20.0)
                 .with_max_width(200.0)
@@ -168,12 +178,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             renderer
                 .draw(&bgs, -0.1)
                 .with_coordinates((10.0 + px, y + px, 200.0 - 2.0 * px, 40.0 - 2.0 * px))
-                .with_color(col, col, col, 1.0)
+                .with_color((col, col, col, 1.0))
                 .finish();
             renderer
                 .draw(&bgs, -0.1)
                 .with_coordinates((10.0, y, 200.0, 40.0))
-                .with_color(0.2, 0.2, 0.2, 1.0)
+                .with_color((0.2, 0.2, 0.2, 1.0))
                 .finish();
             text.draw("Right", 10.0, y + 10.0, 0.0, 20.0)
                 .with_max_width(190.0)
@@ -293,7 +303,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         renderer
             .draw(&call, 0.8)
             .with_coordinates((x, y, cache_size, cache_size))
-            .with_color(0.9, 0.9, 0.9, 1.0)
+            .with_color((0.9, 0.9, 0.9, 1.0))
             .finish();
 
         #[cfg(all(feature = "rusttype", feature = "png"))]

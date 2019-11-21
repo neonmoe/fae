@@ -114,7 +114,7 @@ impl<'a, 'b> Sprite<'a, 'b> {
     }
 
     /// Specifies the color tint of the quad.
-    pub fn with_color(mut self, red: f32, green: f32, blue: f32, alpha: f32) -> Sprite<'a, 'b> {
+    pub fn with_color(mut self, (red, green, blue, alpha): (f32, f32, f32, f32)) -> Sprite<'a, 'b> {
         self.color = (red, green, blue, alpha);
         self
     }

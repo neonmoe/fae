@@ -34,6 +34,7 @@ use std::collections::HashMap;
 /// a text draw call queue.
 pub struct TextRenderer {
     cache: GlyphCache,
+    glyph_cache_filled: bool,
     call: DrawCallHandle,
     glyphs: Vec<Glyph>,
     draw_datas: Vec<TextDrawData>,
@@ -77,6 +78,7 @@ impl TextRenderer {
     ) -> TextRenderer {
         TextRenderer {
             cache,
+            glyph_cache_filled: false,
             call,
             glyphs: Vec::new(),
             draw_datas: Vec::new(),
@@ -84,6 +86,23 @@ impl TextRenderer {
             dpi_factor: 1.0,
             draw_cache: HashMap::new(),
         }
+    }
+
+    /// Returns true if the last
+    /// [`compose_draw_call`](struct.TextRenderer.html#method.compose_draw_call)
+    /// failed to draw a glyph because the glyph cache was full and
+    /// could not be expanded to fit the glyph. Note that this should
+    /// be quite rare, unless you're trying to render very large text,
+    /// or using a *lot* of symbols.
+    ///
+    /// # What to do if the glyph cache is full
+    ///
+    /// Consider using alternative means of rendering large text, or
+    /// increase your application's GPU capability requirements. The
+    /// size of the glyph cache is limited by the OpenGL constant
+    /// `GL_MAX_TEXTURE_SIZE`.
+    pub fn is_glyph_cache_full(&self) -> bool {
+        self.glyph_cache_filled
     }
 
     /// Updates the DPI multiplication factor of the screen.
@@ -271,6 +290,7 @@ impl TextRenderer {
     /// frame before
     /// [`Renderer::render`](../struct.Renderer.html#method.render).
     pub fn compose_draw_call(&mut self, renderer: &mut Renderer) {
+        self.glyph_cache_filled = false;
         for glyph in &self.glyphs {
             let font_size = self.draw_datas[glyph.draw_data].font_size;
             let color = self.draw_datas[glyph.draw_data].color;
@@ -301,7 +321,7 @@ impl TextRenderer {
             let mut sprite = renderer
                 .draw(&self.call, z)
                 .with_physical_coordinates(screen_location)
-                .with_color(color.0, color.1, color.2, color.3);
+                .with_color(color);
             if let Some(area) = self.draw_datas[glyph.draw_data].clip_area {
                 sprite = sprite.with_clip_area(area);
             }
@@ -322,8 +342,7 @@ impl TextRenderer {
             {
                 Ok(texcoords) => finish_sprite(texcoords),
                 Err(err) => match err {
-                    // TODO: Report this to the crate user somehow
-                    GlyphNotRenderedError::GlyphCacheFull => continue,
+                    GlyphNotRenderedError::GlyphCacheFull => self.glyph_cache_filled = true,
                 },
             }
         }
@@ -345,7 +364,7 @@ impl TextRenderer {
             .draw(&self.call, z)
             .with_coordinates(coordinates)
             .with_uvs((0.0, 0.0, 1.0, 1.0))
-            .with_color(0.0, 0.0, 0.0, 1.0)
+            .with_color((0.0, 0.0, 0.0, 1.0))
             .finish();
     }
 }

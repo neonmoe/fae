@@ -1,4 +1,11 @@
 // TODO: Line eviction to allow font size changes
+// Current idea:
+// - Divide the texture into n * 128 wide sections
+//   (n should be the minimum needed to fit a requested character)
+// - Lines work as now, but as a last-resort before resizing the texture,
+//   they should be gone through much like GlyphLine's eviction, but vertically.
+//   (it will probably need to loop through all glyphs to check for line expiry, but it's
+//   still better than resizing to conserve VRAM)
 
 use crate::error::GlyphNotRenderedError;
 use crate::gl::types::*;
