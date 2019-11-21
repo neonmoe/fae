@@ -276,7 +276,11 @@ impl Renderer {
                 image.pixel_type,
                 image.width,
                 image.height,
-                &image.pixels,
+                if image.null_data {
+                    None
+                } else {
+                    Some(&image.pixels)
+                },
             );
             self.calls[index].texture_size = (image.width, image.height);
         }
@@ -966,7 +970,7 @@ fn insert_texture(
     pixel_type: GLuint,
     w: GLint,
     h: GLint,
-    pixels: &[u8],
+    pixels: Option<&[u8]>,
 ) {
     unsafe {
         gl::BindTexture(gl::TEXTURE_2D, tex);
@@ -983,7 +987,11 @@ fn insert_texture(
                 format => format,
             },
             pixel_type,
-            pixels.as_ptr() as *const _,
+            if let Some(pixels) = pixels {
+                pixels.as_ptr() as *const _
+            } else {
+                ptr::null()
+            },
         );
     }
     print_gl_errors("after inserting a texture");

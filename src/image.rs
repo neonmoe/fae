@@ -19,6 +19,10 @@ pub struct Image {
     pub format: GLuint,
     /// The OpenGL type of the pixels of the image.
     pub(crate) pixel_type: GLuint,
+    /// Whether the image represents a null pointer for
+    /// glTexImage2D. If true, the memory for the texture of width x
+    /// height will be allocated, but will probably be garbage.
+    pub(crate) null_data: bool,
 }
 
 impl Image {
@@ -70,6 +74,7 @@ impl Image {
             height: info.height as i32,
             format,
             pixel_type,
+            null_data: false,
         })
     }
 
@@ -106,6 +111,23 @@ impl Image {
             height,
             format,
             pixel_type: gl::UNSIGNED_BYTE,
+            null_data: false,
+        }
+    }
+
+    /// Creates an image with a specified width, height and a format,
+    /// and signals to OpenGL that the texture will be filled in
+    /// later. The memory for the texture will be allocated, but no
+    /// pixel data needs to be sent from the CPU to the GPU during
+    /// initialization.
+    pub(crate) fn create_null(width: i32, height: i32, format: GLuint) -> Image {
+        Image {
+            pixels: Vec::new(),
+            width,
+            height,
+            format,
+            pixel_type: gl::UNSIGNED_BYTE,
+            null_data: true,
         }
     }
 
