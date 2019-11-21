@@ -10,8 +10,8 @@ fn scale(i: i32, font_size: i32) -> i32 {
     i * font_size / 10
 }
 
-fn unscale(i: i32, font_size: i32) -> i32 {
-    i / font_size * 10
+fn scale_f32(i: f32, font_size: f32) -> f32 {
+    i * font_size / 10.0
 }
 
 pub struct Font8x8Provider {
@@ -32,43 +32,35 @@ impl FontProvider for Font8x8Provider {
     }
 
     fn get_line_advance(&self, cursor: Cursor, font_size: i32) -> Advance {
-        let advance = scale(30, font_size) as f32 / 3.0 + cursor.leftover_y;
         Advance {
-            advance_y: advance.trunc() as i32,
-            leftover_y: advance.fract(),
+            advance_y: font_size + 3,
             ..Advance::from(cursor)
         }
     }
 
     fn get_advance(&self, from: GlyphId, _to: GlyphId, cursor: Cursor, font_size: i32) -> Advance {
         let RectPx { width, .. } = self.get_raw_metrics(from);
-        let mut advance_x = scale(width, font_size) + 1;
-        let advance_fractional = scale(width * 8, font_size) as f32 / 8.0 + 1.0 + cursor.leftover_x;
-        let fract = advance_fractional - advance_x as f32;
-
-        let mut space_accumulator = cursor.space_accumulator + fract;
-        if from == ' ' as GlyphId && cursor.space_accumulator >= 1.0 {
-            advance_x += cursor.space_accumulator.trunc() as i32;
-            space_accumulator = space_accumulator.fract();
-        }
-
         Advance {
-            advance_x,
-            leftover_x: 0.0,
-            space_accumulator,
+            advance_x: scale(width, font_size) + 1,
             ..Advance::from(cursor)
         }
     }
 
     fn get_metric(&mut self, id: GlyphId, cursor: Cursor, font_size: i32) -> RectPx {
+        let scaled_line_height = self.get_line_advance(cursor, font_size).advance_y;
+        let y_offset = (scaled_line_height - scale(8, font_size)) / 2;
+
         let metrics = self.get_raw_metrics(id);
-        let line_height = self.get_line_advance(cursor, font_size).advance_y;
-        let y_offset = (unscale(line_height, font_size) - 8) / 2;
+        let metrics_y = scale_f32(metrics.y as f32, font_size as f32);
+        let metrics_height = scale_f32(metrics.height as f32, font_size as f32);
+        let metrics_height = (metrics_height + metrics_y.fract()).trunc() as i32;
+        let metrics_y = metrics_y.trunc() as i32;
+
         RectPx {
             x: 0,
-            y: scale(y_offset + metrics.y, font_size),
+            y: y_offset + metrics_y,
             width: scale(metrics.width, font_size),
-            height: scale(metrics.height, font_size),
+            height: metrics_height,
         }
     }
 
