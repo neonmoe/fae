@@ -5,7 +5,6 @@ cfg_if::cfg_if! {
         fn create_text_renderer(renderer: &mut Renderer) -> TextRenderer {
             use font_loader::system_fonts;
             let property = system_fonts::FontPropertyBuilder::new()
-                .family("serif")
                 .build();
             let (font_bytes, _) = system_fonts::get(&property).unwrap();
             TextRenderer::with_ttf(renderer, font_bytes).unwrap()

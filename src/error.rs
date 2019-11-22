@@ -1,8 +1,9 @@
 //! The error types that `fae` can return.
 
 /// Describes different reasons for why a certain glyph was not drawn.
+#[doc(hidden)]
 #[derive(Debug)]
-pub(crate) enum GlyphNotRenderedError {
+pub enum GlyphNotRenderedError {
     /// The glyph cache texture could not fit the glyph being
     /// rendered. This is usually caused by trying to draw too
     /// high-resolution text.

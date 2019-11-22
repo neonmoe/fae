@@ -18,7 +18,7 @@ pub enum Alignment {
 }
 
 #[derive(Clone, Copy)]
-pub(crate) struct Glyph {
+pub struct Glyph {
     pub id: GlyphId,
     pub cursor: Cursor,
     pub metrics: RectPx,
@@ -26,14 +26,14 @@ pub(crate) struct Glyph {
 }
 
 #[derive(Clone, Copy)]
-pub(crate) struct TextDrawData {
+pub struct TextDrawData {
     pub clip_area: Option<Rect>,
     pub color: (f32, f32, f32, f32),
     pub font_size: i32,
     pub z: f32,
 }
 
-pub(crate) trait FontProvider {
+pub trait FontProvider {
     fn get_glyph_id(&self, c: char) -> Option<GlyphId>;
     fn get_line_advance(&self, cursor: Cursor, font_size: i32) -> Advance;
     fn get_advance(&self, from: GlyphId, to: GlyphId, cursor: Cursor, font_size: i32) -> Advance;

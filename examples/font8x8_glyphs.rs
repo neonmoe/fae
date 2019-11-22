@@ -70,7 +70,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         renderer
             .draw(&call, -0.9)
             .with_coordinates((x, y, cache_size, cache_size))
-            .with_color(0.9, 0.9, 0.9, 1.0)
+            .with_color((0.9, 0.9, 0.9, 1.0))
             .finish();
 
         text.compose_draw_call(&mut renderer);

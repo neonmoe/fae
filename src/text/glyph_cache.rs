@@ -48,7 +48,7 @@ pub struct GlyphSpot {
 }
 
 struct GlyphLine {
-    cache_texture: GLuint,
+    texture: GLuint,
     x: i32,
     y: i32,
     width: i32,
@@ -60,7 +60,7 @@ struct GlyphLine {
 
 impl GlyphLine {
     fn new(
-        cache_texture: GLuint,
+        texture: GLuint,
         cache_height: i32,
         x: i32,
         y: i32,
@@ -68,7 +68,7 @@ impl GlyphLine {
         height: i32,
     ) -> GlyphLine {
         GlyphLine {
-            cache_texture,
+            texture,
             x,
             y,
             width,
@@ -107,14 +107,14 @@ impl GlyphLine {
                         let previous = self.reserved[i - 1].texcoords;
                         previous.x + previous.width + GLYPH_CACHE_GAP
                     } else {
-                        self.x + GLYPH_CACHE_GAP
+                        self.x
                     };
                     collected_range = i..i;
                 }
                 right = if i + 1 < self.reserved.len() {
                     self.reserved[i + 1].texcoords.x - GLYPH_CACHE_GAP
                 } else {
-                    self.x + self.width - GLYPH_CACHE_GAP
+                    self.x + self.width
                 };
                 collected_range.end += 1;
             }
@@ -125,7 +125,7 @@ impl GlyphLine {
         }
 
         if right - left >= width {
-            let texture = self.cache_texture;
+            let texture = self.texture;
             for spot in self.reserved.splice(collected_range, None) {
                 clear_texture_area(texture, spot.texcoords);
             }
@@ -144,7 +144,7 @@ impl GlyphLine {
     ///      left neighbor.
     fn reserve_width(&mut self, width: i32) -> Option<i32> {
         if self.reserved.is_empty() {
-            return Some(self.x + GLYPH_CACHE_GAP);
+            return Some(self.x);
         }
 
         // Compare distances between the left border of each spot and
@@ -154,12 +154,12 @@ impl GlyphLine {
                 let previous = self.reserved[i - 1].texcoords;
                 previous.x + previous.width + GLYPH_CACHE_GAP
             } else {
-                self.x + GLYPH_CACHE_GAP
+                self.x
             };
             let current_spot_left = if i < self.reserved.len() {
                 self.reserved[i].texcoords.x - GLYPH_CACHE_GAP
             } else {
-                self.x + self.width - GLYPH_CACHE_GAP
+                self.x + self.width
             };
 
             if current_spot_left >= previous_spot_right + width {
@@ -204,10 +204,74 @@ impl GlyphLine {
 
         Some(spot_weak)
     }
+}
 
-    fn expire_one_step(&mut self) {
-        for spot in &mut self.reserved {
-            spot.status.set(spot.status.get().one_step_expired());
+struct GlyphColumn {
+    texture: GLuint,
+    x: i32,
+    y: i32,
+    width: i32,
+    height: i32,
+    lines: Vec<GlyphLine>,
+}
+
+impl GlyphColumn {
+    fn new(texture: GLuint, x: i32, y: i32, width: i32, height: i32) -> GlyphColumn {
+        GlyphColumn {
+            texture,
+            x,
+            y,
+            width,
+            height,
+            lines: Vec::new(),
+        }
+    }
+
+    fn reserve_uvs(&mut self, width: i32, height: i32, can_evict: bool) -> Option<Rc<GlyphSpot>> {
+        // First try finding space in existing lines
+        for line in &mut self.lines {
+            if let Some(spot) = line
+                .reserve(width, height, can_evict)
+                .and_then(|spot_weak| spot_weak.upgrade())
+            {
+                return Some(spot);
+            }
+        }
+
+        // Then try creating a new one
+        if let Some(spot) = self
+            .create_line(height)
+            .and_then(|new_line| new_line.reserve(width, height, false))
+            .and_then(|spot_weak| spot_weak.upgrade())
+        {
+            return Some(spot);
+        }
+
+        None
+    }
+
+    fn create_line(&mut self, height: i32) -> Option<&mut GlyphLine> {
+        let mut y = self.y;
+        for line in &self.lines {
+            y += line.height + GLYPH_CACHE_GAP;
+        }
+        if y + height <= self.y + self.height {
+            if !self.lines.is_empty() {
+                let i = self.lines.len() - 1;
+                self.lines[i].max_height = self.lines[i].height;
+            }
+            self.lines.push(GlyphLine::new(
+                self.texture,
+                self.height,
+                self.x,
+                y,
+                self.width,
+                height,
+            ));
+            let i = self.lines.len() - 1;
+            Some(&mut self.lines[i])
+        } else {
+            None
         }
     }
 }
@@ -216,7 +280,8 @@ pub struct GlyphCache {
     texture: GLuint,
     width: i32,
     height: i32,
-    lines: Vec<GlyphLine>,
+    column_cursor: i32,
+    columns: Vec<GlyphColumn>,
     cache: HashMap<CacheIdentifier, Weak<GlyphSpot>>,
 }
 
@@ -245,7 +310,8 @@ impl GlyphCache {
             texture: renderer.get_texture(&call),
             width,
             height,
-            lines: Vec::new(),
+            column_cursor: GLYPH_CACHE_GAP,
+            columns: Vec::new(),
             cache: HashMap::new(),
         };
         (cache, call)
@@ -253,7 +319,7 @@ impl GlyphCache {
 
     /// Returns a pointer to the GlyphSpot, and whether the spot was
     /// reserved just now (and requires rendering into).
-    pub(crate) fn reserve_uvs(
+    pub fn reserve_uvs(
         &mut self,
         id: CacheIdentifier,
         width: i32,
@@ -264,19 +330,51 @@ impl GlyphCache {
             .get_uvs_from_cache(id)
         {
             Ok((uvs.texcoords, false))
-        } else if let Some(uvs) = self
-            // Then try to find space in the existing lines
-            .reserve_uvs_from_existing(width, height, false)
-            // Then try adding a new line
-            .or_else(|| self.reserve_uvs_from_new_line(width, height))
-            // Then try evicting old characters
-            .or_else(|| self.reserve_uvs_from_existing(width, height, true))
-        // TODO: Add glyph cache texture re-sizing as a last resort
-        {
-            self.cache.insert(id, Rc::downgrade(&uvs));
-            Ok((uvs.texcoords, true))
         } else {
+            // Crawl through the columns trying different ways to
+            // reserve a spot, each more invasive than the last.
+            // Start with None to make the chain more uniform.
+            if let Some(uvs) = None
+                .or_else(|| {
+                    let reserve = |col: &mut GlyphColumn| col.reserve_uvs(width, height, false);
+                    self.columns.iter_mut().find_map(reserve)
+                })
+                .or_else(|| {
+                    self.create_column(width, height)
+                        .and_then(|col| col.reserve_uvs(width, height, true))
+                })
+                .or_else(|| {
+                    let reserve = |col: &mut GlyphColumn| col.reserve_uvs(width, height, true);
+                    self.columns.iter_mut().find_map(reserve)
+                })
+                .or_else(|| {
+                    // TODO: Try resizing the texture and then add a new column to reserve from
+                    // TODO: Resize column heights on resize
+                    None
+                })
+            {
+                self.cache.insert(id, Rc::downgrade(&uvs));
+                return Ok((uvs.texcoords, true));
+            }
             Err(GlyphNotRenderedError::GlyphCacheFull)
+        }
+    }
+
+    pub fn get_texture(&self) -> GLuint {
+        self.texture
+    }
+
+    pub fn expire_one_step(&mut self) {
+        let mut removed_spots = Vec::new();
+        for (key, spot) in self.cache.iter_mut() {
+            if let Some(spot) = spot.upgrade() {
+                spot.status.set(spot.status.get().one_step_expired());
+            } else {
+                removed_spots.push(key.clone());
+            }
+        }
+        for spot_key in removed_spots {
+            self.cache.remove(&spot_key);
         }
     }
 
@@ -292,66 +390,30 @@ impl GlyphCache {
         None
     }
 
-    fn reserve_uvs_from_existing(
-        &mut self,
-        width: i32,
-        height: i32,
-        can_evict: bool,
-    ) -> Option<Rc<GlyphSpot>> {
-        for line in &mut self.lines {
-            if let Some(spot) = line
-                .reserve(width, height, can_evict)
-                .and_then(|spot_weak| spot_weak.upgrade())
-            {
-                return Some(spot);
-            }
-        }
-        None
-    }
-
-    fn reserve_uvs_from_new_line(&mut self, width: i32, height: i32) -> Option<Rc<GlyphSpot>> {
-        if let Some(spot) = self
-            .create_line(height)
-            .and_then(|new_line| new_line.reserve(width, height, false))
-            .and_then(|spot_weak| spot_weak.upgrade())
-        {
-            return Some(spot);
-        }
-        None
-    }
-
-    pub fn get_texture(&self) -> GLuint {
-        self.texture
-    }
-
-    pub fn expire_one_step(&mut self) {
-        for line in &mut self.lines {
-            line.expire_one_step();
-        }
-    }
-
-    fn create_line(&mut self, height: i32) -> Option<&mut GlyphLine> {
-        let mut total_height = GLYPH_CACHE_GAP;
-        for line in &self.lines {
-            total_height += line.height + GLYPH_CACHE_GAP;
-        }
-        if total_height + height <= self.height - GLYPH_CACHE_GAP {
-            if !self.lines.is_empty() {
-                let i = self.lines.len() - 1;
-                self.lines[i].max_height = self.lines[i].height;
-            }
-            self.lines.push(GlyphLine::new(
-                self.texture,
-                self.height,
-                0,
-                total_height,
-                self.width,
-                height,
-            ));
-            let i = self.lines.len() - 1;
-            Some(&mut self.lines[i])
-        } else {
+    fn create_column(&mut self, width: i32, height: i32) -> Option<&mut GlyphColumn> {
+        if height > self.height - GLYPH_CACHE_GAP - self.column_cursor {
             None
+        } else {
+            let mut x = GLYPH_CACHE_GAP;
+            for col in &self.columns {
+                x += col.width + GLYPH_CACHE_GAP;
+            }
+            let col_width = (((width * 4).max(128) as u32).next_power_of_two() as i32)
+                .min(self.width - x - GLYPH_CACHE_GAP);
+            if col_width >= width {
+                let column = GlyphColumn::new(
+                    self.texture,
+                    x,
+                    self.column_cursor,
+                    col_width,
+                    self.height - GLYPH_CACHE_GAP - self.column_cursor,
+                );
+                self.columns.push(column);
+                let i = self.columns.len() - 1;
+                Some(&mut self.columns[i])
+            } else {
+                None
+            }
         }
     }
 }
