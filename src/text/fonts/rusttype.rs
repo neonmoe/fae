@@ -8,16 +8,27 @@ use std::collections::HashMap;
 
 type FontSize = i32;
 
+/// An implementation of FontProvider that uses a TTF as the font, and
+/// uses `rusttype` for parsing and rasterizing it.
+///
+/// Contains a metric cache in the form of a HashMap, which takes up
+/// 24 bytes per glyph (4 bytes from GlyphId, 4 bytes from font size,
+/// 16 bytes from the RectPx) plus the HashMap's overhead. As the
+/// cache contains an entry for all combinations of font sizes and
+/// glyphs used, it can get relatively large if lots of different font
+/// sizes are used.
 pub struct RustTypeProvider<'a> {
     // These public variables are probably best to leave at defaults,
     // but I've left them as variables for future consideration.
-    pub sink_overflows_into_spaces: bool,
-    pub glyph_padding: f32,
+    sink_overflows_into_spaces: bool,
+    glyph_padding: f32,
+
     font: Font<'a>,
     units_per_em: i32,
     ascent: i32,
     descent: i32,
     space_glyph_id: GlyphId,
+    // TODO(optimization): Unused cached values should be dropped (rusttype metric cache)
     metrics: HashMap<(GlyphId, FontSize), RectPx>,
 }
 
@@ -61,10 +72,20 @@ impl<'a> RustTypeProvider<'a> {
             (0, 0, 0, 0).into()
         }
     }
+
+    fn get_advance_from_font(&self, from: GlyphId, to: GlyphId, font_size: i32) -> f32 {
+        // TODO(optimization): This all takes a while, maybe this should be cached?
+        let from = rusttype::GlyphId(from);
+        let to = rusttype::GlyphId(to);
+        let scale = self.font_size_to_scale(font_size);
+        let from_glyph = self.font.glyph(from).scaled(scale);
+        from_glyph.h_metrics().advance_width + self.font.pair_kerning(scale, from, to)
+    }
 }
 
 impl<'a> FontProvider for RustTypeProvider<'a> {
     fn get_glyph_id(&self, c: char) -> Option<GlyphId> {
+        // TODO(optimization): Rusttype's glyph() takes a while, maybe this should be cached?
         let id = self.font.glyph(c).id().0;
         if id == 0 {
             None
@@ -82,17 +103,16 @@ impl<'a> FontProvider for RustTypeProvider<'a> {
         }
     }
 
-    fn get_advance(&self, from: GlyphId, to: GlyphId, cursor: Cursor, font_size: i32) -> Advance {
-        let from = rusttype::GlyphId(from);
-        let to = rusttype::GlyphId(to);
+    fn get_advance(
+        &mut self,
+        from: GlyphId,
+        to: GlyphId,
+        cursor: Cursor,
+        font_size: i32,
+    ) -> Advance {
+        let mut advance = self.get_advance_from_font(from, to, font_size) + self.glyph_padding;
 
-        let scale = self.font_size_to_scale(font_size);
-        let from_glyph = self.font.glyph(from).scaled(scale);
-        let from_advance = from_glyph.h_metrics().advance_width + self.glyph_padding;
-        let kern = self.font.pair_kerning(scale, from, to);
-        let mut advance = from_advance + kern;
-
-        let space_accumulator = if to.0 == self.space_glyph_id {
+        let space_accumulator = if to == self.space_glyph_id {
             advance += cursor.space_accumulator;
             0.0
         } else {

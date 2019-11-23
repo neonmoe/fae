@@ -36,6 +36,7 @@ pub(crate) fn get_line_start_x(
     }
 }
 
+// TODO(optimization): This takes around 30% of fae's runtime, needs to be optimized
 pub(crate) fn get_line_length_and_width<F>(
     font: &mut dyn FontProvider,
     mut cursor: Cursor,
@@ -103,6 +104,7 @@ where
     (len, printable_len, total_width)
 }
 
+// TODO(optimization): This takes around 30% of fae's runtime (half of that inside get_line_length_and_width), needs to be optimized
 pub(crate) fn get_char_advance(
     font: &mut dyn FontProvider,
     cursor: Cursor,

@@ -36,7 +36,13 @@ pub struct TextDrawData {
 pub trait FontProvider {
     fn get_glyph_id(&self, c: char) -> Option<GlyphId>;
     fn get_line_advance(&self, cursor: Cursor, font_size: i32) -> Advance;
-    fn get_advance(&self, from: GlyphId, to: GlyphId, cursor: Cursor, font_size: i32) -> Advance;
+    fn get_advance(
+        &mut self,
+        from: GlyphId,
+        to: GlyphId,
+        cursor: Cursor,
+        font_size: i32,
+    ) -> Advance;
     fn get_metric(&mut self, id: GlyphId, cursor: Cursor, font_size: i32) -> RectPx;
     fn render_glyph(
         &mut self,

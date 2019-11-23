@@ -3,25 +3,24 @@ use crate::text::glyph_cache::GlyphCache;
 use crate::text::types::*;
 use crate::text::*;
 
-use std::cell::RefCell;
 use std::collections::HashMap;
 
-fn scale(i: i32, font_size: i32) -> i32 {
-    i * font_size / 10
-}
-
-fn scale_f32(i: f32, font_size: f32) -> f32 {
-    i * font_size / 10.0
-}
-
+/// An implementation of FontProvider that uses `font8x8` as the font.
+///
+/// Contains a metric cache in the form of a HashMap, which takes up
+/// 17 bytes per glyph (1 byte from the GlyphId, 16 bytes from the
+/// RectPx) plus the HashMap's overhead. This cache improves
+/// performance a lot, as the metrics are accessed multiple times per
+/// glyph, every frame in the worst case. As no glyphs in the font8x8
+/// font rely on font size, this cache can't get very big.
 pub struct Font8x8Provider {
-    metrics: RefCell<HashMap<GlyphId, RectPx>>,
+    metrics: HashMap<GlyphId, RectPx>,
 }
 
 impl Font8x8Provider {
     pub fn new() -> Font8x8Provider {
         Font8x8Provider {
-            metrics: RefCell::new(HashMap::new()),
+            metrics: HashMap::new(),
         }
     }
 }
@@ -38,7 +37,13 @@ impl FontProvider for Font8x8Provider {
         }
     }
 
-    fn get_advance(&self, from: GlyphId, _to: GlyphId, cursor: Cursor, font_size: i32) -> Advance {
+    fn get_advance(
+        &mut self,
+        from: GlyphId,
+        _to: GlyphId,
+        cursor: Cursor,
+        font_size: i32,
+    ) -> Advance {
         let RectPx { width, .. } = self.get_raw_metrics(from);
         Advance {
             advance_x: scale(width, font_size) + 1,
@@ -80,11 +85,11 @@ impl FontProvider for Font8x8Provider {
 }
 
 impl Font8x8Provider {
-    fn get_raw_metrics(&self, id: GlyphId) -> RectPx {
+    fn get_raw_metrics(&mut self, id: GlyphId) -> RectPx {
         if id == ' ' as GlyphId {
             (0, 8, 3, 0).into()
         } else {
-            *self.metrics.borrow_mut().entry(id).or_insert_with(|| {
+            *self.metrics.entry(id).or_insert_with(|| {
                 let (left, right) = get_empty_pixels_left_right(id).unwrap_or((0, 0));
                 let (top, bottom) = get_empty_pixels_top_bottom(id).unwrap_or((0, 0));
                 RectPx {
@@ -125,6 +130,14 @@ impl Font8x8Provider {
         crate::profiler::write(|p| p.glyphs_drawn += 1);
         Ok(spot)
     }
+}
+
+fn scale(i: i32, font_size: i32) -> i32 {
+    i * font_size / 10
+}
+
+fn scale_f32(i: f32, font_size: f32) -> f32 {
+    i * font_size / 10.0
 }
 
 fn get_empty_pixels_left_right(id: GlyphId) -> Option<(i32, i32)> {

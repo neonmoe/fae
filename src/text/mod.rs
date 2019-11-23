@@ -30,8 +30,12 @@ use crate::{DrawCallHandle, Renderer};
 
 use std::collections::HashMap;
 
-/// Holds the state required for text rendering, such as the font, and
-/// a text draw call queue.
+/// Contains everything needed to draw text.
+///
+/// Holds a HashMap to cache draws marked as cacheable, which takes up
+/// roughly 33 bytes per draw, 37 bytes per glyph, and whatever
+/// overhead HashMap has. (Note: these values are probably not
+/// accurate, and were eyeballed at the time of writing.)
 pub struct TextRenderer {
     cache: GlyphCache,
     glyph_cache_filled: bool,
@@ -40,7 +44,7 @@ pub struct TextRenderer {
     draw_datas: Vec<TextDrawData>,
     font: Box<dyn FontProvider>,
     dpi_factor: f32,
-    // TODO: Add a timer for cached draws to be cleared every now and then?
+    // TODO(optimization): Unused cached values should be dropped (layout cache)
     draw_cache: HashMap<TextCacheable, (Vec<Glyph>, Option<Rect>)>,
 }
 
