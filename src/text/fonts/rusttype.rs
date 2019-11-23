@@ -11,12 +11,12 @@ type FontSize = i32;
 /// An implementation of FontProvider that uses a TTF as the font, and
 /// uses `rusttype` for parsing and rasterizing it.
 ///
-/// Contains a metric cache in the form of a HashMap, which takes up
-/// 24 bytes per glyph (4 bytes from GlyphId, 4 bytes from font size,
-/// 16 bytes from the RectPx) plus the HashMap's overhead. As the
-/// cache contains an entry for all combinations of font sizes and
-/// glyphs used, it can get relatively large if lots of different font
-/// sizes are used.
+/// Contains three HashMaps for caching:
+/// - Metrics, 24 bytes per GlyphId + font size combination
+/// - Advance widths, 16 bytes per GlyphId pair(!!) + font size combination
+/// - Glyph ids, 4 bytes per character
+/// And of course, the whatever overhead each of these HashMaps will
+/// have because of them being HashMaps.
 pub struct RustTypeProvider<'a> {
     // These public variables are probably best to leave at defaults,
     // but I've left them as variables for future consideration.
@@ -27,9 +27,12 @@ pub struct RustTypeProvider<'a> {
     units_per_em: i32,
     ascent: i32,
     descent: i32,
-    space_glyph_id: GlyphId,
+    glyph_ids: HashMap<char, Option<GlyphId>>,
     // TODO(optimization): Unused cached values should be dropped (rusttype metric cache)
     metrics: HashMap<(GlyphId, FontSize), RectPx>,
+    // TODO(optimization): Unused cached values should be dropped (rusttype advance cache)
+    // Test how much using vs not using this cache will impact memory/perf
+    advances: HashMap<(GlyphId, GlyphId, FontSize), f32>,
 }
 
 impl<'a> RustTypeProvider<'a> {
@@ -40,7 +43,6 @@ impl<'a> RustTypeProvider<'a> {
         }
         let units_per_em = font.units_per_em();
         let v_metrics = font.v_metrics_unscaled();
-        let space_glyph_id = font.glyph(' ').id().0;
         Ok(RustTypeProvider {
             font,
             sink_overflows_into_spaces: false,
@@ -48,8 +50,9 @@ impl<'a> RustTypeProvider<'a> {
             units_per_em: i32::from(units_per_em),
             ascent: v_metrics.ascent as i32,
             descent: v_metrics.descent as i32,
-            space_glyph_id,
+            glyph_ids: HashMap::new(),
             metrics: HashMap::new(),
+            advances: HashMap::new(),
         })
     }
 
@@ -73,24 +76,32 @@ impl<'a> RustTypeProvider<'a> {
         }
     }
 
-    fn get_advance_from_font(&self, from: GlyphId, to: GlyphId, font_size: i32) -> f32 {
-        // TODO(optimization): This all takes a while, maybe this should be cached?
-        let from = rusttype::GlyphId(from);
-        let to = rusttype::GlyphId(to);
-        let scale = self.font_size_to_scale(font_size);
-        let from_glyph = self.font.glyph(from).scaled(scale);
-        from_glyph.h_metrics().advance_width + self.font.pair_kerning(scale, from, to)
+    fn get_advance_from_font(&mut self, from: GlyphId, to: GlyphId, font_size: i32) -> f32 {
+        let key = (from, to, font_size);
+        if let Some(advance) = self.advances.get(&key) {
+            *advance
+        } else {
+            let from = rusttype::GlyphId(from);
+            let to = rusttype::GlyphId(to);
+            let scale = self.font_size_to_scale(font_size);
+            let from_glyph = self.font.glyph(from).scaled(scale);
+            let advance =
+                from_glyph.h_metrics().advance_width + self.font.pair_kerning(scale, from, to);
+            self.advances.insert(key, advance);
+            advance
+        }
     }
 }
 
 impl<'a> FontProvider for RustTypeProvider<'a> {
-    fn get_glyph_id(&self, c: char) -> Option<GlyphId> {
-        // TODO(optimization): Rusttype's glyph() takes a while, maybe this should be cached?
-        let id = self.font.glyph(c).id().0;
-        if id == 0 {
-            None
+    fn get_glyph_id(&mut self, c: char) -> Option<GlyphId> {
+        if let Some(id) = self.glyph_ids.get(&c) {
+            *id
         } else {
-            Some(id)
+            let id = self.font.glyph(c).id().0;
+            let id = if id == 0 { None } else { Some(id) };
+            self.glyph_ids.insert(c, id);
+            id
         }
     }
 
@@ -112,7 +123,7 @@ impl<'a> FontProvider for RustTypeProvider<'a> {
     ) -> Advance {
         let mut advance = self.get_advance_from_font(from, to, font_size) + self.glyph_padding;
 
-        let space_accumulator = if to == self.space_glyph_id {
+        let space_accumulator = if to == self.get_glyph_id(' ').unwrap_or(0) {
             advance += cursor.space_accumulator;
             0.0
         } else {
