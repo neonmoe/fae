@@ -140,7 +140,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .draw(&call, 0.5 - f)
                 .with_coordinates((x, y, 100.0, 100.0))
                 .with_texture_coordinates((0, 0, 1240, 920))
-                .with_color(1.0, 0.7, 0.9, 1.0)
+                .with_color((1.0, 0.7, 0.9, 1.0))
                 .with_rotation(-time * 1.5, 50.0, 50.0)
                 .finish();
         }
