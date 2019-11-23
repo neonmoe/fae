@@ -2,15 +2,19 @@
 //! functionality works correctly.
 
 #[cfg(feature = "font8x8")]
+mod common;
+
+#[cfg(feature = "font8x8")]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    use common::WindowSettings;
     use fae::{
         text::{self, TextRenderer},
-        Renderer, Window, WindowSettings,
+        Renderer, Window,
     };
 
     env_logger::from_env(env_logger::Env::default().default_filter_or("trace")).init();
 
-    let mut window = Window::create(&WindowSettings::default())?;
+    let mut window = Window::create(WindowSettings::default().into())?;
     let mut renderer = Renderer::new(&window);
     let mut text = TextRenderer::with_font8x8(&mut renderer, true);
     let call = renderer.create_draw_call(Default::default());

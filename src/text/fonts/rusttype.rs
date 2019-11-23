@@ -13,10 +13,16 @@ type FontSize = i32;
 ///
 /// Contains three HashMaps for caching:
 /// - Metrics, 24 bytes per GlyphId + font size combination
-/// - Advance widths, 16 bytes per GlyphId pair(!!) + font size combination
+/// - Advance widths, 16 bytes per GlyphId pair\* + font size combination
 /// - Glyph ids, 4 bytes per character
+///
 /// And of course, the whatever overhead each of these HashMaps will
-/// have because of them being HashMaps.
+/// have because of them being HashMaps. At least in the amount of
+/// text rendered in fae's examples, these caches don't seem to have
+/// much of an impact in the total memory usage of the application,
+/// but they do improve performance a lot.
+///
+/// \* The pairs consist of each rendered glyph and the one before it.
 pub struct RustTypeProvider<'a> {
     // These public variables are probably best to leave at defaults,
     // but I've left them as variables for future consideration.
@@ -31,7 +37,6 @@ pub struct RustTypeProvider<'a> {
     // TODO(optimization): Unused cached values should be dropped (rusttype metric cache)
     metrics: HashMap<(GlyphId, FontSize), RectPx>,
     // TODO(optimization): Unused cached values should be dropped (rusttype advance cache)
-    // Test how much using vs not using this cache will impact memory/perf
     advances: HashMap<(GlyphId, GlyphId, FontSize), f32>,
 }
 

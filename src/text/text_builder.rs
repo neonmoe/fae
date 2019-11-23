@@ -79,7 +79,6 @@ impl<'a> Text<'a> {
     }
 
     /// Sets the maximum width of this text.
-    // TODO: Test setting the max width to smaller than one glyph
     pub fn with_max_width(mut self, width: f32) -> Self {
         self.inner.max_line_width = Some((width * self.renderer.dpi_factor) as i32);
         self

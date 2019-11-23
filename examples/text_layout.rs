@@ -6,7 +6,8 @@ mod common;
 #[cfg(all(feature = "rusttype", feature = "png"))]
 use fae::{text::TextRenderer, Image};
 
-use fae::{text::Alignment, DrawCallParameters, Mouse, Window, WindowSettings};
+use common::WindowSettings;
+use fae::{text::Alignment, DrawCallParameters, Window};
 use std::error::Error;
 
 static LOREM_IPSUM: &'static str = "Perferendis officiis ut provident sit eveniet ipsa eos. Facilis delectus at laudantium nemo. Sed ipsa natus perferendis dignissimos odio deserunt omnis.
@@ -19,7 +20,7 @@ In earum architecto qui sunt provident. Vitae rerum molestiae dolorem praesentiu
 fn main() -> Result<(), Box<dyn Error>> {
     env_logger::from_env(env_logger::Env::default().default_filter_or("trace")).init();
 
-    let mut window = Window::create(&WindowSettings::default())?;
+    let mut window = Window::create(WindowSettings::default().into())?;
     let (mut renderer, mut text) = common::create_renderers(&window);
 
     #[cfg(all(feature = "rusttype", feature = "png"))]
@@ -202,7 +203,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .finish();
             y += 50.0;
 
-            if window.mouse_pressed.contains(&Mouse::Left) {
+            if window
+                .mouse_pressed
+                .contains(&fae::glutin::MouseButton::Left)
+            {
                 for i in 0..was_mouse_in.len() {
                     if was_mouse_in[i] {
                         pressed_index = Some(i);
@@ -210,7 +214,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                 }
             }
 
-            if window.mouse_released.contains(&Mouse::Left) {
+            if window
+                .mouse_released
+                .contains(&fae::glutin::MouseButton::Left)
+            {
                 if let Some(i) = pressed_index {
                     if was_mouse_in[i] {
                         match i {

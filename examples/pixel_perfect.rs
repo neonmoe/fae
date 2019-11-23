@@ -1,18 +1,22 @@
 //! This example is used to debug that fae renders textures pixel-perfectly if the texture's resolution matches the quad's coordinates.
 mod common;
 
-use fae::{glutin::dpi::LogicalSize, DrawCallParameters, Image, Window, WindowSettings};
+use common::WindowSettings;
+use fae::{glutin::dpi::LogicalSize, DrawCallParameters, Image, Window};
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
     env_logger::from_env(env_logger::Env::default().default_filter_or("trace")).init();
 
-    let mut window = Window::create(&WindowSettings {
-        multisample: 8,
-        width: 500.0,
-        height: 200.0,
-        ..Default::default()
-    })?;
+    let mut window = Window::create(
+        WindowSettings {
+            multisample: 8,
+            width: 500.0,
+            height: 200.0,
+            ..Default::default()
+        }
+        .into(),
+    )?;
     let (mut renderer, mut text) = common::create_renderers(&window);
     let call = renderer.create_draw_call(DrawCallParameters {
         image: Some(Image::from_png(include_bytes!("res/sprite_8x8.png"))?),

@@ -125,16 +125,11 @@ impl TextRenderer {
     ///   caching of the whole span of text.
     ///
     /// # Usage
-    /// ```no_run
-    /// # fn main() {
-    /// # use fae::{text::{TextRenderer, Text}, Renderer, Window, WindowSettings};
-    /// # let mut renderer = Renderer::new(&Window::create(&WindowSettings::default()).unwrap());
-    /// # let mut text_renderer = TextRenderer::with_font8x8(&mut renderer, true);
+    /// ```ignore
     /// text_renderer.draw("Hello, World!", 10.0, 10.0, 0.0, 12.0)
     ///     .with_color((0.8, 0.5, 0.1, 1.0)) // Orange!
     ///     .with_cacheable(true) // Hello world never changes...
     ///     .finish();
-    /// # }
     /// ```
     pub fn draw<S: Into<String>>(
         &mut self,

@@ -316,16 +316,11 @@ impl Renderer {
     ///   overdraw.
     ///
     /// # Usage
-    /// ```no_run
-    /// # fn main() {
-    /// # use fae::{DrawCallParameters, Renderer, Window, WindowSettings};
-    /// # let mut renderer = Renderer::new(&Window::create(&WindowSettings::default()).unwrap());
-    /// # let call = renderer.create_draw_call(DrawCallParameters::default());
+    /// ```ignore
     /// renderer.draw(&call, 0.0)
     ///     .with_coordinates((100.0, 100.0, 16.0, 16.0))
     ///     .with_texture_coordinates((0, 0, 16, 16))
     ///     .finish();
-    /// # }
     /// ```
     #[inline]
     pub fn draw<'a, 'b>(&'a mut self, call: &'b DrawCallHandle, z: f32) -> Sprite<'a, 'b> {

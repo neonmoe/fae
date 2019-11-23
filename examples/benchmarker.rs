@@ -5,7 +5,8 @@
 //! as they happen to be ordered in the codebase.
 mod common;
 
-use fae::{profiler, DrawCallParameters, Image, Window, WindowSettings};
+use common::WindowSettings;
+use fae::{profiler, DrawCallParameters, Image, Window};
 use std::collections::HashMap;
 use std::error::Error;
 use std::time::{Duration, Instant};
@@ -20,7 +21,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     env_logger::from_env(env_logger::Env::default().default_filter_or("trace")).init();
 
     // Create the window
-    let mut window = Window::create(&WindowSettings::default()).unwrap();
+    let mut window = Window::create(WindowSettings::default().into()).unwrap();
     // Create the OpenGL and text renderers, see common/mod.rs
     let (mut renderer, mut text) = common::create_renderers(&window);
     // Create the draw call for the sprite

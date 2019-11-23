@@ -1,12 +1,15 @@
+//! Window creation utilities for when you don't want to bother
+//! writing the glue between `fae` and `glutin`.
 use crate::gl;
 use crate::renderer::Renderer;
-pub use crate::window::WindowSettings;
-use crate::window::{get_env_dpi, Mouse};
-pub use glutin;
+
 use glutin::dpi::*;
 use glutin::*;
+use std::env;
 use std::error::Error;
 use std::path::PathBuf;
+
+pub use glutin;
 
 /// Wrapper for a Glutin window, to provide a less event-based API.
 pub struct Window {
@@ -45,17 +48,18 @@ pub struct Window {
     /// scroll. (36 by default)
     pub mouse_scroll_length: f32,
     /// The mouse buttons which are currently held down.
-    pub mouse_held: Vec<Mouse>,
+    pub mouse_held: Vec<MouseButton>,
     /// The mouse buttons which were pressed down this frame.
-    pub mouse_pressed: Vec<Mouse>,
+    pub mouse_pressed: Vec<MouseButton>,
     /// The mouse buttons which were released this frame.
-    pub mouse_released: Vec<Mouse>,
+    pub mouse_released: Vec<MouseButton>,
 
     /// A list of files dropped on the window during this frame.
     pub dropped_files: Vec<PathBuf>,
     /// A list of files being currently hovered on the window.
     pub hovered_files: Vec<PathBuf>,
-    // TODO: Handle every glutin event and add fields as needed
+    // TODO: Upgrade glutin and revamp the event system so the used can handle events
+    // (except for the ones that are obviously handled by the renderer)
 }
 
 impl Window {
@@ -63,27 +67,11 @@ impl Window {
     ///
     /// Can result in an error if window creation fails or OpenGL
     /// context creation fails.
-    // TODO: Take in a (WindowBuilder, ContextBuilder) instead of WindowSettings, and impl From<WindowSettings> for (WindowSettings, ContextBuilder)
-    pub fn create(settings: &WindowSettings) -> Result<Window, Box<dyn Error>> {
+    pub fn create<'a>(
+        (window_builder, context_builder): (WindowBuilder, ContextBuilder<'a, NotCurrent>),
+    ) -> Result<Window, Box<dyn Error>> {
         let events_loop = EventsLoop::new();
-        let context = {
-            let mut window = WindowBuilder::new()
-                .with_title(settings.title.clone())
-                .with_dimensions(LogicalSize::new(
-                    f64::from(settings.width),
-                    f64::from(settings.height),
-                ))
-                .with_visibility(false);
-            if settings.is_dialog {
-                window = window_as_dialog(window);
-            }
-            ContextBuilder::new()
-                .with_vsync(settings.vsync)
-                .with_srgb(true)
-                .with_multisampling(settings.multisample)
-                .with_gl(GlRequest::Latest)
-                .build_windowed(window, &events_loop)?
-        };
+        let context = context_builder.build_windowed(window_builder, &events_loop)?;
 
         let env_dpi_factor = {
             let multiplier = get_env_dpi();
@@ -105,6 +93,11 @@ impl Window {
             context
         };
 
+        let (width, height) = if let Some(size) = context.window().get_inner_size() {
+            (size.width as f32, size.height as f32)
+        } else {
+            (0.0, 0.0)
+        };
         context.window().show();
 
         Ok(Window {
@@ -112,8 +105,8 @@ impl Window {
             context,
             events_loop,
 
-            width: settings.width,
-            height: settings.height,
+            width,
+            height,
             dpi_factor: 1.0,
 
             held_keys: Vec::new(),
@@ -212,12 +205,9 @@ impl Window {
                     }
                     WindowEvent::ReceivedCharacter(c) => typed_chars.push(c),
 
-                    WindowEvent::MouseInput { state, button, .. } => match button {
-                        MouseButton::Left => mouse_inputs.push((Mouse::Left, state)),
-                        MouseButton::Right => mouse_inputs.push((Mouse::Right, state)),
-                        MouseButton::Middle => mouse_inputs.push((Mouse::Middle, state)),
-                        MouseButton::Other(n) => mouse_inputs.push((Mouse::Other(n + 3), state)),
-                    },
+                    WindowEvent::MouseInput { state, button, .. } => {
+                        mouse_inputs.push((button, state))
+                    }
                     WindowEvent::CursorMoved { position, .. } => {
                         *mouse_coords = (
                             position.x as f32 / env_dpi_factor,
@@ -310,23 +300,24 @@ impl Window {
     }
 }
 
-#[cfg(any(
-    target_os = "linux",
-    target_os = "dragonfly",
-    target_os = "freebsd",
-    target_os = "openbsd"
-))]
-fn window_as_dialog(window: WindowBuilder) -> WindowBuilder {
-    use glutin::os::unix::{WindowBuilderExt, XWindowType};
-    window.with_x11_window_type(XWindowType::Dialog)
-}
-
-#[cfg(not(any(
-    target_os = "linux",
-    target_os = "dragonfly",
-    target_os = "freebsd",
-    target_os = "openbsd"
-)))]
-fn window_as_dialog(window: WindowBuilder) -> WindowBuilder {
-    window
+fn get_env_dpi() -> f32 {
+    let get_var = |name: &str| {
+        env::var(name)
+            .ok()
+            .and_then(|var| var.parse::<f32>().ok())
+            .filter(|f| *f > 0.0)
+    };
+    if let Some(dpi_factor) = get_var("QT_AUTO_SCREEN_SCALE_FACTOR") {
+        return dpi_factor;
+    }
+    if let Some(dpi_factor) = get_var("QT_SCALE_FACTOR") {
+        return dpi_factor;
+    }
+    if let Some(dpi_factor) = get_var("GDK_SCALE") {
+        return dpi_factor;
+    }
+    if let Some(dpi_factor) = get_var("ELM_SCALE") {
+        return dpi_factor;
+    }
+    1.0
 }

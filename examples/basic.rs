@@ -1,13 +1,14 @@
 mod common;
 
+use common::WindowSettings;
 use fae::text::Alignment;
-use fae::{DrawCallParameters, Image, Window, WindowSettings};
+use fae::{DrawCallParameters, Image, Window};
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
     env_logger::from_env(env_logger::Env::default().default_filter_or("trace")).init();
 
-    let mut window = Window::create(&WindowSettings::default()).unwrap();
+    let mut window = Window::create(WindowSettings::default().into()).unwrap();
     let (mut renderer, mut text) = common::create_renderers(&window);
     let params = DrawCallParameters {
         image: {

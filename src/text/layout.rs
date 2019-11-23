@@ -90,8 +90,10 @@ where
 
                     widths.pop_back(); // Pop off the breaking character (from the width)
                 } else {
-                    widths.pop_back(); // Pop off the overflown character
-                    len -= 1;
+                    if len > 1 {
+                        widths.pop_back(); // Pop off the overflown character
+                        len -= 1;
+                    }
                 }
                 break;
             }
