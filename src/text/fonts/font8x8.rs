@@ -106,39 +106,18 @@ impl Font8x8Provider {
         let metric = self.get_raw_metrics(id);
 
         let id = CacheIdentifier::new(id, None);
-        let tex = cache.get_texture();
-        let (spot, new) = cache.reserve_uvs(id, metric.width, metric.height)?;
+        let (spot, new) = cache.reserve(id, metric.width, metric.height)?;
         if new {
-            let mut data = Vec::with_capacity((metric.width * metric.height) as usize);
-            for y in metric.y..(metric.y + metric.height) {
-                let color = bitmap[y as usize];
-                for x in metric.x..(metric.x + metric.width) {
-                    if (color & (1 << x)) == 0 {
-                        data.push(0x00u8);
-                    } else {
-                        data.push(0xFFu8);
-                    }
+            let x_offset = metric.x;
+            let y_offset = metric.y;
+            cache.upload_glyph(spot, |x, y| {
+                if (bitmap[(y + y_offset) as usize] & (1 << (x + x_offset))) == 0 {
+                    0x0
+                } else {
+                    0xFF
                 }
-            }
+            });
 
-            unsafe {
-                use crate::gl;
-                use crate::gl::types::*;
-                gl::BindTexture(gl::TEXTURE_2D, tex);
-                gl::PixelStorei(gl::UNPACK_ALIGNMENT, 1);
-                gl::TexSubImage2D(
-                    gl::TEXTURE_2D,            // target
-                    0,                         // level
-                    spot.x,                    // xoffset
-                    spot.y,                    // yoffset
-                    spot.width,                // width
-                    spot.height,               // height
-                    gl::RED as GLuint,         // format
-                    gl::UNSIGNED_BYTE,         // type
-                    data.as_ptr() as *const _, // pixels
-                );
-                crate::renderer::print_gl_errors("after font8x8 render_bitmap texsubimage2d");
-            }
             crate::profiler::write(|p| p.glyph_cache_misses += 1);
         } else {
             crate::profiler::write(|p| p.glyph_cache_hits += 1);

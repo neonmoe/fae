@@ -42,6 +42,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut was_mouse_in = vec![false; 3];
     let mut pressed_index = None;
     let mut lipsum_alignment = Alignment::Left;
+    let mut lipsum_font_size = 11.0;
     while window.refresh() {
         renderer.set_dpi_factor(window.dpi_factor);
         text.set_dpi_factor(window.dpi_factor);
@@ -49,6 +50,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         #[cfg(all(feature = "rusttype", feature = "png"))]
         fira_sans.set_dpi_factor(window.dpi_factor);
 
+        // Input handling
+        if window.typed_chars.contains(&'+') {
+            lipsum_font_size += 1.0;
+        }
+        if window.typed_chars.contains(&'-') {
+            lipsum_font_size -= 1.0;
+        }
+
+        // All the text rendering:
         let mut y = 10.0;
 
         let s = "The following rectangle should be red if the glyph cache has been filled:";
@@ -218,14 +228,16 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         {
             // Size comparisons
-            for i in 0..12 {
-                let s = "The quick brown fox jumps over the lazy dog";
-                if let Some(rect) = text
-                    .draw(s, 10.0, y, 0.0, (8 + i) as f32 / window.dpi_factor)
-                    .with_cacheable(true)
-                    .finish()
-                {
-                    y += rect.height + 1.0;
+            if lipsum_font_size < 14.0 {
+                for i in 0..12 {
+                    let s = "The quick brown fox jumps over the lazy dog";
+                    if let Some(rect) = text
+                        .draw(s, 10.0, y, 0.0, (8 + i) as f32 / window.dpi_factor)
+                        .with_cacheable(true)
+                        .finish()
+                    {
+                        y += rect.height + 1.0;
+                    }
                 }
             }
             // Size comparisons
@@ -233,22 +245,25 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         {
             // Lorem ipsum
-            let font_size = 11.0;
             let s = format!(
-                "Font size of lorem ipsum: {} px",
-                (font_size * window.dpi_factor) as i32
+                "Font size of lorem ipsum: {} px (press + to increase, - to decrease)",
+                lipsum_font_size as i32
             );
-            text.draw(s, 300.0, 29.0, 0.0, 8.0)
+            if let Some(rect) = text
+                .draw(s, 300.0, 30.0, 0.0, lipsum_font_size - 2.0)
                 .with_alignment(lipsum_alignment)
                 .with_color((0.1, 0.1, 0.1, 1.0))
                 .with_max_width(320.0)
                 .with_cacheable(true)
-                .finish();
-            text.draw(LOREM_IPSUM, 300.0, 40.0, 0.0, font_size)
-                .with_alignment(lipsum_alignment)
-                .with_max_width(320.0)
-                .with_cacheable(true)
-                .finish();
+                .finish()
+            {
+                let y = rect.y + rect.height + 5.0;
+                text.draw(LOREM_IPSUM, 300.0, y, 0.0, lipsum_font_size)
+                    .with_alignment(lipsum_alignment)
+                    .with_max_width(320.0)
+                    .with_cacheable(true)
+                    .finish();
+            }
             // Lorem ipsum
         }
 

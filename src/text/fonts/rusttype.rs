@@ -138,40 +138,21 @@ impl<'a> FontProvider for RustTypeProvider<'a> {
         let metric = self.get_metric(glyph_id, cursor, font_size);
 
         let id = CacheIdentifier::new(glyph_id, Some(font_size));
-        let tex = cache.get_texture();
-        let (spot, new) = cache.reserve_uvs(id, metric.width, metric.height)?;
+        let (spot, new) = cache.reserve(id, metric.width, metric.height)?;
         if new {
-            // TODO: Add borders around glyphs in the glyph cache when rendering to avoid needing to clear the texture
             let scale = self.font_size_to_scale(font_size);
             let glyph = self
                 .font
                 .glyph(rusttype::GlyphId(glyph_id))
                 .scaled(scale)
                 .positioned(rusttype::point(0.0, 0.0));
-            let mut data = vec![0; (metric.width * metric.height) as usize];
-            let stride = metric.width as u32;
-            glyph.draw(|x, y, c| {
-                data[(x + y * stride) as usize] = (255.0 * c) as u8;
-            });
 
-            unsafe {
-                use crate::gl;
-                use crate::gl::types::*;
-                gl::BindTexture(gl::TEXTURE_2D, tex);
-                gl::PixelStorei(gl::UNPACK_ALIGNMENT, 1);
-                gl::TexSubImage2D(
-                    gl::TEXTURE_2D,            // target
-                    0,                         // level
-                    spot.x,                    // xoffset
-                    spot.y,                    // yoffset
-                    spot.width,                // width
-                    spot.height,               // height
-                    gl::RED as GLuint,         // format
-                    gl::UNSIGNED_BYTE,         // type
-                    data.as_ptr() as *const _, // pixels
-                );
-                crate::renderer::print_gl_errors("after rusttype render_glyph texsubimage2d");
-            }
+            let mut data = vec![0; (metric.width * metric.height) as usize];
+            glyph.draw(|x, y, c| {
+                data[(x + y * metric.width as u32) as usize] = (255.0 * c) as u8;
+            });
+            cache.upload_glyph(spot, |x, y| data[(x + y * metric.width) as usize]);
+
             crate::profiler::write(|p| p.glyph_cache_misses += 1);
         } else {
             crate::profiler::write(|p| p.glyph_cache_hits += 1);

@@ -168,11 +168,16 @@ impl TextRenderer {
             z,
         });
 
-        if let Some((glyphs, bounds)) = self.draw_cache.get(&data) {
+        if let Some((cached_glyphs, bounds)) = self.draw_cache.get(&data) {
             // Append the cached glyphs into the queue if they have been
             // cached, and stop here.
-            self.glyphs.extend(glyphs);
+            let mut glyphs = Vec::with_capacity(cached_glyphs.len());
+            for mut glyph in cached_glyphs.iter().cloned() {
+                glyph.draw_data = draw_data_index;
+                glyphs.push(glyph);
+            }
             crate::profiler::write(|p| p.layout_cache_hits += glyphs.len() as u32);
+            self.glyphs.extend(glyphs);
             return *bounds;
         }
 
