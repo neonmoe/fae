@@ -46,10 +46,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut lipsum_font_size = 11.0;
     while window.refresh() {
         renderer.set_dpi_factor(window.dpi_factor);
-        text.set_dpi_factor(window.dpi_factor);
+        text.prepare_new_frame(&mut renderer, window.dpi_factor);
 
         #[cfg(all(feature = "rusttype", feature = "png"))]
-        fira_sans.set_dpi_factor(window.dpi_factor);
+        fira_sans.prepare_new_frame(&mut renderer, window.dpi_factor);
 
         // Input handling
         if window.typed_chars.contains(&'+') {
@@ -235,16 +235,14 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         {
             // Size comparisons
-            if lipsum_font_size < 14.0 {
-                for i in 0..12 {
-                    let s = "The quick brown fox jumps over the lazy dog";
-                    if let Some(rect) = text
-                        .draw(s, 10.0, y, 0.0, (8 + i) as f32 / window.dpi_factor)
-                        .with_cacheable(true)
-                        .finish()
-                    {
-                        y += rect.height + 1.0;
-                    }
+            for i in 0..12 {
+                let s = "The quick brown fox jumps over the lazy dog";
+                if let Some(rect) = text
+                    .draw(s, 10.0, y, 0.0, (8 + i) as f32 / window.dpi_factor)
+                    .with_cacheable(true)
+                    .finish()
+                {
+                    y += rect.height + 1.0;
                 }
             }
             // Size comparisons
@@ -260,14 +258,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .draw(s, 300.0, 30.0, 0.0, lipsum_font_size - 2.0)
                 .with_alignment(lipsum_alignment)
                 .with_color((0.1, 0.1, 0.1, 1.0))
-                .with_max_width(320.0)
+                .with_max_width(window.width - 320.0)
                 .with_cacheable(true)
                 .finish()
             {
                 let y = rect.y + rect.height + 5.0;
                 text.draw(LOREM_IPSUM, 300.0, y, 0.0, lipsum_font_size)
                     .with_alignment(lipsum_alignment)
-                    .with_max_width(320.0)
+                    .with_max_width(window.width - 320.0)
                     .with_cacheable(true)
                     .finish();
             }

@@ -24,12 +24,14 @@ const TEXT_FRAGMENT_SHADER_330: &str = include_str!("../shaders/text.frag");
 /// cached glyph (2 bytes from the CacheIdentifier + 17 bytes from the
 /// GlyphSpot).
 pub struct GlyphCache {
-    texture: GLuint,
+    call: DrawCallHandle,
     width: i32,
     height: i32,
+    max_size: i32,
     column_cursor: i32,
     columns: Vec<GlyphColumn>,
     cache: HashMap<CacheIdentifier, Weak<GlyphSpot>>,
+    requested_resize: Option<i32>,
 }
 
 impl GlyphCache {
@@ -39,7 +41,14 @@ impl GlyphCache {
         height: i32,
         smoothed: bool,
     ) -> (GlyphCache, DrawCallHandle) {
-        let cache_image = Image::create_null(width as i32, height as i32, gl::RED);
+        let mut max_size = 0 as GLint;
+        unsafe { gl::GetIntegerv(gl::MAX_TEXTURE_SIZE, &mut max_size) };
+
+        let cache_image = Image::create_null(
+            (width as i32).min(max_size),
+            (height as i32).min(max_size),
+            gl::RED,
+        );
         let call = renderer.create_draw_call(DrawCallParameters {
             image: Some(cache_image),
             shaders: Shaders {
@@ -54,14 +63,28 @@ impl GlyphCache {
             srgb: false,
         });
         let cache = GlyphCache {
-            texture: renderer.get_texture(&call),
+            call: call.clone(),
             width,
             height,
+            max_size,
             column_cursor: GLYPH_CACHE_GAP,
             columns: Vec::new(),
             cache: HashMap::new(),
+            requested_resize: None,
         };
         (cache, call)
+    }
+
+    pub fn resize_if_needed(&mut self, renderer: &mut Renderer) {
+        if let Some(size) = self.requested_resize {
+            self.requested_resize = None;
+            renderer.resize_texture(&self.call, size, size);
+            self.width = size;
+            self.height = size;
+            for col in &mut self.columns {
+                col.height = self.height - GLYPH_CACHE_GAP * 2;
+            }
+        }
     }
 
     /// Returns a pointer to the GlyphSpot, and whether the spot was
@@ -83,28 +106,50 @@ impl GlyphCache {
             // Start with None to make the chain more uniform.
             if let Some(uvs) = None
                 .or_else(|| {
-                    // First, try to reserve without evicting anything
+                    // First, try to reserve without evicting anything,
                     let reserve = |col: &mut GlyphColumn| col.reserve(width, height, false, false);
                     self.columns.iter_mut().find_map(reserve)
                 })
                 .or_else(|| {
-                    // Then try creating a new column, and then reserve from that
+                    // Then try creating a new column, and then reserve from that,
                     self.create_column(width, height)
                         .and_then(|col| col.reserve(width, height, false, false))
                 })
                 .or_else(|| {
-                    // Then try evicting spots to make space for this glyph
+                    // Then try evicting spots to make space for this glyph,
                     let reserve = |col: &mut GlyphColumn| col.reserve(width, height, true, false);
                     self.columns.iter_mut().find_map(reserve)
                 })
                 .or_else(|| {
-                    // Then try evicting whole lines to make space for this glyph
+                    // Then try evicting whole lines to make space for this glyph,
                     let reserve = |col: &mut GlyphColumn| col.reserve(width, height, true, true);
                     self.columns.iter_mut().find_map(reserve)
                 })
                 .or_else(|| {
-                    // TODO: Try resizing the texture and then add a new column to reserve from
-                    // TODO: Resize column heights on resize
+                    // And finally, request a resize if it would be
+                    // enough to fit the glyph, and then give
+                    // up. Better luck next frame! (Then there should
+                    // be enough space.)
+
+                    // Note: we do not resize here, because resizing
+                    // during a frame will invalidate all the
+                    // previously reserved glyphs' texture coordinates
+                    // as the size of the texture will change, and
+                    // their UVs are calculated eagerly.
+
+                    let new_size = if width > height {
+                        (((self.column_cursor + width) as u32).next_power_of_two() as i32)
+                            .min(self.max_size)
+                    } else {
+                        (((self.height + height) as u32).next_power_of_two() as i32)
+                            .min(self.max_size)
+                    };
+
+                    if self.column_cursor + width + GLYPH_CACHE_GAP < new_size
+                        || self.height + height + GLYPH_CACHE_GAP * 2 < new_size
+                    {
+                        self.requested_resize = Some(new_size);
+                    }
                     None
                 })
             {
@@ -116,7 +161,12 @@ impl GlyphCache {
         }
     }
 
-    pub fn upload_glyph<F: Fn(i32, i32) -> u8>(&mut self, spot: RectPx, get_color: F) {
+    pub fn upload_glyph<F: Fn(i32, i32) -> u8>(
+        &mut self,
+        renderer: &Renderer,
+        spot: RectPx,
+        get_color: F,
+    ) {
         let tex_x = spot.x - 1;
         let tex_y = spot.y - 1;
         let width = spot.width + 2;
@@ -132,22 +182,7 @@ impl GlyphCache {
             }
         }
 
-        unsafe {
-            gl::BindTexture(gl::TEXTURE_2D, self.texture);
-            gl::PixelStorei(gl::UNPACK_ALIGNMENT, 1);
-            gl::TexSubImage2D(
-                gl::TEXTURE_2D,            // target
-                0,                         // level
-                tex_x,                     // xoffset
-                tex_y,                     // yoffset
-                width,                     // width
-                height,                    // height
-                gl::RED as GLuint,         // format
-                gl::UNSIGNED_BYTE,         // type
-                data.as_ptr() as *const _, // pixels
-            );
-            crate::renderer::print_gl_errors("after upload_glyph texsubimage2d");
-        }
+        renderer.upload_texture_region(&self.call, tex_x, tex_y, width, height, gl::RED, data);
     }
 
     pub fn expire_one_step(&mut self) {
@@ -178,23 +213,20 @@ impl GlyphCache {
     }
 
     fn create_column(&mut self, width: i32, height: i32) -> Option<&mut GlyphColumn> {
-        if height > self.height - GLYPH_CACHE_GAP - self.column_cursor {
+        if height > self.height - GLYPH_CACHE_GAP {
             None
         } else {
-            let mut x = GLYPH_CACHE_GAP;
-            for col in &self.columns {
-                x += col.width + GLYPH_CACHE_GAP;
-            }
             let col_width = (((width * 4).max(128) as u32).next_power_of_two() as i32)
-                .min(self.width - x - GLYPH_CACHE_GAP);
+                .min(self.width - self.column_cursor - GLYPH_CACHE_GAP);
             if col_width >= width {
                 let column = GlyphColumn::new(
-                    x,
                     self.column_cursor,
+                    GLYPH_CACHE_GAP,
                     col_width,
-                    self.height - GLYPH_CACHE_GAP - self.column_cursor,
+                    self.height - GLYPH_CACHE_GAP * 2,
                 );
                 self.columns.push(column);
+                self.column_cursor += col_width + GLYPH_CACHE_GAP;
                 let i = self.columns.len() - 1;
                 Some(&mut self.columns[i])
             } else {
@@ -262,6 +294,8 @@ impl GlyphColumn {
         None
     }
 
+    // FIXME: Change evict_line so it tries to evict as few glyphs as possible
+    // (doesn't matter as much for GlyphLine's evict since that's usually only a few glyphs thrown away)
     // This is analogous to GlyphLine::evict_width, but for lines.
     fn evict_line(&mut self, height: i32) -> Option<&mut GlyphLine> {
         let mut top = 0;
@@ -516,6 +550,11 @@ impl GlyphLine {
     }
 }
 
+pub struct GlyphSpot {
+    pub texcoords: RectPx,
+    status: Cell<ExpiryStatus>,
+}
+
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum ExpiryStatus {
     UsedDuringThisFrame,
@@ -532,9 +571,4 @@ impl ExpiryStatus {
             _ => self,
         }
     }
-}
-
-pub struct GlyphSpot {
-    pub texcoords: RectPx,
-    status: Cell<ExpiryStatus>,
 }

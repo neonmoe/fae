@@ -36,7 +36,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     while window.refresh() {
         renderer.set_dpi_factor(window.dpi_factor);
-        text.set_dpi_factor(window.dpi_factor);
+        text.prepare_new_frame(&mut renderer, window.dpi_factor);
         let font_size = 8.0 / window.dpi_factor;
 
         let mut y = 0.0;

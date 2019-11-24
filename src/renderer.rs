@@ -15,10 +15,13 @@ type VBOHandle = GLuint;
 type VAOHandle = GLuint;
 
 /// A handle to a draw call. Parameter for
-/// [`Renderer::draw`](struct.Renderer.html#method.draw).
+/// [`Renderer::draw`](struct.Renderer.html#method.draw). Can be
+/// cloned and shared, the clones will keep referring to the same draw
+/// call.
 ///
 /// Created with
 /// [`Renderer::create_draw_call`](struct.Renderer.html#method.create_draw_call).
+#[derive(Clone, Debug)]
 pub struct DrawCallHandle(usize);
 
 #[derive(Clone, Copy, Debug)]
@@ -601,15 +604,45 @@ impl Renderer {
         }
     }
 
-    /// Returns the OpenGL texture handle for the texture used by the
-    /// draw call.
-    #[cfg(feature = "text")]
-    pub(crate) fn get_texture(&self, call_handle: &DrawCallHandle) -> GLuint {
-        self.calls[call_handle.0].texture
-    }
-
     pub(crate) fn get_texture_size(&self, call_handle: &DrawCallHandle) -> (i32, i32) {
         self.calls[call_handle.0].texture_size
+    }
+
+    pub(crate) fn upload_texture_region(
+        &self,
+        call_handle: &DrawCallHandle,
+        x: i32,
+        y: i32,
+        width: i32,
+        height: i32,
+        format: GLuint,
+        data: Vec<u8>,
+    ) {
+        insert_sub_texture(
+            self.calls[call_handle.0].texture,
+            x,
+            y,
+            width,
+            height,
+            format,
+            data,
+        );
+    }
+
+    pub(crate) fn resize_texture(
+        &mut self,
+        call_handle: &DrawCallHandle,
+        new_width: i32,
+        new_height: i32,
+    ) {
+        resize_texture(
+            self.calls[call_handle.0].texture,
+            self.calls[call_handle.0].texture_size.0,
+            self.calls[call_handle.0].texture_size.1,
+            new_width,
+            new_height,
+        );
+        self.calls[call_handle.0].texture_size = (new_width, new_height);
     }
 
     /// Saves the current OpenGL state for [`Renderer::gl_pop`] and
@@ -969,6 +1002,7 @@ fn insert_texture(
 ) {
     unsafe {
         gl::BindTexture(gl::TEXTURE_2D, tex);
+        gl::PixelStorei(gl::UNPACK_ALIGNMENT, 1);
         gl::TexImage2D(
             gl::TEXTURE_2D,
             0,
@@ -992,18 +1026,87 @@ fn insert_texture(
     print_gl_errors("after inserting a texture");
 }
 
+fn insert_sub_texture(
+    texture: GLuint,
+    x: i32,
+    y: i32,
+    width: i32,
+    height: i32,
+    format: GLuint,
+    data: Vec<u8>,
+) {
+    unsafe {
+        gl::BindTexture(gl::TEXTURE_2D, texture);
+        gl::PixelStorei(gl::UNPACK_ALIGNMENT, 1);
+        gl::TexSubImage2D(
+            gl::TEXTURE_2D,            // target
+            0,                         // level
+            x,                         // xoffset
+            y,                         // yoffset
+            width,                     // width
+            height,                    // height
+            format,                    // format
+            gl::UNSIGNED_BYTE,         // type
+            data.as_ptr() as *const _, // pixels
+        );
+    }
+    crate::renderer::print_gl_errors("after insert_sub_texture");
+}
+
+fn resize_texture(
+    texture: GLuint,
+    old_width: i32,
+    old_height: i32,
+    new_width: i32,
+    new_height: i32,
+) {
+    let mut fbo = 0;
+    let mut temp_tex = 0;
+    unsafe {
+        // Create framebuffer and attach the original texture onto it
+        gl::GenFramebuffers(1, &mut fbo);
+        gl::BindFramebuffer(gl::FRAMEBUFFER, fbo);
+        gl::FramebufferTexture(gl::FRAMEBUFFER, gl::COLOR_ATTACHMENT0, texture, 0);
+        // Create temp texture and copy over the texture from the framebuffer
+        gl::GenTextures(1, &mut temp_tex);
+        gl::BindTexture(gl::TEXTURE_2D, temp_tex);
+        gl::ReadBuffer(gl::COLOR_ATTACHMENT0);
+        gl::CopyTexImage2D(gl::TEXTURE_2D, 0, gl::RED, 0, 0, old_width, old_height, 0);
+        // Re-create the original texture
+        gl::BindTexture(gl::TEXTURE_2D, texture);
+        gl::TexImage2D(
+            gl::TEXTURE_2D,
+            0,
+            gl::RED as GLint,
+            new_width,
+            new_height,
+            0,
+            gl::RED,
+            gl::UNSIGNED_BYTE,
+            std::ptr::null(),
+        );
+        // Attach the temp texture to the framebuffer and draw it onto the original texture
+        gl::FramebufferTexture(gl::FRAMEBUFFER, gl::COLOR_ATTACHMENT0, temp_tex, 0);
+        gl::CopyTexSubImage2D(gl::TEXTURE_2D, 0, 0, 0, 0, 0, old_width, old_height);
+        // Cleanup
+        gl::DeleteTextures(1, &mut temp_tex);
+        gl::DeleteFramebuffers(1, &mut fbo);
+    }
+    crate::renderer::print_gl_errors("after resize_texture");
+}
+
+#[cfg(not(debug_assertions))]
+pub(crate) fn print_gl_errors(_context: &str) {}
+
+#[cfg(debug_assertions)]
 pub(crate) fn print_gl_errors(context: &str) {
-    let mut error = unsafe { gl::GetError() };
-    while error != gl::NO_ERROR {
-        let error_msg = format!("GL error {}: {}", context, gl_error_to_string(error));
-        if cfg!(debug_assertions) {
-            panic!("{}", error_msg);
-        }
-        log::error!("{}", error_msg);
-        error = unsafe { gl::GetError() };
+    let error = unsafe { gl::GetError() };
+    if error != gl::NO_ERROR {
+        panic!("GL error {}: {}", context, gl_error_to_string(error));
     }
 }
 
+#[cfg(debug_assertions)]
 fn gl_error_to_string(error: GLuint) -> String {
     match error {
         0x0500 => "GL_INVALID_ENUM (0x0500)".to_owned(),

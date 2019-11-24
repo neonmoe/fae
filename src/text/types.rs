@@ -1,4 +1,5 @@
 use crate::error::GlyphNotRenderedError;
+use crate::renderer::Renderer;
 use crate::text::GlyphCache;
 use crate::types::*;
 
@@ -46,6 +47,7 @@ pub trait FontProvider {
     fn get_metric(&mut self, id: GlyphId, cursor: Cursor, font_size: i32) -> RectPx;
     fn render_glyph(
         &mut self,
+        renderer: &mut Renderer,
         cache: &mut GlyphCache,
         id: GlyphId,
         cursor: Cursor,

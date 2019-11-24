@@ -1,4 +1,5 @@
 use crate::error::GlyphNotRenderedError;
+use crate::renderer::Renderer;
 use crate::text::types::*;
 use crate::text::GlyphCache;
 use crate::types::*;
@@ -166,6 +167,7 @@ impl<'a> FontProvider for RustTypeProvider<'a> {
 
     fn render_glyph(
         &mut self,
+        renderer: &mut Renderer,
         cache: &mut GlyphCache,
         glyph_id: GlyphId,
         cursor: Cursor,
@@ -187,7 +189,7 @@ impl<'a> FontProvider for RustTypeProvider<'a> {
             glyph.draw(|x, y, c| {
                 data[(x + y * metric.width as u32) as usize] = (255.0 * c) as u8;
             });
-            cache.upload_glyph(spot, |x, y| data[(x + y * metric.width) as usize]);
+            cache.upload_glyph(renderer, spot, |x, y| data[(x + y * metric.width) as usize]);
 
             crate::profiler::write(|p| p.glyph_cache_misses += 1);
         } else {

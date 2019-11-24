@@ -58,7 +58,7 @@ impl TextRenderer {
     /// interpolation is used (crisp but pixelated).
     #[cfg(feature = "font8x8")]
     pub fn with_font8x8(renderer: &mut Renderer, smoothed: bool) -> TextRenderer {
-        let (cache, call) = GlyphCache::create_cache_and_draw_call(renderer, 128, 128, smoothed);
+        let (cache, call) = GlyphCache::create_cache_and_draw_call(renderer, 64, 64, smoothed);
         TextRenderer::with_params(cache, call, Box::new(fonts::Font8x8Provider::new()))
     }
 
@@ -106,11 +106,6 @@ impl TextRenderer {
     /// `GL_MAX_TEXTURE_SIZE`.
     pub fn is_glyph_cache_full(&self) -> bool {
         self.glyph_cache_filled
-    }
-
-    /// Updates the DPI multiplication factor of the screen.
-    pub fn set_dpi_factor(&mut self, dpi_factor: f32) {
-        self.dpi_factor = dpi_factor;
     }
 
     /// Creates a Sprite struct, which you can render after specifying
@@ -321,38 +316,45 @@ impl TextRenderer {
                 height: glyph.metrics.height as f32 + 1.0,
             };
 
-            let mut sprite = renderer
-                .draw(&self.call, z)
-                .with_physical_coordinates(screen_location)
-                .with_color(color);
-            if let Some(area) = self.draw_datas[glyph.draw_data].clip_area {
-                sprite = sprite.with_clip_area(area);
-            }
+            match self.font.render_glyph(
+                renderer,
+                &mut self.cache,
+                glyph.id,
+                glyph.cursor,
+                font_size,
+            ) {
+                Ok(texcoords) => {
+                    let mut sprite = renderer
+                        .draw(&self.call, z)
+                        .with_physical_coordinates(screen_location)
+                        .with_color(color);
+                    if let Some(area) = self.draw_datas[glyph.draw_data].clip_area {
+                        sprite = sprite.with_clip_area(area);
+                    }
 
-            let finish_sprite = |texcoords: RectPx| {
-                let texcoords = Rect {
-                    x: texcoords.x as f32 - 0.5,
-                    y: texcoords.y as f32 - 0.5,
-                    width: texcoords.width as f32 + 1.0,
-                    height: texcoords.height as f32 + 1.0,
-                };
-                sprite.with_texture_coordinates(texcoords).finish();
-            };
-
-            match self
-                .font
-                .render_glyph(&mut self.cache, glyph.id, glyph.cursor, font_size)
-            {
-                Ok(texcoords) => finish_sprite(texcoords),
+                    let texcoords = Rect {
+                        x: texcoords.x as f32 - 0.5,
+                        y: texcoords.y as f32 - 0.5,
+                        width: texcoords.width as f32 + 1.0,
+                        height: texcoords.height as f32 + 1.0,
+                    };
+                    sprite.with_texture_coordinates(texcoords).finish();
+                }
                 Err(err) => match err {
                     GlyphNotRenderedError::GlyphCacheFull => self.glyph_cache_filled = true,
                 },
             }
         }
+    }
 
+    /// Updates the dpi factor, resizes glyph cache if needed, clears
+    /// up data from previous frame. Call at the beginning of a frame.
+    pub fn prepare_new_frame(&mut self, renderer: &mut Renderer, dpi_factor: f32) {
         self.glyphs.clear();
         self.draw_datas.clear();
         self.cache.expire_one_step();
+        self.cache.resize_if_needed(renderer);
+        self.dpi_factor = dpi_factor;
     }
 
     /// Draws the glyph cache texture in the given screen-space quad,

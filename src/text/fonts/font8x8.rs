@@ -1,4 +1,5 @@
 use crate::error::GlyphNotRenderedError;
+use crate::renderer::Renderer;
 use crate::text::glyph_cache::GlyphCache;
 use crate::text::types::*;
 use crate::text::*;
@@ -71,15 +72,16 @@ impl FontProvider for Font8x8Provider {
 
     fn render_glyph(
         &mut self,
+        renderer: &mut Renderer,
         cache: &mut GlyphCache,
         id: GlyphId,
         _cursor: Cursor,
         _font_size: i32,
     ) -> Result<RectPx, GlyphNotRenderedError> {
         if let Some(bitmap) = get_bitmap(id) {
-            self.render_bitmap(cache, id, bitmap)
+            self.render_bitmap(renderer, cache, id, bitmap)
         } else {
-            self.render_bitmap(cache, id, get_missing_bitmap())
+            self.render_bitmap(renderer, cache, id, get_missing_bitmap())
         }
     }
 }
@@ -104,6 +106,7 @@ impl Font8x8Provider {
 
     fn render_bitmap(
         &mut self,
+        renderer: &mut Renderer,
         cache: &mut GlyphCache,
         id: GlyphId,
         bitmap: [u8; 8],
@@ -115,7 +118,7 @@ impl Font8x8Provider {
         if new {
             let x_offset = metric.x;
             let y_offset = metric.y;
-            cache.upload_glyph(spot, |x, y| {
+            cache.upload_glyph(renderer, spot, |x, y| {
                 if (bitmap[(y + y_offset) as usize] & (1 << (x + x_offset))) == 0 {
                     0x0
                 } else {
