@@ -27,8 +27,8 @@ impl Font8x8Provider {
 }
 
 impl FontProvider for Font8x8Provider {
-    fn get_glyph_id(&mut self, c: char) -> Option<GlyphId> {
-        Some(c as GlyphId)
+    fn get_glyph_id(&mut self, c: char) -> GlyphId {
+        c as GlyphId
     }
 
     fn get_line_advance(&self, cursor: Cursor, font_size: i32) -> Advance {

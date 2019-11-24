@@ -1,6 +1,5 @@
 use crate::text::types::*;
 use crate::text::{Alignment, FontProvider};
-use crate::types::*;
 use std::collections::VecDeque;
 
 // Sources for the following two arrays: https://en.wikipedia.org/wiki/Whitespace_character#Unicode
@@ -37,46 +36,40 @@ pub(crate) fn get_line_start_x(
 }
 
 // TODO(optimization): This takes around 30% of fae's runtime, needs to be optimized
-pub(crate) fn get_line_length_and_width<F>(
+pub(crate) fn get_line_length_and_width(
     font: &mut dyn FontProvider,
     mut cursor: Cursor,
-    get_metric: &F,
     font_size: i32,
     max_width: Option<i32>,
-    s: &str,
-) -> (usize, usize, i32)
-where
-    F: Fn(&mut dyn FontProvider, Cursor, char) -> Option<(GlyphId, RectPx)>,
-{
+    glyphs: &[(char, GlyphId)],
+) -> (usize, usize, i32) {
     let mut widths = VecDeque::new();
     let mut total_width = 0; // See the end of the function: this is re-calculated there
-    let mut previous_character = None;
+    let mut previous_id = None;
     let mut len = 0;
     let mut can_break_len = None;
     // Linebreakers shouldn't be rendered
     let mut broken_by_line_breaker = false;
 
     // Find characters that fit in the given width
-    for c in s.chars() {
+    for (c, glyph_id) in glyphs {
         len += 1;
         let mut width = 0;
-        if let Some(previous_character) = previous_character {
-            if let Some(a) = get_char_advance(font, cursor, font_size, c, previous_character) {
-                width -= get_char_width(font, cursor, get_metric, previous_character);
-                cursor = cursor + a;
-                width += a.advance_x;
-            }
+        if let Some(previous_id) = previous_id {
+            let a = font.get_advance(previous_id, *glyph_id, cursor, font_size);
+            cursor = cursor + a;
+            width += a.advance_x - font.get_metric(previous_id, cursor, font_size).width;
         }
-        width += get_char_width(font, cursor, get_metric, c);
+        width += font.get_metric(*glyph_id, cursor, font_size).width;
         widths.push_back(width);
         total_width += width;
-        previous_character = Some(c);
+        previous_id = Some(*glyph_id);
 
-        if can_break(c) {
+        if can_break(*c) {
             can_break_len = Some(len);
         }
 
-        if must_break(c) {
+        if must_break(*c) {
             widths.pop_back(); // Pop off the breaking character
             broken_by_line_breaker = true;
             break;
@@ -104,29 +97,4 @@ where
     let printable_len = if broken_by_line_breaker { len - 1 } else { len };
 
     (len, printable_len, total_width)
-}
-
-// TODO(optimization): This takes around 30% of fae's runtime (half of that inside get_line_length_and_width), needs to be optimized
-pub(crate) fn get_char_advance(
-    font: &mut dyn FontProvider,
-    cursor: Cursor,
-    font_size: i32,
-    current_char: char,
-    previous_char: char,
-) -> Option<Advance> {
-    let previous_id = font.get_glyph_id(previous_char)?;
-    let current_id = font.get_glyph_id(current_char)?;
-    Some(font.get_advance(previous_id, current_id, cursor, font_size))
-}
-
-pub(crate) fn get_char_width<F>(
-    font: &mut dyn FontProvider,
-    cursor: Cursor,
-    get_metric: &F,
-    c: char,
-) -> i32
-where
-    F: Fn(&mut dyn FontProvider, Cursor, char) -> Option<(GlyphId, RectPx)>,
-{
-    get_metric(font, cursor, c).map(|m| m.1.width).unwrap_or(0)
 }

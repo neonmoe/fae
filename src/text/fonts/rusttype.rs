@@ -34,7 +34,6 @@ pub struct RustTypeProvider<'a> {
     units_per_em: i32,
     ascent: i32,
     descent: i32,
-    glyph_ids: HashMap<char, Option<GlyphId>>,
     // TODO(optimization): Unused cached values should be dropped (rusttype metric cache)
     metrics: HashMap<(GlyphId, FontSize), RectPx>,
     // TODO(optimization): Unused cached values should be dropped (rusttype advance cache)
@@ -56,7 +55,6 @@ impl<'a> RustTypeProvider<'a> {
             units_per_em: i32::from(units_per_em),
             ascent: v_metrics.ascent as i32,
             descent: v_metrics.descent as i32,
-            glyph_ids: HashMap::new(),
             metrics: HashMap::new(),
             advances: HashMap::new(),
         })
@@ -100,15 +98,8 @@ impl<'a> RustTypeProvider<'a> {
 }
 
 impl<'a> FontProvider for RustTypeProvider<'a> {
-    fn get_glyph_id(&mut self, c: char) -> Option<GlyphId> {
-        if let Some(id) = self.glyph_ids.get(&c) {
-            *id
-        } else {
-            let id = self.font.glyph(c).id().0;
-            let id = if id == 0 { None } else { Some(id) };
-            self.glyph_ids.insert(c, id);
-            id
-        }
+    fn get_glyph_id(&mut self, c: char) -> GlyphId {
+        self.font.glyph(c).id().0
     }
 
     fn get_line_advance(&self, cursor: Cursor, font_size: i32) -> Advance {
@@ -129,7 +120,7 @@ impl<'a> FontProvider for RustTypeProvider<'a> {
     ) -> Advance {
         let mut advance = self.get_advance_from_font(from, to, font_size) + self.glyph_padding;
 
-        let space_accumulator = if to == self.get_glyph_id(' ').unwrap_or(0) {
+        let space_accumulator = if to == self.get_glyph_id(' ') {
             advance += cursor.space_accumulator;
             0.0
         } else {

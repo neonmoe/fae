@@ -45,6 +45,7 @@ pub struct TextRenderer {
     font: Box<dyn FontProvider>,
     dpi_factor: f32,
     window_size: (f32, f32),
+    glyph_ids: HashMap<char, GlyphId>,
     // TODO(optimization): Unused cached values should be dropped (layout cache)
     draw_cache: HashMap<TextCacheable, (Vec<Glyph>, Option<Rect>)>,
 }
@@ -89,6 +90,7 @@ impl TextRenderer {
             font,
             dpi_factor: 1.0,
             window_size: (0.0, 0.0),
+            glyph_ids: HashMap::new(),
             draw_cache: HashMap::new(),
         }
     }
@@ -176,11 +178,6 @@ impl TextRenderer {
             return *bounds;
         }
 
-        let max_line_width = data.max_line_width;
-        let (x, y) = (data.x, data.y);
-        let alignment = data.alignment;
-        let text: &str = &data.text;
-
         let (mut min_x, mut min_y, mut max_x, mut max_y) = (
             std::f32::INFINITY,
             std::f32::INFINITY,
@@ -188,70 +185,63 @@ impl TextRenderer {
             std::f32::NEG_INFINITY,
         );
 
-        // FIXME: Convert text into a Vec<GlyphId>
-        // -> less calls to get_glyph_id and avoids problems re: utf-8 char boundaries
+        let max_line_width = data.max_line_width;
+        let (x, y) = (data.x, data.y);
+        let alignment = data.alignment;
+        let text_glyphs: Vec<(char, GlyphId)> = data
+            .text
+            .chars()
+            .map(|c| {
+                let id = if let Some(id) = self.glyph_ids.get(&c) {
+                    *id
+                } else {
+                    let id = self.font.get_glyph_id(c);
+                    self.glyph_ids.insert(c, id);
+                    id
+                };
+                (c, id)
+            })
+            .collect();
 
-        let get_metric = |font: &mut dyn FontProvider, cursor, c| {
-            font.get_glyph_id(c)
-                .or(Some(0))
-                .map(|id| (id, font.get_metric(id, cursor, font_size)))
-        };
-
-        let char_count = text.chars().count();
-        let mut glyphs = Vec::with_capacity(char_count);
+        let mut glyphs = Vec::with_capacity(text_glyphs.len());
         let mut cursor = Cursor::new(x, y);
-        let mut text_left = text;
-        while !text_left.is_empty() {
+        let mut i = 0;
+        while i < text_glyphs.len() {
             let (line_stride, line_len, line_width) = get_line_length_and_width(
                 &mut *self.font,
                 cursor,
-                &get_metric,
                 font_size,
                 max_line_width,
-                text_left,
+                &text_glyphs[i..],
             );
             if let Some(max_line_width) = max_line_width {
                 cursor.x = get_line_start_x(cursor.x, line_width, max_line_width, alignment);
             }
 
-            let mut previous_character = None;
-            let mut chars = text_left.chars();
-            for (chars_processed, c) in (&mut chars).enumerate() {
-                if chars_processed < line_len {
-                    if let Some((glyph_id, metrics)) = get_metric(&mut *self.font, cursor, c) {
-                        // Advance the cursor, if this is not the first character
-                        if let Some(prev_char) = previous_character {
-                            if let Some(advance) =
-                                get_char_advance(&mut *self.font, cursor, font_size, c, prev_char)
-                            {
-                                cursor = cursor + advance;
-                            }
-                        }
-
-                        let screen_location = metrics + cursor;
-                        min_x = min_x.min(screen_location.x as f32 / self.dpi_factor);
-                        min_y = min_y.min(screen_location.y as f32 / self.dpi_factor);
-                        max_x = max_x.max(
-                            (screen_location.x + screen_location.width) as f32 / self.dpi_factor,
-                        );
-                        max_y = max_y.max(
-                            (screen_location.y + screen_location.height) as f32 / self.dpi_factor,
-                        );
-                        glyphs.push(Glyph {
-                            cursor,
-                            metrics,
-                            draw_data: draw_data_index,
-                            id: glyph_id,
-                        });
-                    }
-                    previous_character = Some(c);
+            let mut previous_glyph = None;
+            for (_, glyph_id) in (&text_glyphs[i..]).iter().take(line_len) {
+                let metrics = self.font.get_metric(*glyph_id, cursor, font_size);
+                if let Some(prev) = previous_glyph {
+                    let advance = self.font.get_advance(prev, *glyph_id, cursor, font_size);
+                    cursor = cursor + advance;
                 }
 
-                if chars_processed + 1 >= line_stride {
-                    break;
-                }
+                let screen_location = metrics + cursor;
+                min_x = min_x.min(screen_location.x as f32 / self.dpi_factor);
+                min_y = min_y.min(screen_location.y as f32 / self.dpi_factor);
+                max_x =
+                    max_x.max((screen_location.x + screen_location.width) as f32 / self.dpi_factor);
+                max_y = max_y
+                    .max((screen_location.y + screen_location.height) as f32 / self.dpi_factor);
+                glyphs.push(Glyph {
+                    cursor,
+                    metrics,
+                    draw_data: draw_data_index,
+                    id: *glyph_id,
+                });
+                previous_glyph = Some(*glyph_id);
             }
-            text_left = chars.as_str();
+            i += line_stride;
 
             cursor.x = x;
             cursor = cursor + self.font.get_line_advance(cursor, font_size);
