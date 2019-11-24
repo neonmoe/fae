@@ -44,6 +44,7 @@ pub struct TextRenderer {
     draw_datas: Vec<TextDrawData>,
     font: Box<dyn FontProvider>,
     dpi_factor: f32,
+    window_size: (f32, f32),
     // TODO(optimization): Unused cached values should be dropped (layout cache)
     draw_cache: HashMap<TextCacheable, (Vec<Glyph>, Option<Rect>)>,
 }
@@ -87,6 +88,7 @@ impl TextRenderer {
             draw_datas: Vec::new(),
             font,
             dpi_factor: 1.0,
+            window_size: (0.0, 0.0),
             draw_cache: HashMap::new(),
         }
     }
@@ -162,16 +164,15 @@ impl TextRenderer {
             z,
         });
 
-        if let Some((cached_glyphs, bounds)) = self.draw_cache.get(&data) {
+        if let Some((glyphs, bounds)) = self.draw_cache.get(&data) {
             // Append the cached glyphs into the queue if they have been
             // cached, and stop here.
-            let mut glyphs = Vec::with_capacity(cached_glyphs.len());
-            for mut glyph in cached_glyphs.iter().cloned() {
-                glyph.draw_data = draw_data_index;
-                glyphs.push(glyph);
-            }
             crate::profiler::write(|p| p.layout_cache_hits += glyphs.len() as u32);
-            self.glyphs.extend(glyphs);
+            self.glyphs.reserve(glyphs.len());
+            for mut glyph in glyphs.iter().cloned() {
+                glyph.draw_data = draw_data_index;
+                self.glyphs.push(glyph);
+            }
             return *bounds;
         }
 
@@ -316,6 +317,25 @@ impl TextRenderer {
                 height: glyph.metrics.height as f32 + 1.0,
             };
 
+            // If the glyph is out of bounds, there's nothing to draw
+            let in_window_bounds = |rect: Rect| {
+                let (width, height) = self.window_size;
+                rect.x + rect.width >= 0.0
+                    && rect.y + rect.height >= 0.0
+                    && rect.x < width
+                    && rect.y < height
+            };
+            if !in_window_bounds(screen_location) {
+                continue;
+            }
+
+            // If the clip area is out of bounds, there's nothing to draw either
+            if let Some(area) = self.draw_datas[glyph.draw_data].clip_area {
+                if !in_window_bounds(area) {
+                    continue;
+                }
+            }
+
             match self.font.render_glyph(
                 renderer,
                 &mut self.cache,
@@ -349,12 +369,19 @@ impl TextRenderer {
 
     /// Updates the dpi factor, resizes glyph cache if needed, clears
     /// up data from previous frame. Call at the beginning of a frame.
-    pub fn prepare_new_frame(&mut self, renderer: &mut Renderer, dpi_factor: f32) {
+    pub fn prepare_new_frame(
+        &mut self,
+        renderer: &mut Renderer,
+        dpi_factor: f32,
+        window_width: f32,
+        window_height: f32,
+    ) {
         self.glyphs.clear();
         self.draw_datas.clear();
         self.cache.expire_one_step();
         self.cache.resize_if_needed(renderer);
         self.dpi_factor = dpi_factor;
+        self.window_size = (window_width * dpi_factor, window_height * dpi_factor);
     }
 
     /// Draws the glyph cache texture in the given screen-space quad,

@@ -88,7 +88,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         // Update the renderers' dpi settings, in case refresh
         // changed them
         renderer.set_dpi_factor(window.dpi_factor);
-        text.prepare_new_frame(&mut renderer, window.dpi_factor);
+        text.prepare_new_frame(
+            &mut renderer,
+            window.dpi_factor,
+            window.width,
+            window.height,
+        );
 
         if window.pressed_keys.contains(&keys::CLOSE) {
             should_quit = true;

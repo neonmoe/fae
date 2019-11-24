@@ -33,7 +33,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     while window.refresh() {
         renderer.set_dpi_factor(window.dpi_factor);
-        text.prepare_new_frame(&mut renderer, window.dpi_factor);
+        text.prepare_new_frame(
+            &mut renderer,
+            window.dpi_factor,
+            window.width,
+            window.height,
+        );
 
         offset += 1;
         let s: String = all_characters

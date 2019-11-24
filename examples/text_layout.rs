@@ -46,10 +46,20 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut lipsum_font_size = 11.0;
     while window.refresh() {
         renderer.set_dpi_factor(window.dpi_factor);
-        text.prepare_new_frame(&mut renderer, window.dpi_factor);
+        text.prepare_new_frame(
+            &mut renderer,
+            window.dpi_factor,
+            window.width,
+            window.height,
+        );
 
         #[cfg(all(feature = "rusttype", feature = "png"))]
-        fira_sans.prepare_new_frame(&mut renderer, window.dpi_factor);
+        fira_sans.prepare_new_frame(
+            &mut renderer,
+            window.dpi_factor,
+            window.width,
+            window.height,
+        );
 
         // Input handling
         if window.typed_chars.contains(&'+') {

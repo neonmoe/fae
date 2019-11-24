@@ -26,7 +26,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut should_quit = false;
     while window.refresh() && !should_quit {
         renderer.set_dpi_factor(window.dpi_factor);
-        text.prepare_new_frame(&mut renderer, window.dpi_factor);
+        text.prepare_new_frame(
+            &mut renderer,
+            window.dpi_factor,
+            window.width,
+            window.height,
+        );
 
         if window
             .pressed_keys
