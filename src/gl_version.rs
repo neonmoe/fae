@@ -2,7 +2,8 @@
 use crate::gl;
 use std::ffi::CStr;
 
-/// Represents the two different variants of OpenGL.
+/// Represents the two different variants of OpenGL. Contained within
+/// [`OpenGlVersion`](enum.OpenGlVersion.html).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum OpenGlApi {
     /// "Normal" OpenGL, which usually means the environment is
@@ -13,7 +14,8 @@ pub enum OpenGlApi {
     // TODO: Add WebGL, which seems to be "WebGL ?.? (OpenGL ES ?.? ????)" maybe?
 }
 
-/// Represents the parsed version of the OpenGL version string.
+/// Represents the parsed version of the OpenGL version
+/// string. Returned by [`get_version`](fn.get_version.html).
 #[derive(Clone, Debug, PartialEq)]
 pub enum OpenGlVersion {
     /// Represents a version of the OpenGL api.

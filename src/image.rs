@@ -5,8 +5,7 @@ use crate::gl::types::*;
 #[cfg(feature = "png")]
 use png;
 
-/// Contains the raw pixel color data of an image (`u8` per color
-/// channel).
+/// Contains the raw pixel color data of an image.
 #[derive(Clone, Debug)]
 pub struct Image {
     /// The pixels of the image.
