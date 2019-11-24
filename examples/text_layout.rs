@@ -96,6 +96,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
         y += 20.0;
 
+        text.draw("Layout testing: u\u{308}", 10.0, y, 0.0, 14.0)
+            .with_cacheable(true)
+            .finish();
+        y += 20.0;
+
         if let Some(rect) = text
             .draw("Cut off this text at |, like so |", 10.0, y, 0.0, 14.0)
             .with_cacheable(true)
