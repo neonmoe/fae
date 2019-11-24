@@ -188,6 +188,9 @@ impl TextRenderer {
             std::f32::NEG_INFINITY,
         );
 
+        // FIXME: Convert text into a Vec<GlyphId>
+        // -> less calls to get_glyph_id and avoids problems re: utf-8 char boundaries
+
         let get_metric = |font: &mut dyn FontProvider, cursor, c| {
             font.get_glyph_id(c)
                 .or(Some(0))

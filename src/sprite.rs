@@ -1,6 +1,15 @@
 use crate::renderer::{DrawCallHandle, Renderer};
 use crate::types::*;
 
+// TODO: Add an anchoring system for sprites for smooth resizes
+// - The simpler way, `with_anchor(x, y)`, would anchor the whole
+//   sprite to some corner.
+// - The more advanced version would involve specifying the
+//   top-left/bottom-right corners and their individual anchors.
+// - The anchors should be specified in 0..1 floats, describing the %
+//   of the way between the left/right and top/bottom edges of the
+//   window. See also: how Unity does its GUIs.
+
 /// Sprite builder struct. Call [`finish`](struct.Sprite.html#method.finish) to draw the sprite.
 ///
 /// Created by [`Renderer::draw`](struct.Renderer.html#method.draw).

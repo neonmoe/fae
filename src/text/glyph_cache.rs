@@ -213,7 +213,7 @@ impl GlyphCache {
     }
 
     fn create_column(&mut self, width: i32, height: i32) -> Option<&mut GlyphColumn> {
-        if height > self.height - GLYPH_CACHE_GAP {
+        if height > self.height - GLYPH_CACHE_GAP * 2 {
             None
         } else {
             let col_width = (((width * 4).max(128) as u32).next_power_of_two() as i32)
@@ -262,6 +262,10 @@ impl GlyphColumn {
         can_evict_spots: bool,
         can_evict_lines: bool,
     ) -> Option<Rc<GlyphSpot>> {
+        if width > self.width || height > self.height - GLYPH_CACHE_GAP {
+            return None;
+        }
+
         // First try finding space in existing lines
         for line in &mut self.lines {
             if let Some(spot) = line
