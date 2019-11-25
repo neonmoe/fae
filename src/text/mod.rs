@@ -144,6 +144,7 @@ impl TextRenderer {
         Text::new(self, text.into(), x, y, z, font_size)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn draw_text(
         &mut self,
         data: TextCacheable,
@@ -216,22 +217,29 @@ impl TextRenderer {
         let mut cursor = Cursor::new(x, y);
         let mut i = 0;
         while i < text_glyphs.len() {
-            let (line_stride, line_len, line_width) = get_line_length_and_width(
-                &mut *self.font,
-                cursor,
-                font_size,
-                max_line_width,
-                &text_glyphs[i..],
-            );
-            if let Some(max_line_width) = max_line_width {
-                cursor.x = get_line_start_x(cursor.x, line_width, max_line_width, alignment);
-            }
+            let (line_stride, line_len) = if max_line_width.is_some()
+                || alignment != Alignment::Left
+            {
+                let (line_stride, line_len, line_width) = get_line_length_and_width(
+                    &mut *self.font,
+                    cursor,
+                    font_size,
+                    max_line_width,
+                    &text_glyphs[i..],
+                );
+                if let Some(max_line_width) = max_line_width {
+                    cursor.x = get_line_start_x(cursor.x, line_width, max_line_width, alignment);
+                }
+                (line_stride, line_len)
+            } else {
+                get_line_length(&text_glyphs[i..])
+            };
 
             let mut previous_glyph = None;
             for (_, glyph_id) in (&text_glyphs[i..]).iter().take(line_len) {
-                let metrics = self.font.get_metric(*glyph_id, cursor, font_size);
+                let metrics = self.font.get_metric(*glyph_id, font_size);
                 if let Some(prev) = previous_glyph {
-                    let advance = self.font.get_advance(prev, *glyph_id, cursor, font_size);
+                    let advance = self.font.get_advance(prev, *glyph_id, font_size);
                     cursor = cursor + advance;
                 }
 
@@ -250,10 +258,10 @@ impl TextRenderer {
                 });
                 previous_glyph = Some(*glyph_id);
             }
-            i += line_stride;
 
+            i += line_stride;
             cursor.x = x;
-            cursor = cursor + self.font.get_line_advance(cursor, font_size);
+            cursor = cursor + self.font.get_line_advance(font_size);
         }
 
         if let Some((clip_min_x, clip_min_y, clip_max_x, clip_max_y)) =
@@ -341,13 +349,10 @@ impl TextRenderer {
                 }
             }
 
-            match self.font.render_glyph(
-                renderer,
-                &mut self.cache,
-                glyph.id,
-                glyph.cursor,
-                font_size,
-            ) {
+            match self
+                .font
+                .render_glyph(renderer, &mut self.cache, glyph.id, font_size)
+            {
                 Ok(texcoords) => {
                     let mut sprite = renderer
                         .draw(&self.call, z)

@@ -285,14 +285,12 @@ impl GlyphColumn {
             {
                 return Some(spot);
             }
-        } else {
-            if let Some(spot) = self
-                .reserve_line(height)
-                .and_then(|new_line| new_line.reserve(width, height, false))
-                .and_then(|spot_weak| spot_weak.upgrade())
-            {
-                return Some(spot);
-            }
+        } else if let Some(spot) = self
+            .reserve_line(height)
+            .and_then(|new_line| new_line.reserve(width, height, false))
+            .and_then(|spot_weak| spot_weak.upgrade())
+        {
+            return Some(spot);
         }
 
         None
@@ -301,6 +299,7 @@ impl GlyphColumn {
     // FIXME: Change evict_line so it tries to evict as few glyphs as possible
     // (doesn't matter as much for GlyphLine's evict since that's usually only a few glyphs thrown away)
     // This is analogous to GlyphLine::evict_width, but for lines.
+    #[allow(clippy::len_zero)]
     fn evict_line(&mut self, height: i32) -> Option<&mut GlyphLine> {
         let mut top = 0;
         let mut bottom = 0;

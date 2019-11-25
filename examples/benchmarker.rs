@@ -270,7 +270,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         if let Some(mut rect) = text
             .draw(s, 30.0, 310.0, 0.6, 11.0)
             .with_color(text_color)
-            .with_max_width(380.0)
             .with_clip_area((20.0, 300.0, 420.0, 600.0))
             .finish()
         {

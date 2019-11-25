@@ -5,7 +5,7 @@ use crate::text::GlyphCache;
 use crate::types::*;
 
 use fnv::FnvHashMap;
-use rusttype::{Font, FontCollection, PositionedGlyph, Scale};
+use rusttype::{Font, FontCollection, Scale};
 
 type FontSize = i32;
 
@@ -25,16 +25,11 @@ type FontSize = i32;
 ///
 /// \* The pairs consist of each rendered glyph and the one before it.
 pub struct RustTypeProvider<'a> {
-    // These public variables are probably best to leave at defaults,
-    // but I've left them as variables for future consideration.
-    sink_overflows_into_spaces: bool,
     glyph_padding: f32,
-
     font: Font<'a>,
     units_per_em: i32,
     ascent: i32,
     descent: i32,
-    space_glyph_id: GlyphId,
     // TODO(optimization): Unused cached values should be dropped (rusttype metric cache)
     metrics: FnvHashMap<(GlyphId, FontSize), RectPx>,
     // TODO(optimization): Unused cached values should be dropped (rusttype advance cache)
@@ -49,15 +44,12 @@ impl<'a> RustTypeProvider<'a> {
         }
         let units_per_em = font.units_per_em();
         let v_metrics = font.v_metrics_unscaled();
-        let space_glyph_id = font.glyph(' ').id().0;
         Ok(RustTypeProvider {
             font,
-            sink_overflows_into_spaces: false,
             glyph_padding: 0.0,
             units_per_em: i32::from(units_per_em),
             ascent: v_metrics.ascent as i32,
             descent: v_metrics.descent as i32,
-            space_glyph_id,
             metrics: FnvHashMap::default(),
             advances: FnvHashMap::default(),
         })
@@ -68,36 +60,6 @@ impl<'a> RustTypeProvider<'a> {
             font_size as f32 * (self.ascent - self.descent) as f32 / self.units_per_em as f32,
         )
     }
-
-    fn get_metric_from_glyph(&self, glyph: &PositionedGlyph) -> RectPx {
-        if let Some(rect) = glyph.pixel_bounding_box() {
-            let ascent = self.font.v_metrics(glyph.scale()).ascent;
-            RectPx {
-                x: rect.min.x,
-                y: rect.min.y + ascent as i32,
-                width: rect.width(),
-                height: rect.height(),
-            }
-        } else {
-            (0, 0, 0, 0).into()
-        }
-    }
-
-    fn get_advance_from_font(&mut self, from: GlyphId, to: GlyphId, font_size: i32) -> f32 {
-        let key = (from, to, font_size);
-        if let Some(advance) = self.advances.get(&key) {
-            *advance
-        } else {
-            let from = rusttype::GlyphId(from);
-            let to = rusttype::GlyphId(to);
-            let scale = self.font_size_to_scale(font_size);
-            let from_glyph = self.font.glyph(from).scaled(scale);
-            let advance =
-                from_glyph.h_metrics().advance_width + self.font.pair_kerning(scale, from, to);
-            self.advances.insert(key, advance);
-            advance
-        }
-    }
 }
 
 impl<'a> FontProvider for RustTypeProvider<'a> {
@@ -105,44 +67,37 @@ impl<'a> FontProvider for RustTypeProvider<'a> {
         self.font.glyph(c).id().0
     }
 
-    fn get_line_advance(&self, cursor: Cursor, font_size: i32) -> Advance {
+    fn get_line_advance(&self, font_size: i32) -> Advance {
         let metrics = self.font.v_metrics(self.font_size_to_scale(font_size));
         let advance_y = metrics.ascent - metrics.descent + metrics.line_gap;
         Advance {
+            advance_x: 0,
             advance_y: advance_y.trunc() as i32,
-            ..Advance::from(cursor)
         }
     }
 
-    fn get_advance(
-        &mut self,
-        from: GlyphId,
-        to: GlyphId,
-        cursor: Cursor,
-        font_size: i32,
-    ) -> Advance {
-        let mut advance = self.get_advance_from_font(from, to, font_size) + self.glyph_padding;
-
-        let space_accumulator = if to == self.space_glyph_id {
-            advance += cursor.space_accumulator;
-            0.0
+    fn get_advance(&mut self, from: GlyphId, to: GlyphId, font_size: i32) -> Advance {
+        let key = (from, to, font_size);
+        let advance = if let Some(advance) = self.advances.get(&key) {
+            *advance
         } else {
-            cursor.space_accumulator
-        };
-        let overflow = if self.sink_overflows_into_spaces {
-            advance.fract() - self.glyph_padding
-        } else {
-            0.0
+            let from = rusttype::GlyphId(from);
+            let to = rusttype::GlyphId(to);
+            let scale = self.font_size_to_scale(font_size);
+            let from_glyph = self.font.glyph(from).scaled(scale);
+            let kern = self.font.pair_kerning(scale, from, to);
+            let advance = from_glyph.h_metrics().advance_width + kern;
+            self.advances.insert(key, advance);
+            advance
         };
 
         Advance {
-            advance_x: advance.trunc() as i32,
-            space_accumulator: space_accumulator + overflow,
-            ..Advance::from(cursor)
+            advance_x: (advance + self.glyph_padding).trunc() as i32,
+            advance_y: 0,
         }
     }
 
-    fn get_metric(&mut self, id: GlyphId, _cursor: Cursor, font_size: i32) -> RectPx {
+    fn get_metric(&mut self, id: GlyphId, font_size: i32) -> RectPx {
         let key = (id, font_size);
         if let Some(metric) = self.metrics.get(&key) {
             *metric
@@ -153,7 +108,17 @@ impl<'a> FontProvider for RustTypeProvider<'a> {
                 .glyph(rusttype::GlyphId(id))
                 .scaled(scale)
                 .positioned(rusttype::point(0.0, 0.0));
-            let metric = self.get_metric_from_glyph(&glyph);
+            let metric = if let Some(rect) = glyph.pixel_bounding_box() {
+                let ascent = self.font.v_metrics(glyph.scale()).ascent;
+                RectPx {
+                    x: rect.min.x,
+                    y: rect.min.y + ascent as i32,
+                    width: rect.width(),
+                    height: rect.height(),
+                }
+            } else {
+                (0, 0, 0, 0).into()
+            };
             self.metrics.insert(key, metric);
             metric
         }
@@ -164,10 +129,9 @@ impl<'a> FontProvider for RustTypeProvider<'a> {
         renderer: &mut Renderer,
         cache: &mut GlyphCache,
         glyph_id: GlyphId,
-        cursor: Cursor,
         font_size: i32,
     ) -> Result<RectPx, GlyphNotRenderedError> {
-        let metric = self.get_metric(glyph_id, cursor, font_size);
+        let metric = self.get_metric(glyph_id, font_size);
 
         let id = CacheIdentifier::new(glyph_id, Some(font_size));
         let (spot, new) = cache.reserve(id, metric.width, metric.height)?;

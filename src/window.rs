@@ -67,8 +67,8 @@ impl Window {
     ///
     /// Can result in an error if window creation fails or OpenGL
     /// context creation fails.
-    pub fn create<'a>(
-        (window_builder, context_builder): (WindowBuilder, ContextBuilder<'a, NotCurrent>),
+    pub fn create(
+        (window_builder, context_builder): (WindowBuilder, ContextBuilder<'_, NotCurrent>),
     ) -> Result<Window, Box<dyn Error>> {
         let events_loop = EventsLoop::new();
         let context = context_builder.build_windowed(window_builder, &events_loop)?;

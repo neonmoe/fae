@@ -608,6 +608,7 @@ impl Renderer {
         self.calls[call_handle.0].texture_size
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn upload_texture_region(
         &self,
         call_handle: &DrawCallHandle,
@@ -1089,8 +1090,8 @@ fn resize_texture(
         gl::FramebufferTexture(gl::FRAMEBUFFER, gl::COLOR_ATTACHMENT0, temp_tex, 0);
         gl::CopyTexSubImage2D(gl::TEXTURE_2D, 0, 0, 0, 0, 0, old_width, old_height);
         // Cleanup
-        gl::DeleteTextures(1, &mut temp_tex);
-        gl::DeleteFramebuffers(1, &mut fbo);
+        gl::DeleteTextures(1, &temp_tex);
+        gl::DeleteFramebuffers(1, &fbo);
     }
     crate::renderer::print_gl_errors("after resize_texture");
 }

@@ -34,7 +34,6 @@ pub(crate) fn get_line_start_x(
     }
 }
 
-// TODO(optimization): This takes around 30% of fae's runtime, needs to be optimized
 pub(crate) fn get_line_length_and_width(
     font: &mut dyn FontProvider,
     mut cursor: Cursor,
@@ -42,7 +41,7 @@ pub(crate) fn get_line_length_and_width(
     max_width: Option<i32>,
     glyphs: &[(char, GlyphId)],
 ) -> (usize, usize, i32) {
-    let mut total_width = 0; // See the end of the function: this is re-calculated there
+    let mut total_width = 0;
     let mut width_since_can_break = 0;
     let mut previous_id = None;
     let mut len = 0;
@@ -50,16 +49,15 @@ pub(crate) fn get_line_length_and_width(
     // Linebreakers shouldn't be rendered
     let mut broken_by_line_breaker = false;
 
-    // Find characters that fit in the given width
     for (c, glyph_id) in glyphs {
         len += 1;
         let mut width = 0;
         if let Some(previous_id) = previous_id {
-            let a = font.get_advance(previous_id, *glyph_id, cursor, font_size);
+            let a = font.get_advance(previous_id, *glyph_id, font_size);
             cursor = cursor + a;
-            width += a.advance_x - font.get_metric(previous_id, cursor, font_size).width;
+            width += a.advance_x - font.get_metric(previous_id, font_size).width;
         }
-        width += font.get_metric(*glyph_id, cursor, font_size).width;
+        width += font.get_metric(*glyph_id, font_size).width;
         total_width += width;
         previous_id = Some(*glyph_id);
 
@@ -78,15 +76,11 @@ pub(crate) fn get_line_length_and_width(
         } else if let Some(max_width) = max_width {
             if total_width > max_width {
                 if let Some(can_break_len) = can_break_len {
-                    total_width -= width_since_can_break; // Pop off the overflown characters
+                    total_width -= width_since_can_break;
                     len = can_break_len;
-
-                    total_width -= width; // Pop off the breaking character (from the width)
-                } else {
-                    if len > 1 {
-                        total_width -= width; // Pop off the overflown character
-                        len -= 1;
-                    }
+                } else if len > 1 {
+                    total_width -= width; // Pop off the overflown character
+                    len -= 1;
                 }
                 break;
             }
@@ -94,6 +88,14 @@ pub(crate) fn get_line_length_and_width(
     }
 
     let printable_len = if broken_by_line_breaker { len - 1 } else { len };
-
     (len, printable_len, total_width)
+}
+
+pub(crate) fn get_line_length(glyphs: &[(char, GlyphId)]) -> (usize, usize) {
+    if let Some(len) = glyphs.iter().position(|(c, _)| must_break(*c)) {
+        let stride = if len < glyphs.len() { len + 1 } else { len };
+        (stride, len)
+    } else {
+        (glyphs.len(), glyphs.len())
+    }
 }

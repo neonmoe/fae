@@ -31,29 +31,23 @@ impl FontProvider for Font8x8Provider {
         c as GlyphId
     }
 
-    fn get_line_advance(&self, cursor: Cursor, font_size: i32) -> Advance {
+    fn get_line_advance(&self, font_size: i32) -> Advance {
         Advance {
+            advance_x: 0,
             advance_y: font_size + 3,
-            ..Advance::from(cursor)
         }
     }
 
-    fn get_advance(
-        &mut self,
-        from: GlyphId,
-        _to: GlyphId,
-        cursor: Cursor,
-        font_size: i32,
-    ) -> Advance {
+    fn get_advance(&mut self, from: GlyphId, _to: GlyphId, font_size: i32) -> Advance {
         let RectPx { width, .. } = self.get_raw_metrics(from);
         Advance {
             advance_x: scale(width, font_size) + 1,
-            ..Advance::from(cursor)
+            advance_y: 0,
         }
     }
 
-    fn get_metric(&mut self, id: GlyphId, cursor: Cursor, font_size: i32) -> RectPx {
-        let scaled_line_height = self.get_line_advance(cursor, font_size).advance_y;
+    fn get_metric(&mut self, id: GlyphId, font_size: i32) -> RectPx {
+        let scaled_line_height = self.get_line_advance(font_size).advance_y;
         let y_offset = (scaled_line_height - scale(8, font_size)) / 2;
 
         let metrics = self.get_raw_metrics(id);
@@ -75,7 +69,6 @@ impl FontProvider for Font8x8Provider {
         renderer: &mut Renderer,
         cache: &mut GlyphCache,
         id: GlyphId,
-        _cursor: Cursor,
         _font_size: i32,
     ) -> Result<RectPx, GlyphNotRenderedError> {
         if let Some(bitmap) = get_bitmap(id) {
@@ -90,21 +83,19 @@ impl Font8x8Provider {
     fn get_raw_metrics(&mut self, id: GlyphId) -> RectPx {
         if id == ' ' as GlyphId {
             (0, 8, 3, 0).into()
+        } else if let Some(metric) = self.metrics.get(&id) {
+            *metric
         } else {
-            if let Some(metric) = self.metrics.get(&id) {
-                *metric
-            } else {
-                let (left, right) = get_empty_pixels_left_right(id).unwrap_or((0, 0));
-                let (top, bottom) = get_empty_pixels_top_bottom(id).unwrap_or((0, 0));
-                let metric = RectPx {
-                    x: left,
-                    y: top,
-                    width: 8 - (left + right),
-                    height: 8 - (top + bottom),
-                };
-                self.metrics.insert(id, metric);
-                metric
-            }
+            let (left, right) = get_empty_pixels_left_right(id).unwrap_or((0, 0));
+            let (top, bottom) = get_empty_pixels_top_bottom(id).unwrap_or((0, 0));
+            let metric = RectPx {
+                x: left,
+                y: top,
+                width: 8 - (left + right),
+                height: 8 - (top + bottom),
+            };
+            self.metrics.insert(id, metric);
+            metric
         }
     }
 
