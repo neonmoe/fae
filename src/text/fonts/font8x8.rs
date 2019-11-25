@@ -4,7 +4,7 @@ use crate::text::glyph_cache::GlyphCache;
 use crate::text::types::*;
 use crate::text::*;
 
-use std::collections::HashMap;
+use fnv::FnvHashMap;
 
 /// An implementation of FontProvider that uses `font8x8` as the font.
 ///
@@ -15,13 +15,13 @@ use std::collections::HashMap;
 /// glyph, every frame in the worst case. As no glyphs in the font8x8
 /// font rely on font size, this cache can't get very big.
 pub struct Font8x8Provider {
-    metrics: HashMap<GlyphId, RectPx>,
+    metrics: FnvHashMap<GlyphId, RectPx>,
 }
 
 impl Font8x8Provider {
     pub fn new() -> Font8x8Provider {
         Font8x8Provider {
-            metrics: HashMap::new(),
+            metrics: FnvHashMap::default(),
         }
     }
 }
@@ -91,16 +91,20 @@ impl Font8x8Provider {
         if id == ' ' as GlyphId {
             (0, 8, 3, 0).into()
         } else {
-            *self.metrics.entry(id).or_insert_with(|| {
+            if let Some(metric) = self.metrics.get(&id) {
+                *metric
+            } else {
                 let (left, right) = get_empty_pixels_left_right(id).unwrap_or((0, 0));
                 let (top, bottom) = get_empty_pixels_top_bottom(id).unwrap_or((0, 0));
-                RectPx {
+                let metric = RectPx {
                     x: left,
                     y: top,
                     width: 8 - (left + right),
                     height: 8 - (top + bottom),
-                }
-            })
+                };
+                self.metrics.insert(id, metric);
+                metric
+            }
         }
     }
 

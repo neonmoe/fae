@@ -28,8 +28,10 @@ pub struct Glyph {
 
 #[derive(Clone, Copy)]
 pub struct TextDrawData {
+    pub position: (f32, f32),
     pub clip_area: Option<Rect>,
     pub color: (f32, f32, f32, f32),
+    pub rotation: (f32, f32, f32),
     pub font_size: i32,
     pub z: f32,
 }

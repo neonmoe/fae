@@ -12,7 +12,9 @@ pub struct Text<'a> {
     z: f32,
     clip_area: Option<Rect>,
     color: (f32, f32, f32, f32),
+    rotation: (f32, f32, f32),
     cacheable: bool,
+    visible: bool,
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -47,7 +49,9 @@ impl<'a> Text<'a> {
             z,
             clip_area: None,
             color: (0.0, 0.0, 0.0, 1.0),
+            rotation: (0.0, 0.0, 0.0),
             cacheable: false,
+            visible: true,
         }
     }
 
@@ -59,7 +63,9 @@ impl<'a> Text<'a> {
             self.z,
             self.clip_area,
             self.color,
+            self.rotation,
             self.cacheable,
+            self.visible,
         )
     }
 
@@ -109,6 +115,31 @@ impl<'a> Text<'a> {
     ///      is neglible.
     pub fn with_cacheable(mut self, cacheable: bool) -> Self {
         self.cacheable = cacheable;
+        self
+    }
+
+    /// Sets the visibility of the text. If false, the text will not
+    /// be rendered.
+    ///
+    /// Useful for measuring the bounding box of some piece of text,
+    /// without spending performance drawing it with 0 alpha, which
+    /// would make it invisible as well.
+    ///
+    /// # Tip
+    ///
+    /// Consider using `with_cacheable` in combination with this: the
+    /// second Text, if otherwise identical to this Text, will use the
+    /// cached layout information and avoid recalculation.
+    pub fn with_visibility(mut self, visible: bool) -> Self {
+        self.visible = visible;
+        self
+    }
+
+    /// Specifies the rotation (in radians) and pivot\* of the text.
+    ///
+    /// \* Relative to the text's `x` and `y` parameters.
+    pub fn with_rotation(mut self, rotation: f32, pivot_x: f32, pivot_y: f32) -> Self {
+        self.rotation = (rotation, pivot_x, pivot_y);
         self
     }
 }

@@ -6,8 +6,8 @@ use crate::renderer::{DrawCallHandle, DrawCallParameters, Renderer, Shaders, Tex
 use crate::text::types::*;
 use crate::types::*;
 
+use fnv::FnvHashMap;
 use std::cell::Cell;
-use std::collections::HashMap;
 use std::rc::{Rc, Weak};
 
 // How far the glyphs are from each other (and from the texture's edges)
@@ -30,7 +30,7 @@ pub struct GlyphCache {
     max_size: i32,
     column_cursor: i32,
     columns: Vec<GlyphColumn>,
-    cache: HashMap<CacheIdentifier, Weak<GlyphSpot>>,
+    cache: FnvHashMap<CacheIdentifier, Weak<GlyphSpot>>,
     requested_resize: Option<i32>,
 }
 
@@ -69,7 +69,7 @@ impl GlyphCache {
             max_size,
             column_cursor: GLYPH_CACHE_GAP,
             columns: Vec::new(),
-            cache: HashMap::new(),
+            cache: FnvHashMap::default(),
             requested_resize: None,
         };
         (cache, call)
@@ -535,8 +535,8 @@ impl GlyphLine {
             .binary_search_by(|elem| elem.texcoords.x.cmp(&x))
         {
             self.reserved.splice(i..i, Some(spot));
-        } else {
-            log::warn!("reserved a glyph in a spot that was already taken");
+        } else if cfg!(debug_assertions) {
+            panic!("reserved a glyph in a spot that was already taken");
         }
         self.height = self.height.max(height);
 

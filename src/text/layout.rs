@@ -1,6 +1,5 @@
 use crate::text::types::*;
 use crate::text::{Alignment, FontProvider};
-use std::collections::VecDeque;
 
 // Sources for the following two arrays: https://en.wikipedia.org/wiki/Whitespace_character#Unicode
 // Characters that must break lines when encountered:
@@ -43,8 +42,8 @@ pub(crate) fn get_line_length_and_width(
     max_width: Option<i32>,
     glyphs: &[(char, GlyphId)],
 ) -> (usize, usize, i32) {
-    let mut widths = VecDeque::new();
     let mut total_width = 0; // See the end of the function: this is re-calculated there
+    let mut width_since_can_break = 0;
     let mut previous_id = None;
     let mut len = 0;
     let mut can_break_len = None;
@@ -61,30 +60,31 @@ pub(crate) fn get_line_length_and_width(
             width += a.advance_x - font.get_metric(previous_id, cursor, font_size).width;
         }
         width += font.get_metric(*glyph_id, cursor, font_size).width;
-        widths.push_back(width);
         total_width += width;
         previous_id = Some(*glyph_id);
 
         if can_break(*c) {
             can_break_len = Some(len);
+            width_since_can_break = 0;
+        }
+        if can_break_len.is_some() {
+            width_since_can_break += width;
         }
 
         if must_break(*c) {
-            widths.pop_back(); // Pop off the breaking character
+            total_width -= width; // Pop off the breaking character
             broken_by_line_breaker = true;
             break;
         } else if let Some(max_width) = max_width {
             if total_width > max_width {
                 if let Some(can_break_len) = can_break_len {
-                    for _ in can_break_len..len {
-                        widths.pop_back(); // Pop off the overflown characters
-                    }
+                    total_width -= width_since_can_break; // Pop off the overflown characters
                     len = can_break_len;
 
-                    widths.pop_back(); // Pop off the breaking character (from the width)
+                    total_width -= width; // Pop off the breaking character (from the width)
                 } else {
                     if len > 1 {
-                        widths.pop_back(); // Pop off the overflown character
+                        total_width -= width; // Pop off the overflown character
                         len -= 1;
                     }
                 }
@@ -93,7 +93,6 @@ pub(crate) fn get_line_length_and_width(
         }
     }
 
-    let total_width = widths.into_iter().sum();
     let printable_len = if broken_by_line_breaker { len - 1 } else { len };
 
     (len, printable_len, total_width)

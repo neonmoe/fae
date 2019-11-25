@@ -24,8 +24,9 @@ stb_truetype = { version = "^0.3", optional = true}
 # *sigh*
 
 # Now, the normal [dependencies] section
-glutin = "^0.21.1"
 log = "^0.4.8"
+glutin = "^0.21.1"
+fnv = { version = "^1.0.6", optional = true }
 png = { version = "^0.15.0", optional = true }
 font8x8 = { version = "^0.2.5", optional = true, default_features = false, features = ["std"] }
 lazy_static = { version = "^1.4.0", optional = true }
@@ -33,7 +34,7 @@ lazy_static = { version = "^1.4.0", optional = true }
 [features]
 # FIXME: there should be no default features
 default = ["text", "png", "font8x8", "ttf", "profiler"]
-text = []
+text = ["fnv"]
 profiler = ["lazy_static"]
 ttf = ["rusttype", "stb_truetype"]
 

@@ -4,8 +4,8 @@ use crate::text::types::*;
 use crate::text::GlyphCache;
 use crate::types::*;
 
+use fnv::FnvHashMap;
 use rusttype::{Font, FontCollection, PositionedGlyph, Scale};
-use std::collections::HashMap;
 
 type FontSize = i32;
 
@@ -34,10 +34,11 @@ pub struct RustTypeProvider<'a> {
     units_per_em: i32,
     ascent: i32,
     descent: i32,
+    space_glyph_id: GlyphId,
     // TODO(optimization): Unused cached values should be dropped (rusttype metric cache)
-    metrics: HashMap<(GlyphId, FontSize), RectPx>,
+    metrics: FnvHashMap<(GlyphId, FontSize), RectPx>,
     // TODO(optimization): Unused cached values should be dropped (rusttype advance cache)
-    advances: HashMap<(GlyphId, GlyphId, FontSize), f32>,
+    advances: FnvHashMap<(GlyphId, GlyphId, FontSize), f32>,
 }
 
 impl<'a> RustTypeProvider<'a> {
@@ -48,6 +49,7 @@ impl<'a> RustTypeProvider<'a> {
         }
         let units_per_em = font.units_per_em();
         let v_metrics = font.v_metrics_unscaled();
+        let space_glyph_id = font.glyph(' ').id().0;
         Ok(RustTypeProvider {
             font,
             sink_overflows_into_spaces: false,
@@ -55,8 +57,9 @@ impl<'a> RustTypeProvider<'a> {
             units_per_em: i32::from(units_per_em),
             ascent: v_metrics.ascent as i32,
             descent: v_metrics.descent as i32,
-            metrics: HashMap::new(),
-            advances: HashMap::new(),
+            space_glyph_id,
+            metrics: FnvHashMap::default(),
+            advances: FnvHashMap::default(),
         })
     }
 
@@ -120,7 +123,7 @@ impl<'a> FontProvider for RustTypeProvider<'a> {
     ) -> Advance {
         let mut advance = self.get_advance_from_font(from, to, font_size) + self.glyph_padding;
 
-        let space_accumulator = if to == self.get_glyph_id(' ') {
+        let space_accumulator = if to == self.space_glyph_id {
             advance += cursor.space_accumulator;
             0.0
         } else {

@@ -69,14 +69,14 @@ impl<'a, 'b> Sprite<'a, 'b> {
 
     /// Specifies the screen coordinates (in logical pixels) where the
     /// quad is drawn.
-    pub fn with_coordinates<R: Into<Rect>>(mut self, rect: R) -> Sprite<'a, 'b> {
+    pub fn with_coordinates<R: Into<Rect>>(mut self, rect: R) -> Self {
         self.coords = rect.into().into_corners();
         self
     }
 
     /// Specifies the screen coordinates (in *physical* pixels) where
     /// the quad is drawn.
-    pub fn with_physical_coordinates<R: Into<Rect>>(mut self, rect: R) -> Sprite<'a, 'b> {
+    pub fn with_physical_coordinates<R: Into<Rect>>(mut self, rect: R) -> Self {
         let (x0, y0, x1, y1) = rect.into().into_corners();
         let df = self.renderer.dpi_factor;
         self.coords = (x0 / df, y0 / df, x1 / df, y1 / df);
@@ -85,7 +85,7 @@ impl<'a, 'b> Sprite<'a, 'b> {
 
     /// Specifies the texture coordinates (in actual pixels, in the
     /// texture's coordinate space) from where the quad is sampled.
-    pub fn with_texture_coordinates<R: Into<Rect>>(mut self, rect: R) -> Sprite<'a, 'b> {
+    pub fn with_texture_coordinates<R: Into<Rect>>(mut self, rect: R) -> Self {
         let (tw, th) = self.renderer.get_texture_size(self.call);
         let (tw, th) = (tw as f32, th as f32);
         let (x0, y0, x1, y1) = rect.into().into_corners();
@@ -100,7 +100,7 @@ impl<'a, 'b> Sprite<'a, 'b> {
     /// This might help you with weird visual glitches, especially if
     /// you're trying to render quads that have the same physical
     /// pixel size as the texture it's sampling.
-    pub fn with_pixel_alignment(mut self) -> Sprite<'a, 'b> {
+    pub fn with_pixel_alignment(mut self) -> Self {
         let (x0, y0, x1, y1) = self.coords;
         let dpi_factor = self.renderer.dpi_factor;
         let round_px = |x: f32| (x * dpi_factor).round() / dpi_factor;
@@ -110,27 +110,27 @@ impl<'a, 'b> Sprite<'a, 'b> {
     }
 
     /// Specifies the texture coordinates (as UVs) from where the quad is sampled.
-    pub fn with_uvs<R: Into<Rect>>(mut self, rect: R) -> Sprite<'a, 'b> {
+    pub fn with_uvs<R: Into<Rect>>(mut self, rect: R) -> Self {
         self.texcoords = rect.into().into_corners();
         self
     }
 
     /// Specifies the clip area. Only the parts that overlap between
     /// the clip area and this quad are rendered.
-    pub fn with_clip_area<R: Into<Rect>>(mut self, rect: R) -> Sprite<'a, 'b> {
+    pub fn with_clip_area<R: Into<Rect>>(mut self, rect: R) -> Self {
         self.clip_area = Some(rect.into().into_corners());
         self
     }
 
     /// Specifies the color tint of the quad.
-    pub fn with_color(mut self, (red, green, blue, alpha): (f32, f32, f32, f32)) -> Sprite<'a, 'b> {
+    pub fn with_color(mut self, (red, green, blue, alpha): (f32, f32, f32, f32)) -> Self {
         self.color = (red, green, blue, alpha);
         self
     }
 
     /// Specifies the rotation (in radians) and pivot (which is
     /// relative to the quad's `x` and `y` coordinates) of the quad.
-    pub fn with_rotation(mut self, rotation: f32, pivot_x: f32, pivot_y: f32) -> Sprite<'a, 'b> {
+    pub fn with_rotation(mut self, rotation: f32, pivot_x: f32, pivot_y: f32) -> Self {
         self.rotation = (rotation, pivot_x, pivot_y);
         self
     }

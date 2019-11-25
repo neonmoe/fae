@@ -15,6 +15,7 @@ mod keys {
     pub const CLOSE: glutin::VirtualKeyCode = glutin::VirtualKeyCode::Escape;
     pub const UP: glutin::VirtualKeyCode = glutin::VirtualKeyCode::Up;
     pub const DOWN: glutin::VirtualKeyCode = glutin::VirtualKeyCode::Down;
+    pub const TIME: glutin::VirtualKeyCode = glutin::VirtualKeyCode::Space;
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -68,6 +69,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // For animations
     let start = Instant::now();
+    let mut time_ticking = false;
     // For testing text input
     let mut customizable_text = String::new();
     let mut last_over_text = false;
@@ -104,6 +106,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         if window.pressed_keys.contains(&keys::DOWN) && quad_count > 1 {
             quad_count /= 2;
         }
+        if window.pressed_keys.contains(&keys::TIME) {
+            time_ticking = !time_ticking;
+        }
 
         for c in &window.typed_chars {
             if !c.is_control() {
@@ -119,7 +124,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         last_over_text = over_text;
 
         let time = Instant::now() - start;
-        let time = time.as_secs() as f32 + time.subsec_millis() as f32 / 1000.0;
+        let time = if time_ticking {
+            time.as_secs() as f32 + time.subsec_millis() as f32 / 1000.0
+        } else {
+            0.0
+        };
 
         timers["quad calls"][timer_index].start();
         // Background
@@ -144,7 +153,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             let y = (f * 3.1415 * 8.0 + time).sin() * 150.0 * f.max(0.3) + 190.0;
             renderer
                 .draw(&call, 0.5 - f)
-                .with_coordinates((x, y, 100.0, 100.0))
+                .with_coordinates((x, y, 124.0, 92.0))
                 .with_texture_coordinates((0, 0, 1240, 920))
                 .with_color((1.0, 0.7, 0.9, 1.0))
                 .with_rotation(-time * 1.5, 50.0, 50.0)
@@ -168,6 +177,28 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .with_color(text_color)
                 .finish();
         }
+
+        if let Some(rect) = text
+            .draw("Wee!", 320.0, 340.0, 0.6, 14.0)
+            .with_visibility(false)
+            .finish()
+        {
+            let (half_width, half_height) = (rect.width / 2.0, rect.height / 2.0);
+            let (x, y) = (320.0 - half_width, 340.0 - half_height);
+            text.draw("Wee!", x, y, 0.6, 14.0)
+                .with_color((0.1, 0.2, 0.5, 1.0))
+                .with_rotation(time * 10.0, half_width, half_height)
+                .finish();
+        }
+
+        y += 20.0;
+        let s = format!(
+            "Press {:?} to make everything spin. To demonstrate animation.",
+            keys::TIME
+        );
+        text.draw(s, 10.0, y, 0.6, 11.0)
+            .with_color(text_color)
+            .finish();
 
         y += 20.0;
         let s = format!("Quad count: {}", quad_count);

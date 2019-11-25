@@ -66,7 +66,7 @@ impl TextRenderer {
 
     /// Creates a new text renderer with the given font, rasterized
     /// with `rusttype`.
-    #[cfg(feature = "rusttype")]
+    #[cfg(feature = "ttf")]
     pub fn with_ttf(
         renderer: &mut Renderer,
         ttf_data: Vec<u8>,
@@ -150,7 +150,9 @@ impl TextRenderer {
         z: f32,
         clip_area: Option<Rect>,
         color: (f32, f32, f32, f32),
+        rotation: (f32, f32, f32),
         cacheable: bool,
+        visible: bool,
     ) -> Option<Rect> {
         if data.text.is_empty() {
             return None;
@@ -160,8 +162,13 @@ impl TextRenderer {
 
         let draw_data_index = self.draw_datas.len();
         self.draw_datas.push(TextDrawData {
+            position: (
+                data.x as f32 / self.dpi_factor,
+                data.y as f32 / self.dpi_factor,
+            ),
             clip_area,
             color,
+            rotation,
             font_size,
             z,
         });
@@ -169,11 +176,13 @@ impl TextRenderer {
         if let Some((glyphs, bounds)) = self.draw_cache.get(&data) {
             // Append the cached glyphs into the queue if they have been
             // cached, and stop here.
-            crate::profiler::write(|p| p.layout_cache_hits += glyphs.len() as u32);
-            self.glyphs.reserve(glyphs.len());
-            for mut glyph in glyphs.iter().cloned() {
-                glyph.draw_data = draw_data_index;
-                self.glyphs.push(glyph);
+            if visible {
+                crate::profiler::write(|p| p.layout_cache_hits += glyphs.len() as u32);
+                self.glyphs.reserve(glyphs.len());
+                for mut glyph in glyphs.iter().cloned() {
+                    glyph.draw_data = draw_data_index;
+                    self.glyphs.push(glyph);
+                }
             }
             return *bounds;
         }
@@ -246,7 +255,6 @@ impl TextRenderer {
             cursor.x = x;
             cursor = cursor + self.font.get_line_advance(cursor, font_size);
         }
-        self.glyphs.extend(&glyphs);
 
         if let Some((clip_min_x, clip_min_y, clip_max_x, clip_max_y)) =
             clip_area.map(|a| a.into_corners())
@@ -268,8 +276,10 @@ impl TextRenderer {
         };
 
         let len = glyphs.len() as u32;
-        crate::profiler::write(|p| p.layout_cache_misses += len);
-
+        if visible {
+            crate::profiler::write(|p| p.layout_cache_misses += len);
+            self.glyphs.extend(&glyphs);
+        }
         if cacheable {
             crate::profiler::write(|p| p.layout_cache_count += len);
             self.draw_cache.insert(data, (glyphs, bounds));
@@ -284,6 +294,8 @@ impl TextRenderer {
     pub fn compose_draw_call(&mut self, renderer: &mut Renderer) {
         self.glyph_cache_filled = false;
         for glyph in &self.glyphs {
+            let (base_x, base_y) = self.draw_datas[glyph.draw_data].position;
+            let (radians, pivot_x, pivot_y) = self.draw_datas[glyph.draw_data].rotation;
             let font_size = self.draw_datas[glyph.draw_data].font_size;
             let color = self.draw_datas[glyph.draw_data].color;
             let z = self.draw_datas[glyph.draw_data].z;
@@ -341,6 +353,11 @@ impl TextRenderer {
                         .draw(&self.call, z)
                         .with_physical_coordinates(screen_location)
                         .with_color(color);
+                    if radians != 0.0 {
+                        let dx = screen_location.x / self.dpi_factor - base_x;
+                        let dy = screen_location.y / self.dpi_factor - base_y;
+                        sprite = sprite.with_rotation(radians, pivot_x - dx, pivot_y - dy);
+                    }
                     if let Some(area) = self.draw_datas[glyph.draw_data].clip_area {
                         sprite = sprite.with_clip_area(area);
                     }

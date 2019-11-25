@@ -6,7 +6,7 @@ use fae::text::TextRenderer;
 use fae::{Renderer, Window};
 
 cfg_if::cfg_if! {
-    if #[cfg(feature = "rusttype")] {
+    if #[cfg(feature = "ttf")] {
         fn create_text_renderer(renderer: &mut Renderer) -> TextRenderer {
             use font_loader::system_fonts;
             let property = system_fonts::FontPropertyBuilder::new()
@@ -20,7 +20,7 @@ cfg_if::cfg_if! {
         }
     } else {
         fn create_text_renderer(_renderer: &mut Renderer) -> TextRenderer {
-            panic!("no font feature (`font8x8` or `rusttype`) enabled")
+            panic!("no font feature (`font8x8` or `ttf`) enabled")
         }
     }
 }
