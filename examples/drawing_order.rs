@@ -44,7 +44,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             let s = "Correct: The draw call of the sprite in front is drawn last:";
             text.draw(s, 10.0, 10.0, 0.6, 10.0)
                 .with_max_width(280.0)
-                .with_cacheable(true)
                 .finish();
 
             renderer
@@ -63,7 +62,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             let s = "Not correct: The draw call of the sprite in front is drawn first:";
             text.draw(s, 330.0, 10.0, 0.6, 10.0)
                 .with_max_width(280.0)
-                .with_cacheable(true)
                 .finish();
 
             renderer
@@ -82,7 +80,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         text.draw(s, 80.0, 250.0, 0.6, 10.0)
             .with_max_width(400.0)
             .with_alignment(Alignment::Center)
-            .with_cacheable(true)
             .finish();
 
         text.compose_draw_call(&mut renderer);

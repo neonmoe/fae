@@ -1,5 +1,4 @@
-//! This example writes text in varying ways to test that the layout
-//! functionality works correctly.
+//! This example displays all of the glyphs in the font8x8 font.
 
 #[cfg(feature = "font8x8")]
 mod common;
@@ -53,7 +52,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .finish();
 
         text.draw("Every character in font8x8:", 10.0, 10.0, 0.0, 10.0)
-            .with_cacheable(true)
             .finish();
 
         let profiling_data = fae::profiler::read();

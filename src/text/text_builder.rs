@@ -13,7 +13,6 @@ pub struct Text<'a> {
     clip_area: Option<Rect>,
     color: (f32, f32, f32, f32),
     rotation: (f32, f32, f32),
-    cacheable: bool,
     visible: bool,
 }
 
@@ -50,7 +49,6 @@ impl<'a> Text<'a> {
             clip_area: None,
             color: (0.0, 0.0, 0.0, 1.0),
             rotation: (0.0, 0.0, 0.0),
-            cacheable: false,
             visible: true,
         }
     }
@@ -64,7 +62,6 @@ impl<'a> Text<'a> {
             self.clip_area,
             self.color,
             self.rotation,
-            self.cacheable,
             self.visible,
         )
     }
@@ -98,38 +95,13 @@ impl<'a> Text<'a> {
         self
     }
 
-    /// Sets the "cacheability" of the text. If your text\* doesn't
-    /// change often\*\*, this will improve performance. **Note**:
-    /// individual glyphs are always cached. This affects the caching
-    /// of the whole span of text.
-    ///
-    /// \* This is including some of the text drawing parameters, not
-    ///    just the string itself. Specifically, the ones that affect
-    ///    cacheability: the string being drawn, the x or y
-    ///    coordinate, the font size, the alignment, and the maximum
-    ///    line width.
-    ///
-    /// \*\* More than once a second will probably not be worth
-    ///      it. The more a cached text changes, the more memory will
-    ///      be consumed. If your text doesn't change at all, the cost
-    ///      is neglible.
-    pub fn with_cacheable(mut self, cacheable: bool) -> Self {
-        self.cacheable = cacheable;
-        self
-    }
-
     /// Sets the visibility of the text. If false, the text will not
-    /// be rendered.
+    /// be rendered. That is, only the bounding box of the text will
+    /// be calculated.
     ///
     /// Useful for measuring the bounding box of some piece of text,
     /// without spending performance drawing it with 0 alpha, which
     /// would make it invisible as well.
-    ///
-    /// # Tip
-    ///
-    /// Consider using `with_cacheable` in combination with this: the
-    /// second Text, if otherwise identical to this Text, will use the
-    /// cached layout information and avoid recalculation.
     pub fn with_visibility(mut self, visible: bool) -> Self {
         self.visible = visible;
         self

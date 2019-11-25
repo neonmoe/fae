@@ -31,11 +31,6 @@ use crate::{DrawCallHandle, Renderer};
 use std::collections::HashMap;
 
 /// Contains everything needed to draw text.
-///
-/// Holds a HashMap to cache draws marked as cacheable, which takes up
-/// roughly 33 bytes per draw, 37 bytes per glyph, and whatever
-/// overhead HashMap has. (Note: these values are probably not
-/// accurate, and were eyeballed at the time of writing.)
 pub struct TextRenderer {
     cache: GlyphCache,
     glyph_cache_filled: bool,
@@ -46,8 +41,6 @@ pub struct TextRenderer {
     dpi_factor: f32,
     window_size: (f32, f32),
     glyph_ids: HashMap<char, GlyphId>,
-    // TODO(optimization): Unused cached values should be dropped (layout cache)
-    draw_cache: HashMap<TextCacheable, (Vec<Glyph>, Option<Rect>)>,
 }
 
 impl TextRenderer {
@@ -91,7 +84,6 @@ impl TextRenderer {
             dpi_factor: 1.0,
             window_size: (0.0, 0.0),
             glyph_ids: HashMap::new(),
-            draw_cache: HashMap::new(),
         }
     }
 
@@ -152,7 +144,6 @@ impl TextRenderer {
         clip_area: Option<Rect>,
         color: (f32, f32, f32, f32),
         rotation: (f32, f32, f32),
-        cacheable: bool,
         visible: bool,
     ) -> Option<Rect> {
         if data.text.is_empty() {
@@ -173,20 +164,6 @@ impl TextRenderer {
             font_size,
             z,
         });
-
-        if let Some((glyphs, bounds)) = self.draw_cache.get(&data) {
-            // Append the cached glyphs into the queue if they have been
-            // cached, and stop here.
-            if visible {
-                crate::profiler::write(|p| p.layout_cache_hits += glyphs.len() as u32);
-                self.glyphs.reserve(glyphs.len());
-                for mut glyph in glyphs.iter().cloned() {
-                    glyph.draw_data = draw_data_index;
-                    self.glyphs.push(glyph);
-                }
-            }
-            return *bounds;
-        }
 
         let (mut min_x, mut min_y, mut max_x, mut max_y) = (
             std::f32::INFINITY,
@@ -213,7 +190,11 @@ impl TextRenderer {
             })
             .collect();
 
-        let mut glyphs = Vec::with_capacity(text_glyphs.len());
+        let mut glyphs = if visible {
+            Some(Vec::with_capacity(text_glyphs.len()))
+        } else {
+            None
+        };
         let mut cursor = Cursor::new(x, y);
         let mut i = 0;
         while i < text_glyphs.len() {
@@ -250,12 +231,14 @@ impl TextRenderer {
                     max_x.max((screen_location.x + screen_location.width) as f32 / self.dpi_factor);
                 max_y = max_y
                     .max((screen_location.y + screen_location.height) as f32 / self.dpi_factor);
-                glyphs.push(Glyph {
-                    cursor,
-                    metrics,
-                    draw_data: draw_data_index,
-                    id: *glyph_id,
-                });
+                if let Some(ref mut glyphs) = glyphs {
+                    glyphs.push(Glyph {
+                        cursor,
+                        metrics,
+                        draw_data: draw_data_index,
+                        id: *glyph_id,
+                    });
+                }
                 previous_glyph = Some(*glyph_id);
             }
 
@@ -283,14 +266,10 @@ impl TextRenderer {
             Some((min_x, min_y, max_x - min_x, max_y - min_y).into())
         };
 
-        let len = glyphs.len() as u32;
-        if visible {
-            crate::profiler::write(|p| p.layout_cache_misses += len);
-            self.glyphs.extend(&glyphs);
-        }
-        if cacheable {
-            crate::profiler::write(|p| p.layout_cache_count += len);
-            self.draw_cache.insert(data, (glyphs, bounds));
+        if let Some(glyphs) = glyphs {
+            if visible {
+                self.glyphs.extend(&glyphs);
+            }
         }
 
         bounds

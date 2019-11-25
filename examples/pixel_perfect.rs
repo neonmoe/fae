@@ -70,7 +70,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                 0.0,
                 font_size,
             )
-            .with_cacheable(true)
             .finish();
 
             y += 10.0 + size;
@@ -89,7 +88,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
 
         text.draw("with pixel align =", 175.0, 30.0, 0.0, font_size)
-            .with_cacheable(true)
             .finish();
 
         let mut y = 20.0;

@@ -216,7 +216,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         let s = format!("Scaling factor: {:.1}", window.dpi_factor);
         text.draw(s, 10.0, y, 0.6, 11.0)
             .with_color(text_color)
-            .with_cacheable(true)
             .finish();
 
         y = 5.0;
@@ -255,7 +254,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             let s = format!("OpenGL version: {}.{}", major, minor);
             text.draw(s, 200.0, y, 0.6, 11.0)
                 .with_color(text_color)
-                .with_cacheable(true)
                 .finish();
         }
 
@@ -263,7 +261,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         let s = format!("OpenGL 3.3+ optimizations: {}", !renderer.is_legacy());
         text.draw(s, 200.0, y, 0.6, 11.0)
             .with_color(text_color)
-            .with_cacheable(true)
             .finish();
 
         let s = format!("{:#?}", profiler::read());

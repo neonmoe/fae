@@ -73,11 +73,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         let mut y = 10.0;
 
         let s = "The following rectangle should be red if the glyph cache has been filled:";
-        if let Some(rect) = text
-            .draw(s, 10.0, y, 0.0, 14.0)
-            .with_cacheable(true)
-            .finish()
-        {
+        if let Some(rect) = text.draw(s, 10.0, y, 0.0, 14.0).finish() {
             let y = y - 1.0;
             renderer
                 .draw(&bgs, -0.1)
@@ -97,20 +93,17 @@ fn main() -> Result<(), Box<dyn Error>> {
         y += 20.0;
 
         text.draw("Layout testing: u\u{308}", 10.0, y, 0.0, 14.0)
-            .with_cacheable(true)
             .finish();
         y += 20.0;
 
         if let Some(rect) = text
             .draw("Cut off this text at |, like so |", 10.0, y, 0.0, 14.0)
             .with_visibility(false)
-            .with_cacheable(true)
             .finish()
         {
             let s = "Cut off this text at |, like so |...and here's text that should not appear";
             if let Some(rect) = text
                 .draw(s, 10.0, y, 0.0, 14.0)
-                .with_cacheable(true)
                 .with_clip_area(rect)
                 .finish()
             {
@@ -124,9 +117,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         y += 20.0;
 
         let s = "Missing character (hopefully): \u{FFFF}";
-        text.draw(s, 10.0, y, 0.0, 12.0)
-            .with_cacheable(true)
-            .finish();
+        text.draw(s, 10.0, y, 0.0, 12.0).finish();
         y += 20.0;
 
         {
@@ -157,7 +148,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             text.draw("Left", 20.0, y + 10.0, 0.0, 20.0)
                 .with_max_width(190.0)
                 .with_alignment(Alignment::Left)
-                .with_cacheable(true)
                 .finish();
             y += 50.0;
 
@@ -186,7 +176,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             text.draw("Center", 10.0, y + 10.0, 0.0, 20.0)
                 .with_max_width(200.0)
                 .with_alignment(Alignment::Center)
-                .with_cacheable(true)
                 .finish();
             y += 50.0;
 
@@ -215,7 +204,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             text.draw("Right", 10.0, y + 10.0, 0.0, 20.0)
                 .with_max_width(190.0)
                 .with_alignment(Alignment::Right)
-                .with_cacheable(true)
                 .finish();
             y += 50.0;
 
@@ -255,7 +243,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                 let s = "The quick brown fox jumps over the lazy dog";
                 if let Some(rect) = text
                     .draw(s, 10.0, y, 0.0, (8 + i) as f32 / window.dpi_factor)
-                    .with_cacheable(true)
                     .finish()
                 {
                     y += rect.height + 1.0;
@@ -275,14 +262,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .with_alignment(lipsum_alignment)
                 .with_color((0.1, 0.1, 0.1, 1.0))
                 .with_max_width(window.width - 320.0)
-                .with_cacheable(true)
                 .finish()
             {
                 let y = rect.y + rect.height + 5.0;
                 text.draw(LOREM_IPSUM, 300.0, y, 0.0, lipsum_font_size)
                     .with_alignment(lipsum_alignment)
                     .with_max_width(window.width - 320.0)
-                    .with_cacheable(true)
                     .finish();
             }
             // Lorem ipsum
@@ -298,25 +283,20 @@ fn main() -> Result<(), Box<dyn Error>> {
             let comparison_x = 70.0;
 
             let s = "Comparison between text laid out by Fae and by Firefox:";
-            text.draw(s, x, y, 0.0, 12.0).with_cacheable(true).finish();
+            text.draw(s, x, y, 0.0, 12.0).finish();
             y += 20.0;
 
             let s = "Fae:";
-            text.draw(s, x, y, 0.0, font_size)
-                .with_cacheable(true)
-                .finish();
+            text.draw(s, x, y, 0.0, font_size).finish();
 
             let s = "The quick brown fox jumps over the lazy dog.";
             fira_sans
                 .draw(s, comparison_x + 1.5 / window.dpi_factor, y, 0.0, font_size)
-                .with_cacheable(true)
                 .finish();
             y += font_size * 1.25;
 
             let s = "Firefox:";
-            text.draw(s, x, y, 0.0, font_size)
-                .with_cacheable(true)
-                .finish();
+            text.draw(s, x, y, 0.0, font_size).finish();
             renderer
                 .draw(&sample_text, 0.0)
                 .with_coordinates((
