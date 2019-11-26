@@ -72,6 +72,28 @@ fn main() -> Result<(), Box<dyn Error>> {
         // All the text rendering:
         let mut y = 10.0;
 
+        {
+            // Lorem ipsum
+            let s = format!(
+                "Font size of lorem ipsum: {} px (press + to increase, - to decrease)",
+                lipsum_font_size as i32
+            );
+            if let Some(rect) = text
+                .draw(s, 300.0, 30.0, 0.0, lipsum_font_size - 2.0)
+                .with_alignment(lipsum_alignment)
+                .with_color((0.1, 0.1, 0.1, 1.0))
+                .with_max_width(window.width - 320.0)
+                .finish()
+            {
+                let y = rect.y + rect.height + 5.0;
+                text.draw(LOREM_IPSUM, 300.0, y, 0.0, lipsum_font_size)
+                    .with_alignment(lipsum_alignment)
+                    .with_max_width(window.width - 320.0)
+                    .finish();
+            }
+            // Lorem ipsum
+        }
+
         let s = "The following rectangle should be red if the glyph cache has been filled:";
         if let Some(rect) = text.draw(s, 10.0, y, 0.0, 14.0).finish() {
             let y = y - 1.0;
@@ -90,6 +112,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                 })
                 .finish();
         }
+        y += 20.0;
+
+        let glyphs_drawn_overall = fae::profiler::read().glyphs_drawn_overall;
+        let s = format!("Glyphs drawn so far: {}", glyphs_drawn_overall);
+        text.draw(s, 10.0, y, 0.0, 14.0).finish();
         y += 20.0;
 
         text.draw("Layout testing: u\u{308}", 10.0, y, 0.0, 14.0)
@@ -249,28 +276,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                 }
             }
             // Size comparisons
-        }
-
-        {
-            // Lorem ipsum
-            let s = format!(
-                "Font size of lorem ipsum: {} px (press + to increase, - to decrease)",
-                lipsum_font_size as i32
-            );
-            if let Some(rect) = text
-                .draw(s, 300.0, 30.0, 0.0, lipsum_font_size - 2.0)
-                .with_alignment(lipsum_alignment)
-                .with_color((0.1, 0.1, 0.1, 1.0))
-                .with_max_width(window.width - 320.0)
-                .finish()
-            {
-                let y = rect.y + rect.height + 5.0;
-                text.draw(LOREM_IPSUM, 300.0, y, 0.0, lipsum_font_size)
-                    .with_alignment(lipsum_alignment)
-                    .with_max_width(window.width - 320.0)
-                    .finish();
-            }
-            // Lorem ipsum
         }
 
         #[cfg(all(feature = "ttf", feature = "png"))]

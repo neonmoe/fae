@@ -154,6 +154,7 @@ impl GlyphCache {
                 })
             {
                 self.cache.insert(id, Rc::downgrade(&uvs));
+                crate::profiler::write(|p| p.glyphs_drawn_overall += 1);
                 Ok((uvs.texcoords, true))
             } else {
                 Err(GlyphNotRenderedError::GlyphCacheFull)
@@ -304,13 +305,12 @@ impl GlyphColumn {
         None
     }
 
-    // FIXME: Change evict_line so it tries to evict as few glyphs as possible
-    // (doesn't matter as much for GlyphLine's evict since that's usually only a few glyphs thrown away)
     // This is analogous to GlyphLine::evict_width, but for lines.
     #[allow(clippy::len_zero)]
     fn evict_line(&mut self, height: i32) -> Option<&mut GlyphLine> {
         let mut top = 0;
         let mut bottom = 0;
+        let mut best_range = None;
         let mut collected_range = 0..0;
         for i in 0..self.lines.len() {
             if self.lines[i].has_been_hit_this_frame() {
@@ -332,13 +332,30 @@ impl GlyphColumn {
                 collected_range.end += 1;
             }
 
-            if bottom - top >= height {
-                break;
+            'inner: while bottom - top >= height {
+                let evicted_glyphs: usize = self.lines[collected_range.clone()]
+                    .iter()
+                    .map(|line| line.reserved.len())
+                    .sum();
+                if let Some((_, _, other_evicted_glyphs)) = best_range {
+                    if evicted_glyphs < other_evicted_glyphs {
+                        best_range = Some((collected_range.clone(), top, evicted_glyphs))
+                    }
+                } else {
+                    best_range = Some((collected_range.clone(), top, evicted_glyphs))
+                }
+                if collected_range.start < collected_range.end {
+                    collected_range.start += 1;
+                    let new_top_line = &self.lines[collected_range.start - 1];
+                    top = new_top_line.y + new_top_line.height + GLYPH_CACHE_GAP;
+                } else {
+                    break 'inner;
+                }
             }
         }
 
-        if bottom - top >= height {
-            self.lines.splice(collected_range, None);
+        if let Some((range, top, _)) = best_range {
+            self.lines.splice(range, None);
             self.create_line(top, height)
         } else {
             None

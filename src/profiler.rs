@@ -17,6 +17,8 @@ pub struct ProfilingData {
     pub glyphs_drawn: u32,
     /// The amount of quads that were drawn during this frame overall.
     pub quads_drawn: u32,
+    /// The amount of times a glyph had to be rendered in the application so far.
+    pub glyphs_drawn_overall: u32,
 }
 
 impl ProfilingData {
@@ -26,6 +28,7 @@ impl ProfilingData {
             glyph_cache_hits: 0,
             glyphs_drawn: 0,
             quads_drawn: 0,
+            glyphs_drawn_overall: 0,
         }
     }
 }
@@ -73,8 +76,10 @@ mod actual {
     pub(crate) fn refresh() {
         if let Ok(ref mut front) = FRONT.lock() {
             if let Ok(ref mut back) = BACK.lock() {
+                let temp = back.glyphs_drawn_overall;
                 front.copy_from(back);
                 back.clear();
+                back.glyphs_drawn_overall = temp;
             }
         }
     }
