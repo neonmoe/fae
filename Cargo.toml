@@ -62,9 +62,5 @@ name = "pixel_perfect"
 required-features = ["png", "text", "font8x8"]
 
 [[example]]
-name = "sdf"
-required-features = ["png"]
-
-[[example]]
 name = "text_layout"
 required-features = ["text", "ttf"]
