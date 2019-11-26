@@ -5,7 +5,9 @@ use crate::gl::types::*;
 #[cfg(feature = "png")]
 use png;
 
-/// Contains the raw pixel color data of an image.
+/// Contains the raw pixel color data of an image. Can be uploaded to
+/// the GPU with
+/// [`Renderer::create_draw_call`](struct.Renderer.html#method.create_draw_call).
 #[derive(Clone, Debug)]
 pub struct Image {
     /// The pixels of the image.
@@ -116,10 +118,13 @@ impl Image {
 
     /// Creates an image with a specified width, height and a format,
     /// and signals to OpenGL that the texture will be filled in
-    /// later. The memory for the texture will be allocated, but no
-    /// pixel data needs to be sent from the CPU to the GPU during
-    /// initialization.
-    pub(crate) fn create_null(width: i32, height: i32, format: GLuint) -> Image {
+    /// later. The memory for the texture will be allocated on the
+    /// GPU, but no pixel data needs to be sent from the CPU to the
+    /// GPU during initialization.
+    ///
+    /// See also:
+    /// [`Renderer::upload_texture_region`](struct.Renderer.html#method.upload_texture_region).
+    pub fn create_null(width: i32, height: i32, format: GLuint) -> Image {
         Image {
             pixels: Vec::new(),
             width,

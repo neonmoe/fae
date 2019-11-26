@@ -1,6 +1,6 @@
 [package]
 name = "fae"
-version = "0.4.1-alpha.0"
+version = "0.5.0-alpha.0"
 authors = ["Jens Pitkanen <jens@neon.moe>"]
 edition = "2018"
 description = "A simple and fast 2D rendering crate with optional window creation and text rendering functionality."
@@ -32,17 +32,39 @@ font8x8 = { version = "^0.2.5", optional = true, default_features = false, featu
 lazy_static = { version = "^1.4.0", optional = true }
 
 [features]
-# FIXME: there should be no default features
-default = ["text", "png", "font8x8", "ttf", "profiler"]
+default = []
 text = ["fnv"]
 profiler = ["lazy_static"]
 ttf = ["rusttype", "stb_truetype"]
 
 [dev-dependencies]
-# Note: using a logger adds a lot of executable size.
 env_logger = "^0.7.1"
 cfg-if = "^0.1.10"
 font-loader = "^0.8.0"
 
 [build-dependencies]
 gl_generator = "^0.11.0"
+
+[[example]]
+name = "basic"
+required-features = ["png", "text", "ttf"]
+
+[[example]]
+name = "benchmarker"
+required-features = ["png", "text", "ttf", "profiler"]
+
+[[example]]
+name = "drawing_order"
+required-features = ["png", "text", "ttf"]
+
+[[example]]
+name = "pixel_perfect"
+required-features = ["png", "text", "font8x8"]
+
+[[example]]
+name = "sdf"
+required-features = ["png"]
+
+[[example]]
+name = "text_layout"
+required-features = ["text", "ttf"]

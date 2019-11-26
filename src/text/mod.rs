@@ -89,17 +89,17 @@ impl TextRenderer {
 
     /// Returns true if the last
     /// [`compose_draw_call`](struct.TextRenderer.html#method.compose_draw_call)
-    /// failed to draw a glyph because the glyph cache was full and
-    /// could not be expanded to fit the glyph. Note that this should
-    /// be quite rare, unless you're trying to render very large text,
-    /// or using a *lot* of symbols.
+    /// failed to draw a glyph because the glyph cache was
+    /// full. Generally, this should become false on the next frame
+    /// because the glyph cache is resized at the start of the frame,
+    /// as needed. Resizing is limited by `GL_MAX_TEXTURE_SIZE`
+    /// however, so low-end systems might reach a limit if you're
+    /// drawing lots of very large text using many symbols.
     ///
     /// # What to do if the glyph cache is full
     ///
     /// Consider using alternative means of rendering large text, or
-    /// increase your application's GPU capability requirements. The
-    /// size of the glyph cache is limited by the OpenGL constant
-    /// `GL_MAX_TEXTURE_SIZE`.
+    /// increase your application's GPU capability requirements.
     pub fn is_glyph_cache_full(&self) -> bool {
         self.glyph_cache_filled
     }
@@ -107,19 +107,10 @@ impl TextRenderer {
     /// Creates a Sprite struct, which you can render after specifying
     /// your parameters by modifying it.
     ///
-    /// ## Optimization tips
-    ///
-    /// - Set the "cacheability" of the text to `true` with
-    ///   [`Text::with_cacheable`](struct.Text.html#with_cacheable) if
-    ///   your text (or its parameters) don't change much. Note:
-    ///   individual glyphs are always cached. This affects the
-    ///   caching of the whole span of text.
-    ///
     /// # Usage
     /// ```ignore
     /// text_renderer.draw("Hello, World!", 10.0, 10.0, 0.0, 12.0)
-    ///     .with_color((0.8, 0.5, 0.1, 1.0)) // Orange!
-    ///     .with_cacheable(true) // Hello world never changes...
+    ///     .with_color((0.8, 0.5, 0.1, 1.0))
     ///     .finish();
     /// ```
     pub fn draw<S: Into<String>>(
@@ -378,8 +369,8 @@ impl TextRenderer {
         self.window_size = (window_width * dpi_factor, window_height * dpi_factor);
     }
 
-    /// Draws the glyph cache texture in the given screen-space quad,
-    /// for debugging.
+    /// Draws the glyph cache texture in the given quad, for
+    /// debugging.
     pub fn debug_draw_glyph_cache<R: Into<Rect>>(
         &self,
         renderer: &mut Renderer,

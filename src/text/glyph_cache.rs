@@ -171,18 +171,26 @@ impl GlyphCache {
         let tex_y = spot.y - 1;
         let width = spot.width + 2;
         let height = spot.height + 2;
-        let mut data = Vec::with_capacity((width * height) as usize);
+        let mut pixels = Vec::with_capacity((width * height) as usize);
         for y in 0..height {
             for x in 0..width {
                 if x == 0 || y == 0 || x == width - 1 || y == height - 1 {
-                    data.push(0u8);
+                    pixels.push(0u8);
                 } else {
-                    data.push(get_color(x - 1, y - 1));
+                    pixels.push(get_color(x - 1, y - 1));
                 }
             }
         }
 
-        renderer.upload_texture_region(&self.call, tex_x, tex_y, width, height, gl::RED, data);
+        let image = Image {
+            pixels,
+            width,
+            height,
+            pixel_type: gl::UNSIGNED_BYTE,
+            format: gl::RED,
+            null_data: false,
+        };
+        renderer.upload_texture_region(&self.call, (tex_x, tex_y, width, height).into(), &image);
     }
 
     pub fn expire_one_step(&mut self) {

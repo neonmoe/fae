@@ -5,6 +5,7 @@ use crate::gl::types::*;
 use crate::gl_version::{self, OpenGlApi, OpenGlVersion};
 use crate::image::Image;
 use crate::sprite::Sprite;
+use crate::types::*;
 use std::mem;
 use std::ptr;
 
@@ -116,13 +117,20 @@ pub enum TextureWrapping {
 /// [`Renderer::draw`](struct.Renderer.html#method.draw) with.
 #[derive(Debug, Clone)]
 pub struct DrawCallParameters {
-    /// The texture used when drawing with this handle.
+    /// The texture used when drawing with this handle. None can be
+    /// used if you want to just draw flat-color quads.
     pub image: Option<Image>,
     /// The shaders used when drawing with this handle.
     pub shaders: Shaders,
     /// Whether to blend with previously drawn pixels when drawing
-    /// over them, or just replace the color. (In technical terms:
-    /// whether `GL_BLEND` and back-to-front sorting are enabled.)
+    /// over them, or just replace the color. Rule of thumb: if the
+    /// sprites only use alpha values of 0 and 255 (ie. fully
+    /// transparent and fully opaque), set this to false, and true
+    /// otherwise. In any case, alpha values of less than 1/256 will
+    /// be cut out and won't be rendered at all.
+    ///
+    /// Internally, this controls whether `GL_BLEND` and back-to-front
+    /// sorting are enabled.
     pub alpha_blending: bool,
     /// When drawing quads that are smaller than the texture provided,
     /// use linear (true) or nearest neighbor (false) smoothing when
@@ -131,17 +139,23 @@ pub struct DrawCallParameters {
     /// When drawing quads that are larger than the texture provided,
     /// use linear (true) or nearest neighbor (false) smoothing when
     /// scaling? (Tip: for pixel art or other textures that don't
-    /// suffer from jaggies, set this to false for the intended look.)
+    /// suffer from jaggies, set this to `false` for the intended
+    /// look.)
     pub magnification_smoothing: bool,
     /// Sets the texture's behavior when sampling coordinates under
     /// 0.0 or over 1.0, or smoothing over texture
     /// boundaries. (Corresponds to `GL_TEXTURE_WRAP_S` and
     /// `GL_TEXTURE_WRAP_T`, in that order.)
     pub wrap: (TextureWrapping, TextureWrapping),
-    /// Controls whether or not `GL_FRAMEBUFFER_SRGB` is enabled when
-    /// drawing with this handle. If you want to render in linear
-    /// space, set this to false. You probably don't though, unless
-    /// you know what you're doing.
+    /// Controls whether the colors rendered by this draw call should
+    /// be converted into sRGB before display. This should generally
+    /// be true, unless you handle gamma in your shaders
+    /// yourself. Note that in any case, the fragment shader will
+    /// process fragments in linear space: this conversion happens
+    /// after blending.
+    ///
+    /// Internally, this controls whether or not `GL_FRAMEBUFFER_SRGB`
+    /// is enabled when drawing with this handle.
     pub srgb: bool,
 }
 
@@ -339,7 +353,7 @@ impl Renderer {
         color: (f32, f32, f32, f32),
         rotation: (f32, f32, f32),
         z: f32,
-        call_handle: &DrawCallHandle,
+        call: &DrawCallHandle,
     ) {
         let (cx0, cy0, cx1, cy1) = clip_area; // Clip coords
         let (ox0, oy0, ox1, oy1) = coords; // Original coords
@@ -363,7 +377,7 @@ impl Renderer {
             ty1.min(ty1 + th * (y1 - oy1) / oh),
         );
 
-        self.draw_quad((x0, y0, x1, y1), texcoords, color, rotation, z, call_handle);
+        self.draw_quad((x0, y0, x1, y1), texcoords, color, rotation, z, call);
     }
 
     #[inline]
@@ -374,15 +388,14 @@ impl Renderer {
         color: (f32, f32, f32, f32),
         rotation: (f32, f32, f32),
         depth: f32,
-        call_handle: &DrawCallHandle,
+        call: &DrawCallHandle,
     ) {
         let (x0, y0, x1, y1) = coords;
         let (tx0, ty0, tx1, ty1) = texcoords;
         let (red, green, blue, alpha) = color;
         let (rads, pivot_x, pivot_y) = rotation;
 
-        self.calls[call_handle.0].highest_depth =
-            self.calls[call_handle.0].highest_depth.max(depth);
+        self.calls[call.0].highest_depth = self.calls[call.0].highest_depth.max(depth);
         if self.gl_state.legacy {
             let (pivot_x, pivot_y) = (pivot_x + x0, pivot_y + y0);
 
@@ -400,7 +413,7 @@ impl Renderer {
                 blue, alpha, rads, pivot_x, pivot_y,
             ];
 
-            self.calls[call_handle.0]
+            self.calls[call.0]
                 .attributes
                 .vbo_data
                 .extend_from_slice(&quad);
@@ -410,7 +423,7 @@ impl Renderer {
                 x0, y0, width, height, tx0, ty0, tw, th, red, green, blue, alpha, rads, pivot_x,
                 pivot_y, depth,
             ];
-            self.calls[call_handle.0]
+            self.calls[call.0]
                 .attributes
                 .vbo_data
                 .extend_from_slice(&quad);
@@ -604,46 +617,71 @@ impl Renderer {
         }
     }
 
-    pub(crate) fn get_texture_size(&self, call_handle: &DrawCallHandle) -> (i32, i32) {
-        self.calls[call_handle.0].texture_size
+    pub(crate) fn get_texture_size(&self, call: &DrawCallHandle) -> (i32, i32) {
+        self.calls[call.0].texture_size
     }
 
-    #[allow(clippy::too_many_arguments)]
-    pub(crate) fn upload_texture_region(
+    /// Upload an image into the specified region in a draw call's
+    /// texture.
+    ///
+    /// If the width and height of `region` and `image` don't match,
+    /// or the `region` isn't completely contained within the texture,
+    /// this function will do nothing and return false.
+    ///
+    /// See also:
+    /// [`Image::create_null`](struct.Image.html#method.create_null).
+    pub fn upload_texture_region(
         &self,
-        call_handle: &DrawCallHandle,
-        x: i32,
-        y: i32,
-        width: i32,
-        height: i32,
-        format: GLuint,
-        data: Vec<u8>,
-    ) {
-        insert_sub_texture(
-            self.calls[call_handle.0].texture,
-            x,
-            y,
-            width,
-            height,
-            format,
-            data,
-        );
+        call: &DrawCallHandle,
+        region: RectPx,
+        image: &Image,
+    ) -> bool {
+        let (tex_width, tex_height) = self.calls[call.0].texture_size;
+        if region.width == image.width
+            && region.height == image.height
+            && region.x + region.width <= tex_width
+            && region.y + region.height <= tex_height
+            && region.x >= 0
+            && region.y >= 0
+        {
+            insert_sub_texture(
+                self.calls[call.0].texture,
+                region.x,
+                region.y,
+                region.width,
+                region.height,
+                image.format,
+                &image.pixels,
+            );
+            true
+        } else {
+            false
+        }
     }
 
-    pub(crate) fn resize_texture(
-        &mut self,
-        call_handle: &DrawCallHandle,
-        new_width: i32,
-        new_height: i32,
-    ) {
-        resize_texture(
-            self.calls[call_handle.0].texture,
-            self.calls[call_handle.0].texture_size.0,
-            self.calls[call_handle.0].texture_size.1,
-            new_width,
-            new_height,
-        );
-        self.calls[call_handle.0].texture_size = (new_width, new_height);
+    /// Resize the draw call's texture to a new width and height,
+    /// which must be equal or greater than the original
+    /// dimensions. The previous contents of the texture are preserved
+    /// in the origin corner of the texture.
+    ///
+    /// If `new_width` is less than the current width, or `new_height`
+    /// is less than the current height, this function will do
+    /// nothing.
+    ///
+    /// See also:
+    /// [`Renderer::upload_texture_region`](struct.Renderer.html#method.upload_texture_region).
+    pub fn resize_texture(&mut self, call: &DrawCallHandle, new_width: i32, new_height: i32) {
+        let (old_width, old_height) = self.calls[call.0].texture_size;
+        if new_width >= old_width && new_height >= old_height {
+            resize_texture(
+                self.calls[call.0].texture,
+                old_width,
+                old_height,
+                new_width,
+                new_height,
+            );
+            self.calls[call.0].texture_size = (new_width, new_height);
+        }
     }
 
     /// Saves the current OpenGL state for [`Renderer::gl_pop`] and
@@ -1034,7 +1072,7 @@ fn insert_sub_texture(
     width: i32,
     height: i32,
     format: GLuint,
-    data: Vec<u8>,
+    data: &[u8],
 ) {
     unsafe {
         gl::BindTexture(gl::TEXTURE_2D, texture);

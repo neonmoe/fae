@@ -100,7 +100,7 @@ fn generate_sdf(image: Image) -> Image {
         }
     }
 
-    println!("Time: {:?}", Instant::now() - start);
+    log::info!("Sdf render time: {:?}", Instant::now() - start);
     result
 }
 
