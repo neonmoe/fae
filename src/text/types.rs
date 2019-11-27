@@ -22,7 +22,7 @@ pub enum Alignment {
 pub struct Glyph {
     pub id: GlyphId,
     pub cursor: Cursor,
-    pub metrics: RectPx,
+    pub metric: RectPx,
     pub draw_data: usize,
 }
 

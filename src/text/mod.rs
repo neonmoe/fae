@@ -28,7 +28,7 @@ use crate::text::types::*;
 use crate::types::*;
 use crate::{DrawCallHandle, Renderer};
 
-use std::collections::HashMap;
+use fnv::FnvHashMap;
 
 /// Contains everything needed to draw text.
 pub struct TextRenderer {
@@ -40,7 +40,7 @@ pub struct TextRenderer {
     font: Box<dyn FontProvider>,
     dpi_factor: f32,
     window_size: (f32, f32),
-    glyph_ids: HashMap<char, GlyphId>,
+    glyph_ids: FnvHashMap<char, GlyphId>,
 }
 
 impl TextRenderer {
@@ -83,7 +83,7 @@ impl TextRenderer {
             font,
             dpi_factor: 1.0,
             window_size: (0.0, 0.0),
-            glyph_ids: HashMap::new(),
+            glyph_ids: FnvHashMap::default(),
         }
     }
 
@@ -166,20 +166,29 @@ impl TextRenderer {
         let max_line_width = data.max_line_width;
         let (x, y) = (data.x, data.y);
         let alignment = data.alignment;
-        let text_glyphs: Vec<(char, GlyphId)> = data
-            .text
-            .chars()
-            .map(|c| {
-                let id = if let Some(id) = self.glyph_ids.get(&c) {
-                    *id
-                } else {
-                    let id = self.font.get_glyph_id(c);
-                    self.glyph_ids.insert(c, id);
-                    id
-                };
-                (c, id)
-            })
-            .collect();
+
+        let mut text_glyphs = Vec::with_capacity(data.text.len());
+        let mut previous_id = None;
+        for c in data.text.chars() {
+            let id = if let Some(id) = self.glyph_ids.get(&c) {
+                *id
+            } else {
+                let id = self.font.get_glyph_id(c);
+                self.glyph_ids.insert(c, id);
+                id
+            };
+            let advance = if let Some(prev) = previous_id {
+                self.font.get_advance(prev, id, font_size)
+            } else {
+                Advance {
+                    advance_x: 0,
+                    advance_y: 0,
+                }
+            };
+            let metric = self.font.get_metric(id, font_size);
+            text_glyphs.push((c, id, metric, advance));
+            previous_id = Some(id);
+        }
 
         let mut glyphs = if visible {
             Some(Vec::with_capacity(text_glyphs.len()))
@@ -192,13 +201,8 @@ impl TextRenderer {
             let (line_stride, line_len) = if max_line_width.is_some()
                 || alignment != Alignment::Left
             {
-                let (line_stride, line_len, line_width) = get_line_length_and_width(
-                    &mut *self.font,
-                    cursor,
-                    font_size,
-                    max_line_width,
-                    &text_glyphs[i..],
-                );
+                let (line_stride, line_len, line_width) =
+                    get_line_length_and_width(max_line_width, &text_glyphs[i..]);
                 if let Some(max_line_width) = max_line_width {
                     cursor.x = get_line_start_x(cursor.x, line_width, max_line_width, alignment);
                 }
@@ -207,15 +211,17 @@ impl TextRenderer {
                 get_line_length(&text_glyphs[i..])
             };
 
-            let mut previous_glyph = None;
-            for (_, glyph_id) in (&text_glyphs[i..]).iter().take(line_len) {
-                let metrics = self.font.get_metric(*glyph_id, font_size);
-                if let Some(prev) = previous_glyph {
-                    let advance = self.font.get_advance(prev, *glyph_id, font_size);
-                    cursor = cursor + advance;
+            let mut first_glyph_of_line = true;
+            for (_, glyph_id, metric, advance) in (&text_glyphs[i..]).iter().take(line_len) {
+                if !first_glyph_of_line {
+                    cursor = cursor + *advance;
+                } else {
+                    first_glyph_of_line = false;
                 }
 
-                let screen_location = metrics + cursor;
+                let id = *glyph_id;
+                let metric = *metric;
+                let screen_location = metric + cursor;
                 min_x = min_x.min(screen_location.x as f32 / self.dpi_factor);
                 min_y = min_y.min(screen_location.y as f32 / self.dpi_factor);
                 max_x =
@@ -225,12 +231,11 @@ impl TextRenderer {
                 if let Some(ref mut glyphs) = glyphs {
                     glyphs.push(Glyph {
                         cursor,
-                        metrics,
+                        metric,
                         draw_data: draw_data_index,
-                        id: *glyph_id,
+                        id,
                     });
                 }
-                previous_glyph = Some(*glyph_id);
             }
 
             i += line_stride;
@@ -294,10 +299,10 @@ impl TextRenderer {
             // glyphs to avoid leaking because of this.
 
             let screen_location = Rect {
-                x: (glyph.cursor.x + glyph.metrics.x) as f32 - 0.5,
-                y: (glyph.cursor.y + glyph.metrics.y) as f32 - 0.5,
-                width: glyph.metrics.width as f32 + 1.0,
-                height: glyph.metrics.height as f32 + 1.0,
+                x: (glyph.cursor.x + glyph.metric.x) as f32 - 0.5,
+                y: (glyph.cursor.y + glyph.metric.y) as f32 - 0.5,
+                width: glyph.metric.width as f32 + 1.0,
+                height: glyph.metric.height as f32 + 1.0,
             };
 
             // If the glyph is out of bounds, there's nothing to draw

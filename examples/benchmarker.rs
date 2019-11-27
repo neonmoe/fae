@@ -6,7 +6,7 @@
 mod common;
 
 use common::WindowSettings;
-use fae::{profiler, DrawCallParameters, Image, Window};
+use fae::{DrawCallParameters, Image, Window};
 use std::collections::HashMap;
 use std::error::Error;
 use std::time::{Duration, Instant};
@@ -263,15 +263,18 @@ fn main() -> Result<(), Box<dyn Error>> {
             .with_color(text_color)
             .finish();
 
-        let s = format!("{:#?}", profiler::read());
-        if let Some(mut rect) = text
-            .draw(s, 30.0, 310.0, 0.6, 11.0)
-            .with_color(text_color)
-            .with_clip_area((20.0, 300.0, 420.0, 600.0))
-            .finish()
+        #[cfg(feature = "profiler")]
         {
-            rect.width = 380.0;
-            renderer.draw(&call, 0.55).with_coordinates(rect).finish();
+            let s = format!("{:#?}", fae::profiler::read());
+            if let Some(mut rect) = text
+                .draw(s, 30.0, 310.0, 0.6, 11.0)
+                .with_color(text_color)
+                .with_clip_area((20.0, 300.0, 420.0, 600.0))
+                .finish()
+            {
+                rect.width = 380.0;
+                renderer.draw(&call, 0.55).with_coordinates(rect).finish();
+            }
         }
 
         timers["text calls"][timer_index].end();

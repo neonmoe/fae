@@ -51,7 +51,7 @@ required-features = ["png", "text", "ttf"]
 
 [[example]]
 name = "benchmarker"
-required-features = ["png", "text", "ttf", "profiler"]
+required-features = ["png", "text", "ttf"]
 
 [[example]]
 name = "drawing_order"
@@ -64,3 +64,6 @@ required-features = ["png", "text", "font8x8"]
 [[example]]
 name = "text_layout"
 required-features = ["text", "ttf"]
+
+[profile.release]
+debug = true
