@@ -175,7 +175,7 @@ impl Default for DrawCallParameters {
 
 impl Renderer {
     /// Creates a new Renderer. **Requires** a valid OpenGL context.
-    pub fn new(window: &crate::Window) -> Renderer {
+    pub fn new() -> Renderer {
         let version = gl_version::get_version();
         let legacy = match &version {
             OpenGlVersion::Available { api, major, minor } => {
@@ -218,7 +218,7 @@ impl Renderer {
                 vbo: 0,
                 element_buffer: 0,
             },
-            dpi_factor: window.dpi_factor,
+            dpi_factor: 1.0,
             preserve_gl_state: false,
         }
     }
@@ -435,19 +435,8 @@ impl Renderer {
         self.dpi_factor = dpi_factor;
     }
 
-    // TODO: Add a re-render function for fast re-rendering in resize events
-    // Rationale:
-    // - Clears need to be made when resizing, otherwise there will be flickering when expanding the window
-    // - render() might be clearer if split into two anyway: uploading the buffers, and drawing them
-    // - Possibility for optimization: the uploading action could only be ran when needed
-
-    /// Renders all currently queued draws.
-    ///
-    /// First the non-alpha-blended calls, front to back, then the
-    /// alpha-blended ones, back to front. Drawing from front to back
-    /// is more efficient, as there is less overdraw because of depth
-    /// testing, but proper blending requires back to front ordering.
-    pub fn render(&mut self, width: f32, height: f32) {
+    /// Renders the queued draws.
+    pub(crate) fn render(&mut self, width: f32, height: f32) {
         self.gl_push();
 
         let m00 = 2.0 / width;
@@ -515,20 +504,6 @@ impl Renderer {
             }
             print_gl_errors(&format!("after initializing draw call #{}", i));
 
-            let len = (mem::size_of::<f32>() * call.attributes.vbo_data.len()) as isize;
-            let ptr = call.attributes.vbo_data.as_ptr() as *const _;
-            if len <= call.attributes.allocated_vbo_data_size {
-                unsafe {
-                    gl::BufferSubData(gl::ARRAY_BUFFER, 0, len, ptr);
-                }
-            } else {
-                call.attributes.allocated_vbo_data_size = len;
-                unsafe {
-                    gl::BufferData(gl::ARRAY_BUFFER, len, ptr, gl::STREAM_DRAW);
-                }
-            }
-            print_gl_errors(&format!("after pushing vertex buffer #{}", i));
-
             if legacy {
                 // 12 floats (3 for pos + 2 tex + 4 col + 3 rot) per vertex
                 let vertex_count = call.attributes.vbo_data.len() as i32 / 12;
@@ -561,10 +536,47 @@ impl Renderer {
                 print_gl_errors(&format!("after drawing buffer #{}", i));
             }
 
+            print_gl_errors(&*format!("after render #{}", i));
+        }
+
+        self.gl_pop();
+    }
+
+    /// Prepares the renderer for drawing.
+    pub(crate) fn start_frame(&mut self) {
+        for call in &mut self.calls {
             call.attributes.vbo_data.clear();
             call.highest_depth = -1.0;
+        }
+    }
 
-            print_gl_errors(&*format!("after render #{}", i));
+    /// Renders all currently queued draws.
+    ///
+    /// First the non-alpha-blended calls, front to back, then the
+    /// alpha-blended ones, back to front. Drawing from front to back
+    /// is more efficient, as there is less overdraw because of depth
+    /// testing, but proper blending requires back to front ordering.
+    pub(crate) fn finish_frame(&mut self) {
+        self.gl_push();
+
+        for call in &mut self.calls {
+            unsafe {
+                gl::BindBuffer(gl::ARRAY_BUFFER, call.attributes.vbo);
+            }
+
+            let len = (mem::size_of::<f32>() * call.attributes.vbo_data.len()) as isize;
+            let ptr = call.attributes.vbo_data.as_ptr() as *const _;
+            if len <= call.attributes.allocated_vbo_data_size {
+                unsafe {
+                    gl::BufferSubData(gl::ARRAY_BUFFER, 0, len, ptr);
+                }
+            } else {
+                call.attributes.allocated_vbo_data_size = len;
+                unsafe {
+                    gl::BufferData(gl::ARRAY_BUFFER, len, ptr, gl::STREAM_DRAW);
+                }
+            }
+            print_gl_errors("after pushing vertex buffer");
         }
 
         self.gl_pop();

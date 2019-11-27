@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use fae::glutin::dpi::*;
+use fae::glutin::window::WindowBuilder;
 use fae::glutin::*;
 
 #[cfg(feature = "text")]
@@ -8,11 +9,11 @@ pub use renderer_and_text_renderer_creation::*;
 #[cfg(feature = "text")]
 mod renderer_and_text_renderer_creation {
     use fae::text::TextRenderer;
-    use fae::{Renderer, Window};
+    use fae::Renderer;
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "ttf")] {
-            fn create_text_renderer(renderer: &mut Renderer) -> TextRenderer {
+            pub fn create_text_renderer(renderer: &mut Renderer) -> TextRenderer {
                 use font_loader::system_fonts;
                 let property = system_fonts::FontPropertyBuilder::new()
                     .build();
@@ -20,20 +21,14 @@ mod renderer_and_text_renderer_creation {
                 TextRenderer::with_ttf(renderer, font_bytes).unwrap()
             }
         } else if #[cfg(feature = "font8x8")] {
-            fn create_text_renderer(renderer: &mut Renderer) -> TextRenderer {
+            pub fn create_text_renderer(renderer: &mut Renderer) -> TextRenderer {
                 TextRenderer::with_font8x8(renderer, true)
             }
         } else {
-            fn create_text_renderer(_renderer: &mut Renderer) -> TextRenderer {
+            pub fn create_text_renderer(_renderer: &mut Renderer) -> TextRenderer {
                 panic!("no font feature (`font8x8` or `ttf`) enabled")
             }
         }
-    }
-
-    pub fn create_renderers(window: &Window) -> (Renderer, TextRenderer) {
-        let mut renderer = Renderer::new(&window);
-        let text = create_text_renderer(&mut renderer);
-        (renderer, text)
     }
 }
 
@@ -65,11 +60,11 @@ impl<'a> From<WindowSettings> for (WindowBuilder, ContextBuilder<'a, NotCurrent>
     fn from(settings: WindowSettings) -> (WindowBuilder, ContextBuilder<'a, NotCurrent>) {
         let window = WindowBuilder::new()
             .with_title(settings.title.clone())
-            .with_dimensions(LogicalSize::new(
+            .with_inner_size(LogicalSize::new(
                 f64::from(settings.width),
                 f64::from(settings.height),
             ))
-            .with_visibility(false);
+            .with_visible(false);
         let context = ContextBuilder::new()
             .with_vsync(settings.vsync)
             .with_srgb(true)

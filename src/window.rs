@@ -1,65 +1,53 @@
 //! Window creation utilities for when you don't want to bother
 //! writing the glue between `fae` and `glutin`.
-use crate::gl;
 use crate::renderer::Renderer;
 
-use glutin::dpi::*;
+use glutin::dpi::LogicalSize;
+use glutin::event::{Event, WindowEvent};
+use glutin::event_loop::{ControlFlow, EventLoop, EventLoopWindowTarget};
+use glutin::window::WindowBuilder;
 use glutin::*;
 use std::env;
 use std::error::Error;
-use std::path::PathBuf;
 
 pub use glutin;
 
-/// Wrapper for a Glutin window, to provide a less event-based API.
+/// Wrapper for Glutin window creation.
 pub struct Window {
+    event_loop: EventLoop<()>,
+    /// The `Window`'s rendering context.
+    pub ctx: GraphicsContext,
+}
+
+/// The graphics context: used to draw stuff on the screen.
+pub struct GraphicsContext {
     env_dpi_factor: f32,
-    context: WindowedContext<PossiblyCurrent>,
-    events_loop: EventsLoop,
-
-    /// The width of the window.
+    window: WindowedContext<PossiblyCurrent>,
+    renderer: Renderer,
+    /// The width of the window in logical coordinates. Multiply with
+    /// dpi_factor to get the width in physical pixels.
     pub width: f32,
-    /// The height of the window.
+    /// The height of the window in logical coordinates. Multiply with
+    /// dpi_factor to get the height in physical pixels.
     pub height: f32,
-    /// The dpi of the window.
+    /// The dpi multiplier of the window.
     pub dpi_factor: f32,
-    /// The keys which are currently held down.
-    pub held_keys: Vec<VirtualKeyCode>,
-    /// The keys which were pressed this frame.
-    pub pressed_keys: Vec<VirtualKeyCode>,
-    /// The keys which were released this frame.
-    pub released_keys: Vec<VirtualKeyCode>,
-    /// The characters typed this frame, in chronological order.
-    pub typed_chars: Vec<char>,
+}
 
-    /// Whether the mouse is inside the window.
-    pub mouse_inside: bool,
-    /// The mouse position inside the window. Arrangement: (x, y)
-    pub mouse_coords: (f32, f32),
-    /// The mouse scroll amount during this frame, in pixels. If the
-    /// user supports pixel-perfect scrolling, this will be equal to
-    /// those pixel-perfect deltas. Otherwise, the polled scrolling
-    /// amounts will be multiplied with `mouse_scroll_length`. With
-    /// the default settings, this will usually result in bursts of
-    /// (0, -36) and (0, 36) during normal scrolling. Arrangement: (x,
-    /// y)
-    pub mouse_scroll: (f32, f32),
-    /// How many pixels one "notch" on the mouse scroll wheel should
-    /// scroll. (36 by default)
-    pub mouse_scroll_length: f32,
-    /// The mouse buttons which are currently held down.
-    pub mouse_held: Vec<MouseButton>,
-    /// The mouse buttons which were pressed down this frame.
-    pub mouse_pressed: Vec<MouseButton>,
-    /// The mouse buttons which were released this frame.
-    pub mouse_released: Vec<MouseButton>,
+impl GraphicsContext {
+    /// Updates the window (swaps the front and back buffers). The
+    /// renderer handle is used for a CPU/GPU synchronization call, so
+    /// while it is optional, it's definitely recommended. If vsync is
+    /// enabled, this function will hang until the next frame.
+    fn swap_buffers(&mut self) {
+        let _ = self.window.swap_buffers();
+        self.renderer.synchronize();
+    }
 
-    /// A list of files dropped on the window during this frame.
-    pub dropped_files: Vec<PathBuf>,
-    /// A list of files being currently hovered on the window.
-    pub hovered_files: Vec<PathBuf>,
-    // TODO: Upgrade glutin and revamp the event system so the used can handle events
-    // (except for the ones that are obviously handled by the renderer)
+    /// Returns the renderer.
+    pub fn renderer(&mut self) -> &mut Renderer {
+        &mut self.renderer
+    }
 }
 
 impl Window {
@@ -70,17 +58,16 @@ impl Window {
     pub fn create(
         (window_builder, context_builder): (WindowBuilder, ContextBuilder<'_, NotCurrent>),
     ) -> Result<Window, Box<dyn Error>> {
-        let events_loop = EventsLoop::new();
-        let context = context_builder.build_windowed(window_builder, &events_loop)?;
+        let event_loop = EventLoop::new();
+        let context = context_builder.build_windowed(window_builder, &event_loop)?;
 
         let env_dpi_factor = {
             let multiplier = get_env_dpi();
-            if let Some(size) = context.window().get_inner_size() {
-                let (w, h): (f64, f64) = size.into();
-                context
-                    .window()
-                    .set_inner_size((w * f64::from(multiplier), h * f64::from(multiplier)).into());
-            }
+            let size = context.window().inner_size();
+            let (w, h): (f64, f64) = size.into();
+            context
+                .window()
+                .set_inner_size((w * f64::from(multiplier), h * f64::from(multiplier)).into());
             multiplier
         };
 
@@ -89,214 +76,122 @@ impl Window {
                 Ok(current_ctx) => current_ctx,
                 Err((_, err)) => return Err(Box::new(err)),
             };
-            gl::load_with(|symbol| context.get_proc_address(symbol) as *const _);
+            crate::gl::load_with(|symbol| context.get_proc_address(symbol) as *const _);
             context
         };
 
-        let (width, height) = if let Some(size) = context.window().get_inner_size() {
-            (size.width as f32, size.height as f32)
-        } else {
-            (0.0, 0.0)
-        };
-        context.window().show();
+        let size = context.window().inner_size();
+        let (width, height) = (size.width as f32, size.height as f32);
+        let renderer = Renderer::new();
+
+        context.window().set_visible(true);
 
         Ok(Window {
-            env_dpi_factor,
-            context,
-            events_loop,
-
-            width,
-            height,
-            dpi_factor: 1.0,
-
-            held_keys: Vec::new(),
-            pressed_keys: Vec::new(),
-            released_keys: Vec::new(),
-            typed_chars: Vec::new(),
-
-            mouse_inside: false,
-            mouse_coords: (0.0, 0.0),
-            mouse_scroll: (0.0, 0.0),
-            mouse_scroll_length: 36.0,
-            mouse_held: Vec::new(),
-            mouse_pressed: Vec::new(),
-            mouse_released: Vec::new(),
-
-            dropped_files: Vec::new(),
-            hovered_files: Vec::new(),
+            event_loop,
+            ctx: GraphicsContext {
+                env_dpi_factor,
+                window: context,
+                renderer,
+                width,
+                height,
+                dpi_factor: 1.0,
+            },
         })
     }
 
-    /// Borrows the `glutin` window for resizing, setting the cursor,
-    /// or whatever else you might want to do with it.
-    pub fn get_window(&self) -> &glutin::Window {
-        self.context.window()
-    }
+    /// Starts the event loop.
+    ///
+    /// This is a wrapper for
+    /// [`winit::event_loop::EventLoop::run`](https://docs.rs/winit/event_loop/struct.EventLoop.html#method.run),
+    /// and it is used in a similar fashion. Whatever events are
+    /// needed to keep the graphics flowing are intercepted, handled,
+    /// and passed on to `event_handler` for your use.
+    ///
+    /// When handling the EventsCleared, the rendering context is set
+    /// up for drawing. This is when the first parameter of `F` is
+    /// Some, and this should be considered the event during which you
+    /// should update and render. Consider the following correlation:
+    /// ```ignore
+    /// // A traditional game loop:
+    /// loop {
+    ///     handle_input();
+    ///     update();
+    ///     render();
+    ///     swap_buffers();
+    /// }
+    /// ```
+    /// ```ignore
+    /// // A fae game loop (a la winit):
+    /// window.run(|ctx, event, _, _| {
+    ///     if let Some(ctx) = ctx {
+    ///         update();
+    ///         render();
+    ///     } else {
+    ///         handle_input(event);
+    ///     }
+    /// });
+    /// // Swapping buffers (and rendering, actually) is done when winit wants, by Window::run
+    /// ```
+    pub fn run<F>(self, mut event_handler: F) -> !
+    where
+        F: 'static
+            + FnMut(
+                Option<&mut GraphicsContext>,
+                Event<()>,
+                &EventLoopWindowTarget<()>,
+                &mut ControlFlow,
+            ),
+    {
+        let handle_resize =
+            |ctx: &mut GraphicsContext, logical_size: LogicalSize, dpi_factor: f64| {
+                let physical_size = logical_size.to_physical(dpi_factor);
 
-    /// Updates the window (swaps the front and back buffers). The
-    /// renderer handle is used for a CPU/GPU synchronization call, so
-    /// while it is optional, it's definitely recommended. If vsync is
-    /// enabled, this function will hang until the next frame.
-    pub fn swap_buffers(&mut self, renderer: Option<&Renderer>) {
-        let _ = self.context.swap_buffers();
-        if let Some(renderer) = renderer {
-            renderer.synchronize();
-        }
-    }
+                let (width, height): (u32, u32) = physical_size.into();
+                unsafe {
+                    crate::gl::Viewport(0, 0, width as i32, height as i32);
+                }
+                ctx.window.resize(physical_size);
+                ctx.width = logical_size.width as f32 / ctx.env_dpi_factor;
+                ctx.height = logical_size.height as f32 / ctx.env_dpi_factor;
+                ctx.dpi_factor = dpi_factor as f32 * ctx.env_dpi_factor;
+            };
 
-    /// Polls for new events. Returns whether the user has requested
-    /// the window to be closed.
-    pub fn refresh(&mut self) -> bool {
-        crate::profiler::refresh();
-
-        let mut running = true;
-        let mut key_inputs = Vec::new();
-        let mut mouse_inputs = Vec::new();
-        let window_width = &mut self.width;
-        let window_height = &mut self.height;
-        let window_dpi_factor = &mut self.dpi_factor;
-        let typed_chars = &mut self.typed_chars;
-        let mouse_coords = &mut self.mouse_coords;
-        let mouse_inside = &mut self.mouse_inside;
-        let scroll = &mut self.mouse_scroll;
-        let scroll_length = self.mouse_scroll_length;
-        let dropped_files = &mut self.dropped_files;
-        let hovered_files = &mut self.hovered_files;
-
-        *scroll = (0.0, 0.0);
-        typed_chars.clear();
-        dropped_files.clear();
-
-        let context = &self.context;
-        let env_dpi_factor = self.env_dpi_factor;
-        let mut handle_resize = |logical_size: LogicalSize, dpi_factor: f64| {
-            let physical_size = logical_size.to_physical(dpi_factor);
-
-            let (width, height): (u32, u32) = physical_size.into();
-            unsafe {
-                gl::Viewport(0, 0, width as i32, height as i32);
+        let event_loop = self.event_loop;
+        let mut ctx = self.ctx;
+        event_loop.run(move |event, target, control_flow| match event {
+            Event::WindowEvent {
+                event: WindowEvent::Resized(logical_size),
+                ..
+            } => {
+                let dpi_factor = ctx.window.window().hidpi_factor();
+                handle_resize(&mut ctx, logical_size, dpi_factor);
+                event_handler(None, event, target, control_flow);
             }
-            context.resize(physical_size);
-            *window_width = logical_size.width as f32 / env_dpi_factor;
-            *window_height = logical_size.height as f32 / env_dpi_factor;
-            *window_dpi_factor = dpi_factor as f32 * env_dpi_factor;
-        };
-
-        let events_loop = &mut self.events_loop;
-        events_loop.poll_events(|event| {
-            if let Event::WindowEvent { event, .. } = event {
-                match event {
-                    WindowEvent::CloseRequested | WindowEvent::Destroyed => running = false,
-                    WindowEvent::Resized(logical_size) => {
-                        let dpi_factor = context.window().get_hidpi_factor();
-                        handle_resize(logical_size, dpi_factor);
-                    }
-                    WindowEvent::HiDpiFactorChanged(dpi_factor) => {
-                        if let Some(logical_size) = context.window().get_inner_size() {
-                            handle_resize(logical_size, dpi_factor);
-                        }
-                    }
-
-                    WindowEvent::KeyboardInput { input, .. } => {
-                        let state = input.state;
-                        if let Some(key) = input.virtual_keycode {
-                            key_inputs.push((key, state));
-                        }
-                    }
-                    WindowEvent::ReceivedCharacter(c) => typed_chars.push(c),
-
-                    WindowEvent::MouseInput { state, button, .. } => {
-                        mouse_inputs.push((button, state))
-                    }
-                    WindowEvent::CursorMoved { position, .. } => {
-                        *mouse_coords = (
-                            position.x as f32 / env_dpi_factor,
-                            position.y as f32 / env_dpi_factor,
-                        );
-                    }
-                    WindowEvent::CursorEntered { .. } => *mouse_inside = true,
-                    WindowEvent::CursorLeft { .. } => *mouse_inside = false,
-                    WindowEvent::MouseWheel { delta, .. } => match delta {
-                        MouseScrollDelta::LineDelta(x, y) => {
-                            *scroll = (scroll_length * x, scroll_length * y)
-                        }
-                        MouseScrollDelta::PixelDelta(pos) => *scroll = (pos.x as f32, pos.y as f32),
-                    },
-
-                    WindowEvent::DroppedFile(path) => {
-                        for (i, hovered_path) in hovered_files.iter().enumerate() {
-                            if hovered_path == &path {
-                                hovered_files.remove(i);
-                                break;
-                            }
-                        }
-                        dropped_files.push(path);
-                    }
-                    WindowEvent::HoveredFile(path) => {
-                        hovered_files.push(path);
-                    }
-                    WindowEvent::HoveredFileCancelled => {
-                        hovered_files.clear();
-                    }
-
-                    _ => {}
-                }
+            Event::WindowEvent {
+                event: WindowEvent::HiDpiFactorChanged(dpi_factor),
+                ..
+            } => {
+                let logical_size = ctx.window.window().inner_size();
+                handle_resize(&mut ctx, logical_size, dpi_factor);
+                event_handler(None, event, target, control_flow);
             }
-        });
-
-        /* Keyboard event handling */
-        self.pressed_keys.clear();
-        self.released_keys.clear();
-        for (key, state) in key_inputs {
-            match state {
-                ElementState::Pressed => {
-                    let mut already_pressed = false;
-                    for previously_pressed_key in &self.held_keys {
-                        if previously_pressed_key == &key {
-                            already_pressed = true;
-                            break;
-                        }
-                    }
-
-                    if !already_pressed {
-                        self.pressed_keys.push(key);
-                        self.held_keys.push(key);
-                    }
-                }
-                ElementState::Released => {
-                    self.released_keys.push(key);
-                    for (i, held_key) in self.held_keys.iter().enumerate() {
-                        if held_key == &key {
-                            self.held_keys.remove(i);
-                            break;
-                        }
-                    }
-                }
+            Event::WindowEvent {
+                event: WindowEvent::RedrawRequested,
+                ..
+            } => {
+                ctx.renderer.render(ctx.width, ctx.height);
+                ctx.swap_buffers();
+                event_handler(None, event, target, control_flow);
             }
-        }
-
-        /* Mouse event handling */
-        self.mouse_pressed.clear();
-        self.mouse_released.clear();
-        for (button, state) in mouse_inputs {
-            match state {
-                ElementState::Pressed => {
-                    self.mouse_pressed.push(button);
-                    self.mouse_held.push(button);
-                }
-                ElementState::Released => {
-                    self.mouse_released.push(button);
-                    for (i, held_button) in self.mouse_held.iter().enumerate() {
-                        if held_button == &button {
-                            self.mouse_held.remove(i);
-                            break;
-                        }
-                    }
-                }
+            Event::EventsCleared => {
+                crate::profiler::refresh();
+                ctx.renderer.start_frame();
+                event_handler(Some(&mut ctx), event, target, control_flow);
+                ctx.renderer.finish_frame();
+                ctx.window.window().request_redraw();
             }
-        }
-
-        running
+            _ => event_handler(None, event, target, control_flow),
+        })
     }
 }
 

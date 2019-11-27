@@ -1,6 +1,8 @@
 mod common;
 
 use common::WindowSettings;
+use fae::glutin::event::{Event, WindowEvent};
+use fae::glutin::event_loop::ControlFlow;
 use fae::text::Alignment;
 use fae::{DrawCallParameters, Image, Window};
 use std::error::Error;
@@ -9,7 +11,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     env_logger::from_env(env_logger::Env::default().default_filter_or("trace")).init();
 
     let mut window = Window::create(WindowSettings::default().into()).unwrap();
-    let (mut renderer, mut text) = common::create_renderers(&window);
+    let mut text = common::create_text_renderer(window.ctx.renderer());
     let params = DrawCallParameters {
         image: {
             #[cfg(feature = "png")]
@@ -21,39 +23,38 @@ fn main() -> Result<(), Box<dyn Error>> {
         alpha_blending: false,
         ..Default::default()
     };
-    let call = renderer.create_draw_call(params);
+    let call = window.ctx.renderer().create_draw_call(params);
 
-    let mut should_quit = false;
-    while window.refresh() && !should_quit {
-        renderer.set_dpi_factor(window.dpi_factor);
-        text.prepare_new_frame(
-            &mut renderer,
-            window.dpi_factor,
-            window.width,
-            window.height,
-        );
+    window.run(move |ctx, event, _, control_flow| {
+        *control_flow = ControlFlow::Poll;
+        if let Some(ctx) = ctx {
+            let dpi_factor = ctx.dpi_factor;
+            let width = ctx.width;
+            let height = ctx.height;
+            ctx.renderer().set_dpi_factor(dpi_factor);
+            text.prepare_new_frame(ctx.renderer(), dpi_factor, width, height);
 
-        if window
-            .pressed_keys
-            .contains(&glutin::VirtualKeyCode::Escape)
-        {
-            should_quit = true;
+            ctx.renderer()
+                .draw(&call, 0.5)
+                .with_coordinates((0.0, 0.0, 640.0, 480.0))
+                .with_texture_coordinates((0, 0, 1240, 920))
+                .finish();
+
+            text.draw("Some cool text!", 10.0, 10.0, 0.6, 16.0)
+                .with_alignment(Alignment::Left)
+                .with_color((0.0, 0.5, 0.1, 1.0))
+                .finish();
+
+            text.compose_draw_call(ctx.renderer());
+        } else {
+            if let Event::WindowEvent { event, .. } = event {
+                match event {
+                    WindowEvent::CloseRequested | WindowEvent::Destroyed => {
+                        *control_flow = ControlFlow::Exit
+                    }
+                    _ => {}
+                }
+            }
         }
-
-        renderer
-            .draw(&call, 0.5)
-            .with_coordinates((0.0, 0.0, 640.0, 480.0))
-            .with_texture_coordinates((0, 0, 1240, 920))
-            .finish();
-
-        text.draw("Some cool text!", 10.0, 10.0, 0.6, 16.0)
-            .with_alignment(Alignment::Left)
-            .with_color((0.0, 0.5, 0.1, 1.0))
-            .finish();
-
-        text.compose_draw_call(&mut renderer);
-        renderer.render(window.width, window.height);
-        window.swap_buffers(Some(&renderer));
-    }
-    Ok(())
+    });
 }
