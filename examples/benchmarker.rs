@@ -11,13 +11,6 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::time::{Duration, Instant};
 
-mod keys {
-    pub const CLOSE: glutin::VirtualKeyCode = glutin::VirtualKeyCode::Escape;
-    pub const UP: glutin::VirtualKeyCode = glutin::VirtualKeyCode::Up;
-    pub const DOWN: glutin::VirtualKeyCode = glutin::VirtualKeyCode::Down;
-    pub const TIME: glutin::VirtualKeyCode = glutin::VirtualKeyCode::Space;
-}
-
 fn main() -> Result<(), Box<dyn Error>> {
     env_logger::from_env(env_logger::Env::default().default_filter_or("trace")).init();
 
@@ -97,16 +90,19 @@ fn main() -> Result<(), Box<dyn Error>> {
             window.height,
         );
 
-        if window.pressed_keys.contains(&keys::CLOSE) {
+        if window
+            .pressed_keys
+            .contains(&glutin::VirtualKeyCode::Escape)
+        {
             should_quit = true;
         }
-        if window.pressed_keys.contains(&keys::UP) {
+        if window.pressed_keys.contains(&glutin::VirtualKeyCode::Up) {
             quad_count *= 2;
         }
-        if window.pressed_keys.contains(&keys::DOWN) && quad_count > 1 {
+        if window.pressed_keys.contains(&glutin::VirtualKeyCode::Down) && quad_count > 1 {
             quad_count /= 2;
         }
-        if window.pressed_keys.contains(&keys::TIME) {
+        if window.pressed_keys.contains(&glutin::VirtualKeyCode::Space) {
             time_ticking = !time_ticking;
         }
 
@@ -192,10 +188,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
 
         y += 20.0;
-        let s = format!(
-            "Press {:?} to make everything spin. To demonstrate animation.",
-            keys::TIME
-        );
+        let s = "Press Space to make everything spin. To demonstrate animation.";
         text.draw(s, 10.0, y, 0.6, 11.0)
             .with_color(text_color)
             .finish();

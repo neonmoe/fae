@@ -68,6 +68,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         if window.typed_chars.contains(&'-') {
             lipsum_font_size -= 1.0;
         }
+        let mouse_coords = window.mouse_coords;
 
         // All the text rendering:
         let mut y = 10.0;
@@ -150,7 +151,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         {
             // Buttons
             let px = 2.0;
-            let mouse_in = is_mouse_in(&window, (10.0, y, 210.0, y + 40.0));
+            let mouse_in = is_mouse_in(mouse_coords, (10.0, y, 210.0, y + 40.0));
             if mouse_in && !was_mouse_in[0] {
                 window
                     .get_window()
@@ -178,7 +179,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .finish();
             y += 50.0;
 
-            let mouse_in = is_mouse_in(&window, (10.0, y, 210.0, y + 40.0));
+            let mouse_in = is_mouse_in(mouse_coords, (10.0, y, 210.0, y + 40.0));
             if mouse_in && !was_mouse_in[1] {
                 window
                     .get_window()
@@ -206,7 +207,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .finish();
             y += 50.0;
 
-            let mouse_in = is_mouse_in(&window, (10.0, y, 210.0, y + 40.0));
+            let mouse_in = is_mouse_in(mouse_coords, (10.0, y, 210.0, y + 40.0));
             if mouse_in && !was_mouse_in[2] {
                 window
                     .get_window()
@@ -337,7 +338,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn is_mouse_in(window: &Window, rect: (f32, f32, f32, f32)) -> bool {
-    let (x, y) = window.mouse_coords;
+fn is_mouse_in((x, y): (f32, f32), rect: (f32, f32, f32, f32)) -> bool {
     x >= rect.0 && x <= rect.2 && y >= rect.1 && y <= rect.3
 }

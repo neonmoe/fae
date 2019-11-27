@@ -54,14 +54,6 @@ name = "benchmarker"
 required-features = ["png", "text", "ttf"]
 
 [[example]]
-name = "drawing_order"
-required-features = ["png", "text", "ttf"]
-
-[[example]]
-name = "pixel_perfect"
-required-features = ["png", "text", "font8x8"]
-
-[[example]]
 name = "text_layout"
 required-features = ["text", "ttf"]
 
