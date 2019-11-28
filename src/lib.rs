@@ -13,25 +13,16 @@ pub mod gl {
     include!(concat!(env!("OUT_DIR"), "/gl_bindings.rs"));
 }
 
+mod api;
 mod error;
-pub mod gl_version;
-mod graphics_context;
+mod gl_version;
 mod image;
+mod profiler;
 mod renderer;
 mod shaders;
 mod sprite;
-mod types;
-mod window;
-
-pub use error::*;
-pub use graphics_context::*;
-pub use image::*;
-pub use renderer::*;
-pub use sprite::*;
-pub use types::*;
-pub use window::*;
-
 #[cfg(feature = "text")]
-pub mod text;
+mod text;
+mod types;
 
-pub mod profiler;
+pub use api::*;

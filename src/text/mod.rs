@@ -20,13 +20,14 @@ pub use crate::text::fonts::font8x8::get_bitmap;
 pub use self::text_builder::Text;
 pub use self::types::Alignment;
 
-use self::text_builder::TextCacheable;
+use self::text_builder::TextData;
+use crate::api::DrawCallHandle;
 use crate::error::GlyphNotRenderedError;
+use crate::renderer::Renderer;
 use crate::text::glyph_cache::*;
 use crate::text::layout::*;
 use crate::text::types::*;
 use crate::types::*;
-use crate::{DrawCallHandle, Renderer};
 
 use fnv::FnvHashMap;
 
@@ -93,27 +94,28 @@ impl TextRenderer {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub(crate) fn draw_text(
-        &mut self,
-        data: TextCacheable,
-        z: f32,
-        clip_area: Option<Rect>,
-        color: (f32, f32, f32, f32),
-        rotation: (f32, f32, f32),
-        visible: bool,
-    ) -> Option<Rect> {
-        if data.text.is_empty() {
+    pub(crate) fn draw_text(&mut self, data: TextData) -> Option<Rect> {
+        let TextData {
+            x,
+            y,
+            z,
+            font_size,
+            text,
+            alignment,
+            max_line_width,
+            color,
+            rotation,
+            clip_area,
+            visible,
+        } = data;
+
+        if text.is_empty() {
             return None;
         }
 
-        let font_size = data.font_size;
-
         let draw_data_index = self.draw_datas.len();
         self.draw_datas.push(TextDrawData {
-            position: (
-                data.x as f32 / self.dpi_factor,
-                data.y as f32 / self.dpi_factor,
-            ),
+            position: (x as f32 / self.dpi_factor, y as f32 / self.dpi_factor),
             clip_area,
             color,
             rotation,
@@ -128,13 +130,13 @@ impl TextRenderer {
             std::f32::NEG_INFINITY,
         );
 
-        let max_line_width = data.max_line_width;
-        let (x, y) = (data.x, data.y);
-        let alignment = data.alignment;
+        let max_line_width = max_line_width;
+        let (x, y) = (x, y);
+        let alignment = alignment;
 
-        let mut text_glyphs = Vec::with_capacity(data.text.len());
+        let mut text_glyphs = Vec::with_capacity(text.len());
         let mut previous_id = None;
-        for c in data.text.chars() {
+        for c in text.chars() {
             let id = if let Some(id) = self.glyph_ids.get(&c) {
                 *id
             } else {

@@ -1,6 +1,6 @@
 //! Window creation utilities for when you don't want to bother
 //! writing the glue between `fae` and `glutin`.
-use crate::graphics_context::GraphicsContext;
+use crate::api::GraphicsContext;
 use crate::renderer::Renderer;
 
 use glutin::event::{Event, WindowEvent};

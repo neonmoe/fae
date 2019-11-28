@@ -4,7 +4,7 @@ use common::WindowSettings;
 use fae::glutin::event::{Event, WindowEvent};
 use fae::glutin::event_loop::ControlFlow;
 #[cfg(feature = "text")]
-use fae::text::Alignment;
+use fae::Alignment;
 use fae::{DrawCallParameters, Image, Window};
 use std::error::Error;
 
