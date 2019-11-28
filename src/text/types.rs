@@ -19,7 +19,7 @@ pub enum Alignment {
 }
 
 #[derive(Clone, Copy)]
-pub struct Glyph {
+pub(crate) struct Glyph {
     pub id: GlyphId,
     pub cursor: Cursor,
     pub metric: RectPx,
@@ -27,7 +27,7 @@ pub struct Glyph {
 }
 
 #[derive(Clone, Copy)]
-pub struct TextDrawData {
+pub(crate) struct TextDrawData {
     pub position: (f32, f32),
     pub clip_area: Option<Rect>,
     pub color: (f32, f32, f32, f32),
@@ -36,7 +36,7 @@ pub struct TextDrawData {
     pub z: f32,
 }
 
-pub trait FontProvider {
+pub(crate) trait FontProvider {
     fn get_glyph_id(&mut self, c: char) -> GlyphId;
     fn get_line_advance(&self, font_size: i32) -> Advance;
     fn get_advance(&mut self, from: GlyphId, to: GlyphId, font_size: i32) -> Advance;
@@ -51,7 +51,7 @@ pub trait FontProvider {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct CacheIdentifier {
+pub(crate) struct CacheIdentifier {
     id: GlyphId,
     font_size: Option<i32>,
 }
@@ -63,7 +63,7 @@ impl CacheIdentifier {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct Cursor {
+pub(crate) struct Cursor {
     pub x: i32,
     pub y: i32,
 }
@@ -84,7 +84,7 @@ impl Add<Cursor> for RectPx {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct Advance {
+pub(crate) struct Advance {
     pub advance_x: i32,
     pub advance_y: i32,
 }

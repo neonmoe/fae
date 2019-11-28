@@ -5,27 +5,26 @@ use fae::glutin::window::WindowBuilder;
 use fae::glutin::*;
 
 #[cfg(feature = "text")]
-pub use renderer_and_text_renderer_creation::*;
+pub use create_font::*;
 #[cfg(feature = "text")]
-mod renderer_and_text_renderer_creation {
-    use fae::text::TextRenderer;
-    use fae::Renderer;
+mod create_font {
+    use fae::{FontHandle, GraphicsContext};
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "ttf")] {
-            pub fn create_text_renderer(renderer: &mut Renderer) -> TextRenderer {
+            pub fn create_font(ctx: &mut GraphicsContext) -> FontHandle {
                 use font_loader::system_fonts;
                 let property = system_fonts::FontPropertyBuilder::new()
                     .build();
                 let (font_bytes, _) = system_fonts::get(&property).unwrap();
-                TextRenderer::with_ttf(renderer, font_bytes).unwrap()
+                ctx.create_font_ttf(font_bytes).unwrap()
             }
         } else if #[cfg(feature = "font8x8")] {
-            pub fn create_text_renderer(renderer: &mut Renderer) -> TextRenderer {
-                TextRenderer::with_font8x8(renderer, true)
+            pub fn create_font(ctx: &mut GraphicsContext) -> FontHandle {
+                ctx.create_font8x8(true)
             }
         } else {
-            pub fn create_text_renderer(_renderer: &mut Renderer) -> TextRenderer {
+            pub fn create_font(_ctx: &mut GraphicsContext) -> FontHandle {
                 panic!("no font feature (`font8x8` or `ttf`) enabled")
             }
         }

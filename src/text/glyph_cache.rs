@@ -23,7 +23,7 @@ const TEXT_FRAGMENT_SHADER_330: &str = include_str!("../shaders/text.frag");
 /// previously allocated UVs. This will take roughly 19 bytes per
 /// cached glyph (2 bytes from the CacheIdentifier + 17 bytes from the
 /// GlyphSpot).
-pub struct GlyphCache {
+pub(crate) struct GlyphCache {
     call: DrawCallHandle,
     width: i32,
     height: i32,

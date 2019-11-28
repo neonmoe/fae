@@ -7,7 +7,7 @@ use png;
 
 /// Contains the raw pixel color data of an image. Can be uploaded to
 /// the GPU with
-/// [`Renderer::create_draw_call`](struct.Renderer.html#method.create_draw_call).
+/// [`GraphicsContext::create_draw_call`](struct.GraphicsContext.html#method.create_draw_call).
 #[derive(Clone, Debug)]
 pub struct Image {
     /// The pixels of the image.
@@ -123,7 +123,7 @@ impl Image {
     /// GPU during initialization.
     ///
     /// See also:
-    /// [`Renderer::upload_texture_region`](struct.Renderer.html#method.upload_texture_region).
+    /// [`GraphicsContext::upload_texture_region`](struct.GraphicsContext.html#method.upload_texture_region).
     pub fn create_null(width: i32, height: i32, format: GLuint) -> Image {
         Image {
             pixels: Vec::new(),

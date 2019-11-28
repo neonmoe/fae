@@ -1,12 +1,13 @@
 //! Window creation utilities for when you don't want to bother
 //! writing the glue between `fae` and `glutin`.
+use crate::graphics_context::GraphicsContext;
 use crate::renderer::Renderer;
 
-use glutin::dpi::LogicalSize;
 use glutin::event::{Event, WindowEvent};
 use glutin::event_loop::{ControlFlow, EventLoop, EventLoopWindowTarget};
 use glutin::window::WindowBuilder;
 use glutin::*;
+
 use std::env;
 use std::error::Error;
 
@@ -17,37 +18,6 @@ pub struct Window {
     event_loop: EventLoop<()>,
     /// The `Window`'s rendering context.
     pub ctx: GraphicsContext,
-}
-
-/// The graphics context: used to draw stuff on the screen.
-pub struct GraphicsContext {
-    env_dpi_factor: f32,
-    window: WindowedContext<PossiblyCurrent>,
-    renderer: Renderer,
-    /// The width of the window in logical coordinates. Multiply with
-    /// dpi_factor to get the width in physical pixels.
-    pub width: f32,
-    /// The height of the window in logical coordinates. Multiply with
-    /// dpi_factor to get the height in physical pixels.
-    pub height: f32,
-    /// The dpi multiplier of the window.
-    pub dpi_factor: f32,
-}
-
-impl GraphicsContext {
-    /// Updates the window (swaps the front and back buffers). The
-    /// renderer handle is used for a CPU/GPU synchronization call, so
-    /// while it is optional, it's definitely recommended. If vsync is
-    /// enabled, this function will hang until the next frame.
-    fn swap_buffers(&mut self) {
-        let _ = self.window.swap_buffers();
-        self.renderer.synchronize();
-    }
-
-    /// Returns the renderer.
-    pub fn renderer(&mut self) -> &mut Renderer {
-        &mut self.renderer
-    }
 }
 
 impl Window {
@@ -92,6 +62,8 @@ impl Window {
                 env_dpi_factor,
                 window: context,
                 renderer,
+                #[cfg(feature = "text")]
+                text_renderers: Vec::new(),
                 width,
                 height,
                 dpi_factor: 1.0,
@@ -142,20 +114,6 @@ impl Window {
                 &mut ControlFlow,
             ),
     {
-        let handle_resize =
-            |ctx: &mut GraphicsContext, logical_size: LogicalSize, dpi_factor: f64| {
-                let physical_size = logical_size.to_physical(dpi_factor);
-
-                let (width, height): (u32, u32) = physical_size.into();
-                unsafe {
-                    crate::gl::Viewport(0, 0, width as i32, height as i32);
-                }
-                ctx.window.resize(physical_size);
-                ctx.width = logical_size.width as f32 / ctx.env_dpi_factor;
-                ctx.height = logical_size.height as f32 / ctx.env_dpi_factor;
-                ctx.dpi_factor = dpi_factor as f32 * ctx.env_dpi_factor;
-            };
-
         let event_loop = self.event_loop;
         let mut ctx = self.ctx;
         event_loop.run(move |event, target, control_flow| match event {
@@ -164,7 +122,7 @@ impl Window {
                 ..
             } => {
                 let dpi_factor = ctx.window.window().hidpi_factor();
-                handle_resize(&mut ctx, logical_size, dpi_factor);
+                ctx.resize(logical_size, dpi_factor);
                 event_handler(None, event, target, control_flow);
             }
             Event::WindowEvent {
@@ -172,7 +130,7 @@ impl Window {
                 ..
             } => {
                 let logical_size = ctx.window.window().inner_size();
-                handle_resize(&mut ctx, logical_size, dpi_factor);
+                ctx.resize(logical_size, dpi_factor);
                 event_handler(None, event, target, control_flow);
             }
             Event::WindowEvent {
@@ -185,9 +143,30 @@ impl Window {
             }
             Event::EventsCleared => {
                 crate::profiler::refresh();
-                ctx.renderer.start_frame();
+                // Prepare renderer
+                ctx.renderer.prepare_new_frame(ctx.dpi_factor);
+                // Prepare text renderers
+                #[cfg(feature = "text")]
+                for font in &mut ctx.text_renderers {
+                    font.prepare_new_frame(
+                        &mut ctx.renderer,
+                        ctx.dpi_factor,
+                        ctx.width,
+                        ctx.height,
+                    );
+                }
+
+                // Do things!
                 event_handler(Some(&mut ctx), event, target, control_flow);
+
+                // Flush text renderers
+                #[cfg(feature = "text")]
+                for font in &mut ctx.text_renderers {
+                    font.compose_draw_call(&mut ctx.renderer);
+                }
+                // Flush renderer
                 ctx.renderer.finish_frame();
+                // Request redraw so the drawn stuff gets actually rendered
                 ctx.window.window().request_redraw();
             }
             _ => event_handler(None, event, target, control_flow),

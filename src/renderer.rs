@@ -3,9 +3,11 @@
 use crate::gl;
 use crate::gl::types::*;
 use crate::gl_version::{self, OpenGlApi, OpenGlVersion};
+use crate::graphics_context::GraphicsContext;
 use crate::image::Image;
 use crate::sprite::Sprite;
 use crate::types::*;
+
 use std::mem;
 use std::ptr;
 
@@ -15,15 +17,85 @@ type TextureHandle = GLuint;
 type VBOHandle = GLuint;
 type VAOHandle = GLuint;
 
-/// A handle to a draw call. Parameter for
-/// [`Renderer::draw`](struct.Renderer.html#method.draw). Can be
-/// cloned and shared, the clones will keep referring to the same draw
-/// call.
+/// A handle to a draw call. Can be used to draw sprites.
 ///
 /// Created with
-/// [`Renderer::create_draw_call`](struct.Renderer.html#method.create_draw_call).
+/// [`GraphicsContext::create_draw_call`](struct.GraphicsContext.html#method.create_draw_call).
 #[derive(Clone, Debug)]
-pub struct DrawCallHandle(usize);
+pub struct DrawCallHandle {
+    index: usize,
+}
+
+impl DrawCallHandle {
+    /// Creates a Sprite struct, which you can render after specifying
+    /// your parameters by modifying it.
+    ///
+    /// Higher Z sprites are drawn over the lower ones (with the
+    /// exception of the case described below).
+    ///
+    /// ## Weird Z-coordinate behavior note
+    ///
+    /// Try to constrain your z-coordinates to small ranges within
+    /// individual draw calls; draw call rendering order is decided by
+    /// the highest z-coordinate that each draw call has to draw. This
+    /// can even cause visual glitches in alpha-blended draw calls, if
+    /// their sprites overlap and have overlapping ranges of
+    /// z-coordinates.
+    ///
+    /// ## Optimization tips
+    /// - Draw the sprites in front first. This way you'll avoid
+    ///   rendering over already drawn pixels. If you're rendering
+    ///   *lots* of sprites, this is a good place to start optimizing.
+    /// - If possible, make your textures without using alpha values
+    ///   between 1 and 0 (ie. use only 100% and 0% opacity), and
+    ///   disable `alpha_blending` in your draw call. These kinds of
+    ///   sprites can be drawn much more efficiently when it comes to
+    ///   overdraw.
+    ///
+    /// # Usage
+    /// ```ignore
+    /// call.draw(&mut ctx, 0.0)
+    ///     .with_coordinates((100.0, 100.0, 16.0, 16.0))
+    ///     .with_texture_coordinates((0, 0, 16, 16))
+    ///     .finish();
+    /// ```
+    pub fn draw<'a, 'b>(&'b self, ctx: &'a mut GraphicsContext, z: f32) -> Sprite<'a, 'b> {
+        ctx.renderer.draw(&self, z)
+    }
+
+    /// Upload an image into the specified region in a draw call's
+    /// texture.
+    ///
+    /// If the width and height of `region` and `image` don't match,
+    /// or the `region` isn't completely contained within the texture,
+    /// this function will do nothing and return false.
+    ///
+    /// See also:
+    /// [`Image::create_null`](struct.Image.html#method.create_null).
+    pub fn upload_texture_region(
+        &self,
+        ctx: &mut GraphicsContext,
+        region: RectPx,
+        image: &Image,
+    ) -> bool {
+        ctx.renderer.upload_texture_region(self, region, image)
+    }
+
+    /// Resize the draw call's texture to a new width and height,
+    /// which must be equal or greater than the original
+    /// dimensions. The previous contents of the texture are preserved
+    /// in the origin corner of the texture.
+    ///
+    /// If `new_width` is less than the current width, or `new_height`
+    /// is less than the current height, this function will do
+    /// nothing.
+    ///
+    /// See also:
+    /// [`GraphicsContext::upload_texture_region`](struct.GraphicsContext.html#method.upload_texture_region).
+    pub fn resize_texture(&self, ctx: &mut GraphicsContext, new_width: i32, new_height: i32) {
+        ctx.renderer.resize_texture(self, new_width, new_height);
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 struct ShaderProgram {
@@ -63,8 +135,6 @@ struct DrawCall {
 
 #[derive(Clone, Debug)]
 struct OpenGLState {
-    legacy: bool,
-    version: OpenGlVersion,
     // The fields below are settings set by other possible OpenGL
     // calls made in the surrounding program, because the point of
     // this crate is to behave well with other OpenGL code running
@@ -85,9 +155,11 @@ struct OpenGLState {
 /// Contains the data and functionality needed to draw rectangles with
 /// OpenGL.
 #[derive(Debug)]
-pub struct Renderer {
+pub(crate) struct Renderer {
     calls: Vec<DrawCall>,
     gl_state: OpenGLState,
+    pub(crate) legacy: bool,
+    pub(crate) version: OpenGlVersion,
     pub(crate) dpi_factor: f32,
     /// Whether the Renderer should try to preserve the OpenGL
     /// state. If you're using OpenGL yourself, set this to `true` to
@@ -111,10 +183,9 @@ pub enum TextureWrapping {
 /// draw calls.
 ///
 /// Used in
-/// [`Renderer::create_draw_call`](struct.Renderer.html#method.create_draw_call)
+/// [`GraphicsContext::create_draw_call`](struct.GraphicsContext.html#method.create_draw_call)
 /// to create a [`DrawCallHandle`](struct.DrawCallHandle.html) which
-/// can then be used to
-/// [`Renderer::draw`](struct.Renderer.html#method.draw) with.
+/// can then be used to draw with.
 #[derive(Debug, Clone)]
 pub struct DrawCallParameters {
     /// The texture used when drawing with this handle. None can be
@@ -174,8 +245,7 @@ impl Default for DrawCallParameters {
 }
 
 impl Renderer {
-    /// Creates a new Renderer. **Requires** a valid OpenGL context.
-    pub fn new() -> Renderer {
+    pub(crate) fn new() -> Renderer {
         let version = gl_version::get_version();
         let legacy = match &version {
             OpenGlVersion::Available { api, major, minor } => {
@@ -204,8 +274,6 @@ impl Renderer {
         Renderer {
             calls: Vec::with_capacity(2),
             gl_state: OpenGLState {
-                legacy,
-                version,
                 pushed: false,
                 depth_test: false,
                 srgb: false,
@@ -218,20 +286,11 @@ impl Renderer {
                 vbo: 0,
                 element_buffer: 0,
             },
+            legacy,
+            version,
             dpi_factor: 1.0,
             preserve_gl_state: false,
         }
-    }
-
-    /// Returns whether or not running in legacy mode (OpenGL 3.3+
-    /// optimizations off).
-    pub fn is_legacy(&self) -> bool {
-        self.gl_state.legacy
-    }
-
-    /// Returns the OpenGL version if it could be parsed.
-    pub fn get_opengl_version(&self) -> &OpenGlVersion {
-        &self.gl_state.version
     }
 
     /// Creates a new draw call in the pipeline, and returns a handle
@@ -248,22 +307,22 @@ impl Renderer {
     /// replace, which usually means just the fragment shaders. Make
     /// sure to study the uniform variables and attributes of the
     /// default shaders before making your own.
-    pub fn create_draw_call(&mut self, params: DrawCallParameters) -> DrawCallHandle {
+    pub(crate) fn create_draw_call(&mut self, params: DrawCallParameters) -> DrawCallHandle {
         self.gl_push();
 
         let (api, legacy) = (
-            match self.gl_state.version {
+            match self.version {
                 OpenGlVersion::Available { api, .. } => api,
                 _ => OpenGlApi::Desktop,
             },
-            self.gl_state.legacy,
+            self.legacy,
         );
         let vert = params.shaders.create_vert_string(api, legacy);
         let frag = params.shaders.create_frag_string(api, legacy);
         let index = self.calls.len();
 
-        let program = create_program(&vert, &frag, self.gl_state.legacy);
-        let attributes = create_attributes(self.gl_state.legacy, program);
+        let program = create_program(&vert, &frag, self.legacy);
+        let attributes = create_attributes(self.legacy, program);
         let filter = |smoothed| if smoothed { gl::LINEAR } else { gl::NEAREST } as i32;
         let wrap = |wrap_type| match wrap_type {
             TextureWrapping::Clamp => gl::CLAMP_TO_EDGE,
@@ -303,44 +362,10 @@ impl Renderer {
         }
 
         self.gl_pop();
-        DrawCallHandle(index)
+        DrawCallHandle { index }
     }
 
-    /// Creates a Sprite struct, which you can render after specifying
-    /// your parameters by modifying it.
-    ///
-    /// Higher Z sprites are drawn over the lower ones (with the
-    /// exception of the case described below).
-    ///
-    /// ## Weird Z-coordinate behavior note
-    ///
-    /// Try to constrain your z-coordinates to small ranges within
-    /// individual draw calls; draw call rendering order is decided by
-    /// the highest z-coordinate that each draw call has to draw. This
-    /// can even cause visual glitches in alpha-blended draw calls, if
-    /// their sprites overlap and have overlapping ranges of
-    /// z-coordinates. For an example of this, see the `drawing_order`
-    /// example.
-    ///
-    /// ## Optimization tips
-    /// - Draw the sprites in front first. This way you'll avoid
-    ///   rendering over already drawn pixels. If you're rendering
-    ///   *lots* of sprites, this is a good place to start optimizing.
-    /// - If possible, make your textures without using alpha values
-    ///   between 1 and 0 (ie. use only 100% and 0% opacity), and
-    ///   disable `alpha_blending` in your draw call. These kinds of
-    ///   sprites can be drawn much more efficiently when it comes to
-    ///   overdraw.
-    ///
-    /// # Usage
-    /// ```ignore
-    /// renderer.draw(&call, 0.0)
-    ///     .with_coordinates((100.0, 100.0, 16.0, 16.0))
-    ///     .with_texture_coordinates((0, 0, 16, 16))
-    ///     .finish();
-    /// ```
-    #[inline]
-    pub fn draw<'a, 'b>(&'a mut self, call: &'b DrawCallHandle, z: f32) -> Sprite<'a, 'b> {
+    pub(crate) fn draw<'a, 'b>(&'a mut self, call: &'b DrawCallHandle, z: f32) -> Sprite<'a, 'b> {
         Sprite::create(self, call, z)
     }
 
@@ -395,8 +420,8 @@ impl Renderer {
         let (red, green, blue, alpha) = color;
         let (rads, pivot_x, pivot_y) = rotation;
 
-        self.calls[call.0].highest_depth = self.calls[call.0].highest_depth.max(depth);
-        if self.gl_state.legacy {
+        self.calls[call.index].highest_depth = self.calls[call.index].highest_depth.max(depth);
+        if self.legacy {
             let (pivot_x, pivot_y) = (pivot_x + x0, pivot_y + y0);
 
             // 6 vertices, each of which consist of: position (x, y,
@@ -413,7 +438,7 @@ impl Renderer {
                 blue, alpha, rads, pivot_x, pivot_y,
             ];
 
-            self.calls[call.0]
+            self.calls[call.index]
                 .attributes
                 .vbo_data
                 .extend_from_slice(&quad);
@@ -423,16 +448,11 @@ impl Renderer {
                 x0, y0, width, height, tx0, ty0, tw, th, red, green, blue, alpha, rads, pivot_x,
                 pivot_y, depth,
             ];
-            self.calls[call.0]
+            self.calls[call.index]
                 .attributes
                 .vbo_data
                 .extend_from_slice(&quad);
         }
-    }
-
-    /// Updates the DPI multiplication factor of the screen.
-    pub fn set_dpi_factor(&mut self, dpi_factor: f32) {
-        self.dpi_factor = dpi_factor;
     }
 
     /// Renders the queued draws.
@@ -450,7 +470,7 @@ impl Renderer {
             gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
         }
 
-        let legacy = self.gl_state.legacy;
+        let legacy = self.legacy;
 
         unsafe {
             gl::Enable(gl::DEPTH_TEST);
@@ -543,7 +563,8 @@ impl Renderer {
     }
 
     /// Prepares the renderer for drawing.
-    pub(crate) fn start_frame(&mut self) {
+    pub(crate) fn prepare_new_frame(&mut self, dpi_factor: f32) {
+        self.dpi_factor = dpi_factor;
         for call in &mut self.calls {
             call.attributes.vbo_data.clear();
             call.highest_depth = -1.0;
@@ -592,13 +613,13 @@ impl Renderer {
     ///
     /// If running with legacy (2.1 or 2.0 ES) OpenGL, this is
     /// equivalent to glFinish.
-    pub fn synchronize(&self) {
+    pub(crate) fn synchronize(&self) {
         use std::thread::sleep;
         use std::time::Duration;
 
         let mut synchronized = false;
 
-        if !self.gl_state.legacy {
+        if !self.legacy {
             let fence = unsafe { gl::FenceSync(gl::SYNC_GPU_COMMANDS_COMPLETE, 0) };
             while {
                 let status = unsafe { gl::ClientWaitSync(fence, gl::SYNC_FLUSH_COMMANDS_BIT, 0) };
@@ -630,25 +651,17 @@ impl Renderer {
     }
 
     pub(crate) fn get_texture_size(&self, call: &DrawCallHandle) -> (i32, i32) {
-        self.calls[call.0].texture_size
+        self.calls[call.index].texture_size
     }
 
-    /// Upload an image into the specified region in a draw call's
-    /// texture.
-    ///
-    /// If the width and height of `region` and `image` don't match,
-    /// or the `region` isn't completely contained within the texture,
-    /// this function will do nothing and return false.
-    ///
-    /// See also:
-    /// [`Image::create_null`](struct.Image.html#method.create_null).
-    pub fn upload_texture_region(
+    // Documentation: GraphicsContext::upload_texture_region
+    pub(crate) fn upload_texture_region(
         &self,
         call: &DrawCallHandle,
         region: RectPx,
         image: &Image,
     ) -> bool {
-        let (tex_width, tex_height) = self.calls[call.0].texture_size;
+        let (tex_width, tex_height) = self.calls[call.index].texture_size;
         if region.width == image.width
             && region.height == image.height
             && region.x + region.width <= tex_width
@@ -657,7 +670,7 @@ impl Renderer {
             && region.y >= 0
         {
             insert_sub_texture(
-                self.calls[call.0].texture,
+                self.calls[call.index].texture,
                 region.x,
                 region.y,
                 region.width,
@@ -671,28 +684,23 @@ impl Renderer {
         }
     }
 
-    /// Resize the draw call's texture to a new width and height,
-    /// which must be equal or greater than the original
-    /// dimensions. The previous contents of the texture are preserved
-    /// in the origin corner of the texture.
-    ///
-    /// If `new_width` is less than the current width, or `new_height`
-    /// is less than the current height, this function will do
-    /// nothing.
-    ///
-    /// See also:
-    /// [`Renderer::upload_texture_region`](struct.Renderer.html#method.upload_texture_region).
-    pub fn resize_texture(&mut self, call: &DrawCallHandle, new_width: i32, new_height: i32) {
-        let (old_width, old_height) = self.calls[call.0].texture_size;
+    // Documentation: GraphicsContext::resize_texture
+    pub(crate) fn resize_texture(
+        &mut self,
+        call: &DrawCallHandle,
+        new_width: i32,
+        new_height: i32,
+    ) {
+        let (old_width, old_height) = self.calls[call.index].texture_size;
         if new_width >= old_width && new_height >= old_height {
             resize_texture(
-                self.calls[call.0].texture,
+                self.calls[call.index].texture,
                 old_width,
                 old_height,
                 new_width,
                 new_height,
             );
-            self.calls[call.0].texture_size = (new_width, new_height);
+            self.calls[call.index].texture_size = (new_width, new_height);
         }
     }
 
@@ -711,7 +719,7 @@ impl Renderer {
                 gl::GetIntegerv(gl::BLEND_DST, &mut dst);
                 self.gl_state.blend_func = (src, dst);
                 gl::GetIntegerv(gl::CURRENT_PROGRAM, &mut self.gl_state.program);
-                if !self.gl_state.legacy {
+                if !self.legacy {
                     gl::GetIntegerv(gl::VERTEX_ARRAY_BINDING, &mut self.gl_state.vao);
                 }
                 gl::GetIntegerv(gl::TEXTURE_BINDING_2D, &mut self.gl_state.texture);
@@ -756,7 +764,7 @@ impl Renderer {
                     self.gl_state.blend_func.1 as GLuint,
                 );
                 gl::UseProgram(self.gl_state.program as GLuint);
-                if !self.gl_state.legacy {
+                if !self.legacy {
                     gl::BindVertexArray(self.gl_state.vao as GLuint);
                 }
                 gl::BindTexture(gl::TEXTURE_2D, self.gl_state.texture as GLuint);
@@ -779,7 +787,7 @@ impl Drop for Renderer {
             // gl resources (because they can't have been allocated)
             return;
         }
-        let legacy = self.gl_state.legacy;
+        let legacy = self.legacy;
         for call in self.calls.iter() {
             let ShaderProgram {
                 program,

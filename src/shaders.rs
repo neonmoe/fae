@@ -1,7 +1,7 @@
 use crate::gl_version::OpenGlApi;
 
 /// Represents the shader code for a shader. Used in
-/// [`Renderer::create_draw_call`](struct.Renderer.html#method.create_draw_call).
+/// [`GraphicsContext::create_draw_call`](struct.GraphicsContext.html#method.create_draw_call).
 #[derive(Clone, Copy, Debug)]
 pub struct Shaders {
     /// The GLSL 3.30 version of the vertex shader. Ensure that the
@@ -19,10 +19,10 @@ pub struct Shaders {
 }
 
 static DEFAULT_SHADERS: [&str; 4] = [
-    include_str!("legacy/texquad.vert"),
-    include_str!("legacy/texquad.frag"),
-    include_str!("texquad.vert"),
-    include_str!("texquad.frag"),
+    include_str!("shaders/legacy/texquad.vert"),
+    include_str!("shaders/legacy/texquad.frag"),
+    include_str!("shaders/texquad.vert"),
+    include_str!("shaders/texquad.frag"),
 ];
 impl Default for Shaders {
     fn default() -> Self {

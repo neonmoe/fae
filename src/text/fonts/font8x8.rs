@@ -14,7 +14,7 @@ use fnv::FnvHashMap;
 /// performance a lot, as the metrics are accessed multiple times per
 /// glyph, every frame in the worst case. As no glyphs in the font8x8
 /// font rely on font size, this cache can't get very big.
-pub struct Font8x8Provider {
+pub(crate) struct Font8x8Provider {
     metrics: FnvHashMap<GlyphId, RectPx>,
 }
 

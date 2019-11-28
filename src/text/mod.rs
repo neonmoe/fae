@@ -31,9 +31,9 @@ use crate::{DrawCallHandle, Renderer};
 use fnv::FnvHashMap;
 
 /// Contains everything needed to draw text.
-pub struct TextRenderer {
+pub(crate) struct TextRenderer {
+    pub glyph_cache_filled: bool,
     cache: GlyphCache,
-    glyph_cache_filled: bool,
     call: DrawCallHandle,
     glyphs: Vec<Glyph>,
     draw_datas: Vec<TextDrawData>,
@@ -44,23 +44,14 @@ pub struct TextRenderer {
 }
 
 impl TextRenderer {
-    /// Creates a new text renderer using the font provided by
-    /// `font8x8`.
-    ///
-    /// If `smoothed` is `true`, glyphs which are bigger than 8
-    /// physical pixels will be linearly interpolated when stretching
-    /// (smooth but blurry). If `false`, nearest-neighbor
-    /// interpolation is used (crisp but pixelated).
     #[cfg(feature = "font8x8")]
-    pub fn with_font8x8(renderer: &mut Renderer, smoothed: bool) -> TextRenderer {
+    pub(crate) fn from_font8x8(renderer: &mut Renderer, smoothed: bool) -> TextRenderer {
         let (cache, call) = GlyphCache::create_cache_and_draw_call(renderer, 64, 64, smoothed);
         TextRenderer::with_params(cache, call, Box::new(fonts::Font8x8Provider::new()))
     }
 
-    /// Creates a new text renderer with the given font, rasterized
-    /// with `rusttype`.
     #[cfg(feature = "ttf")]
-    pub fn with_ttf(
+    pub(crate) fn from_ttf(
         renderer: &mut Renderer,
         ttf_data: Vec<u8>,
     ) -> Result<TextRenderer, rusttype::Error> {
@@ -87,35 +78,9 @@ impl TextRenderer {
         }
     }
 
-    /// Returns true if the last
-    /// [`compose_draw_call`](struct.TextRenderer.html#method.compose_draw_call)
-    /// failed to draw a glyph because the glyph cache was
-    /// full. Generally, this should become false on the next frame
-    /// because the glyph cache is resized at the start of the frame,
-    /// as needed. Resizing is limited by `GL_MAX_TEXTURE_SIZE`
-    /// however, so low-end systems might reach a limit if you're
-    /// drawing lots of very large text using many symbols.
-    ///
-    /// # What to do if the glyph cache is full
-    ///
-    /// Consider using alternative means of rendering large text, or
-    /// increase your application's GPU capability requirements.
-    pub fn is_glyph_cache_full(&self) -> bool {
-        self.glyph_cache_filled
-    }
-
-    /// Creates a Sprite struct, which you can render after specifying
-    /// your parameters by modifying it.
-    ///
-    /// # Usage
-    /// ```ignore
-    /// text_renderer.draw("Hello, World!", 10.0, 10.0, 0.0, 12.0)
-    ///     .with_color((0.8, 0.5, 0.1, 1.0))
-    ///     .finish();
-    /// ```
-    pub fn draw<S: Into<String>>(
+    pub(crate) fn draw(
         &mut self,
-        text: S,
+        text: String,
         x: f32,
         y: f32,
         z: f32,
@@ -374,12 +339,10 @@ impl TextRenderer {
         self.window_size = (window_width * dpi_factor, window_height * dpi_factor);
     }
 
-    /// Draws the glyph cache texture in the given quad, for
-    /// debugging.
-    pub fn debug_draw_glyph_cache<R: Into<Rect>>(
+    pub(crate) fn debug_draw_glyph_cache(
         &self,
         renderer: &mut Renderer,
-        coordinates: R,
+        coordinates: Rect,
         z: f32,
     ) {
         renderer

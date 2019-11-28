@@ -15,6 +15,7 @@ pub mod gl {
 
 mod error;
 pub mod gl_version;
+mod graphics_context;
 mod image;
 mod renderer;
 mod shaders;
@@ -23,6 +24,7 @@ mod types;
 mod window;
 
 pub use error::*;
+pub use graphics_context::*;
 pub use image::*;
 pub use renderer::*;
 pub use sprite::*;

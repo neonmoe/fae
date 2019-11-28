@@ -24,7 +24,7 @@ type FontSize = i32;
 /// but they do improve performance a lot.
 ///
 /// \* The pairs consist of each rendered glyph and the one before it.
-pub struct RustTypeProvider<'a> {
+pub(crate) struct RustTypeProvider<'a> {
     glyph_padding: f32,
     font: Font<'a>,
     units_per_em: i32,

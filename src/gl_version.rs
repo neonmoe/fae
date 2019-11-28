@@ -1,4 +1,4 @@
-//! This module contains functionality for reading the current context's OpenGL version.
+//! OpenGL version parsing.
 use crate::gl;
 use std::ffi::CStr;
 
@@ -15,7 +15,8 @@ pub enum OpenGlApi {
 }
 
 /// Represents the parsed version of the OpenGL version
-/// string. Returned by [`get_version`](fn.get_version.html).
+/// string. Returned by
+/// [`GraphicsContext::get_opengl_version`](../struct.GraphicsContext.html#method.get_opengl_version).
 #[derive(Clone, Debug, PartialEq)]
 pub enum OpenGlVersion {
     /// Represents a version of the OpenGL api.
@@ -44,7 +45,7 @@ pub enum OpenGlVersion {
 ///
 /// See the documentation for
 /// [`OpenGlVersion`](enum.OpenGlVersion.html).
-pub fn get_version() -> OpenGlVersion {
+pub(crate) fn get_version() -> OpenGlVersion {
     let version_str = unsafe { CStr::from_ptr(gl::GetString(gl::VERSION) as *const _) };
     let version_str = version_str.to_string_lossy();
     if let Some((es, major, minor)) = parse_version(&version_str) {
