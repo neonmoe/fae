@@ -17,9 +17,6 @@ type VBOHandle = GLuint;
 type VAOHandle = GLuint;
 
 /// A handle to a draw call. Can be used to draw sprites.
-///
-/// Created with
-/// [`GraphicsContext::create_draw_call`](struct.GraphicsContext.html#method.create_draw_call).
 #[derive(Clone, Debug)]
 pub struct DrawCallHandle {
     index: usize,
@@ -110,10 +107,8 @@ pub enum TextureWrapping {
 /// Options which set capabilities, restrictions and resources for
 /// draw calls.
 ///
-/// Used in
-/// [`GraphicsContext::create_draw_call`](struct.GraphicsContext.html#method.create_draw_call)
-/// to create a [`DrawCallHandle`](struct.DrawCallHandle.html) which
-/// can then be used to draw with.
+/// See also:
+/// [`DrawCallHandle::create`](struct.DrawCallHandle.html#method.create).
 #[derive(Debug, Clone)]
 pub struct DrawCallParameters {
     /// The texture used when drawing with this handle. None can be
@@ -293,8 +288,8 @@ impl Renderer {
         DrawCallHandle { index }
     }
 
-    pub(crate) fn draw<'a, 'b>(&'a mut self, call: &'b DrawCallHandle, z: f32) -> Sprite<'a, 'b> {
-        Sprite::create(self, call, z)
+    pub(crate) fn draw<'a, 'b>(&'a mut self, call: &'b DrawCallHandle) -> Sprite<'a, 'b> {
+        Sprite::create(self, call)
     }
 
     #[allow(clippy::too_many_arguments)]

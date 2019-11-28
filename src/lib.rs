@@ -17,7 +17,6 @@ mod api;
 mod error;
 mod gl_version;
 mod image;
-mod profiler;
 mod renderer;
 mod shaders;
 mod sprite;
@@ -25,4 +24,5 @@ mod sprite;
 mod text;
 mod types;
 
+pub mod profiler;
 pub use api::*;

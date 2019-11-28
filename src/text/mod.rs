@@ -297,7 +297,8 @@ impl TextRenderer {
             {
                 Ok(texcoords) => {
                     let mut sprite = renderer
-                        .draw(&self.call, z)
+                        .draw(&self.call)
+                        .with_z(z)
                         .with_physical_coordinates(screen_location)
                         .with_color(color);
                     if radians != 0.0 {
@@ -341,17 +342,7 @@ impl TextRenderer {
         self.window_size = (window_width * dpi_factor, window_height * dpi_factor);
     }
 
-    pub(crate) fn debug_draw_glyph_cache(
-        &self,
-        renderer: &mut Renderer,
-        coordinates: Rect,
-        z: f32,
-    ) {
-        renderer
-            .draw(&self.call, z)
-            .with_coordinates(coordinates)
-            .with_uvs((0.0, 0.0, 1.0, 1.0))
-            .with_color((0.0, 0.0, 0.0, 1.0))
-            .finish();
+    pub(crate) fn draw_call(&self) -> &DrawCallHandle {
+        &self.call
     }
 }

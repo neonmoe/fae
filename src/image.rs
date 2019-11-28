@@ -5,9 +5,9 @@ use crate::gl::types::*;
 #[cfg(feature = "png")]
 use png;
 
-/// Contains the raw pixel color data of an image. Can be uploaded to
-/// the GPU with
-/// [`GraphicsContext::create_draw_call`](struct.GraphicsContext.html#method.create_draw_call).
+/// Contains the raw pixel color data of an image.
+///
+/// See also: [`DrawCallParameters`](struct.DrawCallParameters.html).
 #[derive(Clone, Debug)]
 pub struct Image {
     /// The pixels of the image.
@@ -123,7 +123,7 @@ impl Image {
     /// GPU during initialization.
     ///
     /// See also:
-    /// [`GraphicsContext::upload_texture_region`](struct.GraphicsContext.html#method.upload_texture_region).
+    /// [`DrawCallHandle::upload_texture_region`](struct.DrawCallHandle.html#method.upload_texture_region).
     pub fn create_null(width: i32, height: i32, format: GLuint) -> Image {
         Image {
             pixels: Vec::new(),

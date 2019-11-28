@@ -1,7 +1,7 @@
 use crate::gl_version::OpenGlVersion;
-use crate::renderer::{DrawCallHandle, DrawCallParameters, Renderer};
+use crate::renderer::Renderer;
 #[cfg(feature = "text")]
-use crate::text::{Text, TextRenderer};
+use crate::text::TextRenderer;
 
 use glutin::dpi::LogicalSize;
 use glutin::{PossiblyCurrent, WindowedContext};
@@ -19,11 +19,12 @@ use glutin::{PossiblyCurrent, WindowedContext};
 /// - [`DrawCallHandle::draw`](struct.DrawCallHandle.html#method.draw) to draw sprites,
 /// - [`FontHandle::draw`](struct.FontHandle.html#method.draw) to draw text.
 pub struct GraphicsContext {
+    window: WindowedContext<PossiblyCurrent>,
+    env_dpi_factor: f32,
+
     #[cfg(feature = "text")]
     pub(crate) text_renderers: Vec<TextRenderer>,
-    pub(crate) window: WindowedContext<PossiblyCurrent>,
     pub(crate) renderer: Renderer,
-    pub(crate) env_dpi_factor: f32,
 
     /// The width of the window in logical coordinates. Multiply with
     /// `dpi_factor` to get the width in physical pixels.
@@ -36,13 +37,47 @@ pub struct GraphicsContext {
 }
 
 impl GraphicsContext {
-    /// Updates the window (swaps the front and back buffers).
+    pub(crate) fn new(context: WindowedContext<PossiblyCurrent>) -> GraphicsContext {
+        let env_dpi_factor = {
+            let multiplier = get_env_dpi();
+            let size = context.window().inner_size();
+            let (w, h): (f64, f64) = size.into();
+            context
+                .window()
+                .set_inner_size((w * f64::from(multiplier), h * f64::from(multiplier)).into());
+            multiplier
+        };
+
+        let size = context.window().inner_size();
+        let (width, height) = (size.width as f32, size.height as f32);
+        let renderer = Renderer::new();
+
+        context.window().set_visible(true);
+
+        GraphicsContext {
+            env_dpi_factor,
+            window: context,
+            renderer,
+            #[cfg(feature = "text")]
+            text_renderers: Vec::new(),
+            width,
+            height,
+            dpi_factor: 1.0,
+        }
+    }
+
     pub(crate) fn swap_buffers(&mut self) {
         let _ = self.window.swap_buffers();
         self.renderer.synchronize();
     }
 
-    pub(crate) fn resize(&mut self, logical_size: LogicalSize, dpi_factor: f64) {
+    pub(crate) fn render(&mut self) {
+        self.renderer.render(self.width, self.height);
+    }
+
+    pub(crate) fn resize(&mut self, logical_size: Option<LogicalSize>, dpi_factor: Option<f64>) {
+        let logical_size = logical_size.unwrap_or_else(|| self.window.window().inner_size());
+        let dpi_factor = dpi_factor.unwrap_or_else(|| self.window.window().hidpi_factor());
         let physical_size = logical_size.to_physical(dpi_factor);
         let (width, height): (u32, u32) = physical_size.into();
         unsafe {
@@ -53,40 +88,23 @@ impl GraphicsContext {
         self.height = logical_size.height as f32 / self.env_dpi_factor;
         self.dpi_factor = dpi_factor as f32 * self.env_dpi_factor;
     }
-}
 
-/// Creation utilities for various handles.
-impl GraphicsContext {
-    /// Creates a new draw call, and returns a handle to it. You can draw with the handle.
-    pub fn create_draw_call(&mut self, params: DrawCallParameters) -> DrawCallHandle {
-        self.renderer.create_draw_call(params)
-    }
+    pub(crate) fn prepare_frame(&mut self) {
+        self.renderer.prepare_new_frame(self.dpi_factor);
 
-    /// Creates a new font renderer (using the given TTF file as a
-    /// font) and returns a handle to it.
-    #[cfg(all(feature = "text", feature = "ttf"))]
-    pub fn create_font_ttf(&mut self, ttf_data: Vec<u8>) -> Result<FontHandle, rusttype::Error> {
-        let text = TextRenderer::from_ttf(&mut self.renderer, ttf_data)?;
-        self.text_renderers.push(text);
-        Ok(FontHandle {
-            index: self.text_renderers.len() - 1,
-        })
-    }
-
-    /// Creates a new font renderer (using the font8x8 font) and
-    /// returns a handle to it.
-    ///
-    /// If `smoothed` is `true`, glyphs which are bigger than 8
-    /// physical pixels will be linearly interpolated when stretching
-    /// (smooth but blurry). If `false`, nearest-neighbor
-    /// interpolation is used (crisp but pixelated).
-    #[cfg(all(feature = "text", feature = "font8x8"))]
-    pub fn create_font8x8(&mut self, smoothed: bool) -> FontHandle {
-        let text = TextRenderer::from_font8x8(&mut self.renderer, smoothed);
-        self.text_renderers.push(text);
-        FontHandle {
-            index: self.text_renderers.len() - 1,
+        #[cfg(feature = "text")]
+        for font in &mut self.text_renderers {
+            font.prepare_new_frame(&mut self.renderer, self.dpi_factor, self.width, self.height);
         }
+    }
+
+    pub(crate) fn finish_frame(&mut self) {
+        #[cfg(feature = "text")]
+        for font in &mut self.text_renderers {
+            font.compose_draw_call(&mut self.renderer);
+        }
+        self.renderer.finish_frame();
+        self.window.window().request_redraw();
     }
 }
 
@@ -108,70 +126,24 @@ impl GraphicsContext {
     }
 }
 
-/// A handle to a font. Can be used to draw strings of text.
-///
-/// Created with
-/// [`GraphicsContext::create_font_ttf`](struct.GraphicsContext.html#method.create_font_ttf)
-/// or
-/// [`GraphicsContext::create_font8x8`](struct.GraphicsContext.html#method.create_font8x8)
-/// depending on your needs.
-#[cfg(feature = "text")]
-#[derive(Clone, Debug)]
-pub struct FontHandle {
-    pub(crate) index: usize,
-}
-
-#[cfg(feature = "text")]
-impl FontHandle {
-    /// Creates a Text struct, which you can render after
-    /// specifying your parameters by modifying it.
-    ///
-    /// # Usage
-    /// ```ignore
-    /// font.draw(&mut ctx, "Hello, World!", 10.0, 10.0, 0.0, 12.0)
-    ///     .with_color((0.8, 0.5, 0.1, 1.0))
-    ///     .finish();
-    /// ```
-    pub fn draw<'a, S: Into<String>>(
-        &mut self,
-        ctx: &'a mut GraphicsContext,
-        text: S,
-        x: f32,
-        y: f32,
-        z: f32,
-        font_size: f32,
-    ) -> Text<'a> {
-        ctx.text_renderers[self.index].draw(text.into(), x, y, z, font_size)
+fn get_env_dpi() -> f32 {
+    let get_var = |name: &str| {
+        std::env::var(name)
+            .ok()
+            .and_then(|var| var.parse::<f32>().ok())
+            .filter(|f| *f > 0.0)
+    };
+    if let Some(dpi_factor) = get_var("QT_AUTO_SCREEN_SCALE_FACTOR") {
+        return dpi_factor;
     }
-
-    /// Returns true if this font failed to draw a glyph last
-    /// frame because the glyph cache was full. Generally, this
-    /// should become false on the next frame because the glyph
-    /// cache is resized at the start of the frame, as
-    /// needed. Resizing is limited by `GL_MAX_TEXTURE_SIZE`
-    /// however, so low-end systems might reach a limit if you're
-    /// drawing lots of very large text using many symbols.
-    ///
-    /// # What to do if the glyph cache is full
-    ///
-    /// Consider using alternative means of rendering large text, or
-    /// increase your application's GPU capability requirements.
-    pub fn is_glyph_cache_full(&self, ctx: &GraphicsContext) -> bool {
-        ctx.text_renderers[self.index].glyph_cache_filled
+    if let Some(dpi_factor) = get_var("QT_SCALE_FACTOR") {
+        return dpi_factor;
     }
-
-    /// Draws the glyph cache texture in the given quad, for
-    /// debugging.
-    pub fn debug_draw_glyph_cache<R: Into<crate::types::Rect>>(
-        &self,
-        ctx: &mut GraphicsContext,
-        coordinates: R,
-        z: f32,
-    ) {
-        ctx.text_renderers[self.index].debug_draw_glyph_cache(
-            &mut ctx.renderer,
-            coordinates.into(),
-            z,
-        )
+    if let Some(dpi_factor) = get_var("GDK_SCALE") {
+        return dpi_factor;
     }
+    if let Some(dpi_factor) = get_var("ELM_SCALE") {
+        return dpi_factor;
+    }
+    1.0
 }

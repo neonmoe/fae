@@ -5,7 +5,7 @@ use crate::types::*;
 /// [`finish`](struct.Text.html#method.finish) to draw the text.
 ///
 /// Created by
-/// [`TextRenderer::draw`](struct.TextRenderer.html#method.draw).
+/// [`FontHandle::draw`](struct.FontHandle.html#method.draw).
 pub struct Text<'a> {
     renderer: &'a mut TextRenderer,
     data: TextData,
@@ -99,9 +99,8 @@ impl<'a> Text<'a> {
         self
     }
 
-    /// Specifies the rotation (in radians) and pivot\* of the text.
-    ///
-    /// \* Relative to the text's `x` and `y` parameters.
+    /// Specifies the rotation (in radians) and pivot of the text,
+    /// relative to the text's origin.
     pub fn with_rotation(mut self, rotation: f32, pivot_x: f32, pivot_y: f32) -> Self {
         self.data.rotation = (rotation, pivot_x, pivot_y);
         self

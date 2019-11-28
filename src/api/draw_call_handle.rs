@@ -1,20 +1,32 @@
-use crate::api::{DrawCallHandle, GraphicsContext, Image, RectPx, Sprite};
+use crate::api::GraphicsContext;
+use crate::image::Image;
+use crate::sprite::Sprite;
+use crate::types::RectPx;
+
+pub use crate::renderer::{DrawCallHandle, DrawCallParameters};
 
 impl DrawCallHandle {
-    /// Creates a Sprite struct, which you can render after specifying
-    /// your parameters by modifying it.
+    /// Creates a new draw call you can draw with.
     ///
-    /// Higher Z sprites are drawn over the lower ones (with the
-    /// exception of the case described below).
+    /// `DrawCallParameters` implements `Default`, so the idea is that
+    /// you specify the parts you want to customize. For basic colored
+    /// rectangle rendering, the default configuration is all you
+    /// need.
+    pub fn create(ctx: &mut GraphicsContext, params: DrawCallParameters) -> DrawCallHandle {
+        ctx.renderer.create_draw_call(params)
+    }
+
+    /// Creates a Sprite struct, which you can draw by calling
+    /// `.finish()`. The parameters are set using [the builder
+    /// pattern](https://doc.rust-lang.org/1.0.0/style/ownership/builders.html).
     ///
-    /// ## Weird Z-coordinate behavior note
-    ///
-    /// Try to constrain your z-coordinates to small ranges within
-    /// individual draw calls; draw call rendering order is decided by
-    /// the highest z-coordinate that each draw call has to draw. This
-    /// can even cause visual glitches in alpha-blended draw calls, if
-    /// their sprites overlap and have overlapping ranges of
-    /// z-coordinates.
+    /// # Usage
+    /// ```ignore
+    /// draw_call_handle.draw(&mut ctx)
+    ///     .with_coordinates((100.0, 100.0, 16.0, 16.0))
+    ///     .with_texture_coordinates((0, 0, 16, 16))
+    ///     .finish();
+    /// ```
     ///
     /// ## Optimization tips
     /// - Draw the sprites in front first. This way you'll avoid
@@ -25,16 +37,8 @@ impl DrawCallHandle {
     ///   disable `alpha_blending` in your draw call. These kinds of
     ///   sprites can be drawn much more efficiently when it comes to
     ///   overdraw.
-    ///
-    /// # Usage
-    /// ```ignore
-    /// call.draw(&mut ctx, 0.0)
-    ///     .with_coordinates((100.0, 100.0, 16.0, 16.0))
-    ///     .with_texture_coordinates((0, 0, 16, 16))
-    ///     .finish();
-    /// ```
-    pub fn draw<'a, 'b>(&'b self, ctx: &'a mut GraphicsContext, z: f32) -> Sprite<'a, 'b> {
-        ctx.renderer.draw(&self, z)
+    pub fn draw<'a, 'b>(&'b self, ctx: &'a mut GraphicsContext) -> Sprite<'a, 'b> {
+        ctx.renderer.draw(&self)
     }
 
     /// Upload an image into the specified region in a draw call's
@@ -65,7 +69,7 @@ impl DrawCallHandle {
     /// nothing.
     ///
     /// See also:
-    /// [`GraphicsContext::upload_texture_region`](struct.GraphicsContext.html#method.upload_texture_region).
+    /// [`DrawCallHandle::upload_texture_region`](struct.DrawCallHandle.html#method.upload_texture_region).
     pub fn resize_texture(&self, ctx: &mut GraphicsContext, new_width: i32, new_height: i32) {
         ctx.renderer.resize_texture(self, new_width, new_height);
     }

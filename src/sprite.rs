@@ -12,7 +12,7 @@ use crate::types::*;
 
 /// Sprite builder struct. Call [`finish`](struct.Sprite.html#method.finish) to draw the sprite.
 ///
-/// Created by [`Renderer::draw`](struct.Renderer.html#method.draw).
+/// Created by [`DrawCallHandle::draw`](struct.DrawCallHandle.html#method.draw).
 pub struct Sprite<'a, 'b> {
     renderer: &'a mut Renderer,
     call: &'b DrawCallHandle,
@@ -25,15 +25,11 @@ pub struct Sprite<'a, 'b> {
 }
 
 impl<'a, 'b> Sprite<'a, 'b> {
-    pub(crate) fn create(
-        renderer: &'a mut Renderer,
-        call: &'b DrawCallHandle,
-        z: f32,
-    ) -> Sprite<'a, 'b> {
+    pub(crate) fn create(renderer: &'a mut Renderer, call: &'b DrawCallHandle) -> Sprite<'a, 'b> {
         Sprite {
             renderer,
             call,
-            z,
+            z: 0.0,
             coords: (0.0, 0.0, 0.0, 0.0),
             texcoords: (-1.0, -1.0, -1.0, -1.0),
             color: (1.0, 1.0, 1.0, 1.0),
@@ -67,6 +63,35 @@ impl<'a, 'b> Sprite<'a, 'b> {
         }
     }
 
+    /// Specifies the Z-coordinate of the sprite. Sprites with a
+    /// higher Z-coordinate will be rendered over ones with a lower
+    /// Z-coordinate.
+    ///
+    /// ## Alpha blending and Z-coordinates
+    ///
+    /// When drawing sprites on top of each other, with
+    /// [`alpha_blending`][alpha_blending] set to true, draw the ones
+    /// with the highest Z-coordinate the last, and avoid overlapping
+    /// the minimum and maximum Z-coordinate ranges between draw
+    /// calls.
+    ///
+    /// Explanation: Draw call rendering order is decided by the
+    /// highest z-coordinate that each call has to draw. To get proper
+    /// blending, the sprites furthest back need to be rendered
+    /// first. Therefore, if a draw call is ordered to be rendered the
+    /// last, but has sprites behind some other sprites, they will not
+    /// get blended as hoped. However, this ordering only applies
+    /// between draw calls that have
+    /// [`alpha_blending`][alpha_blending]
+    /// set to `true`: non-blended draw calls are always drawn before
+    /// blended ones.
+    ///
+    /// [alpha_blending]: struct.DrawCallParameters.html#structfield.alpha_blending
+    pub fn with_z(mut self, z: f32) -> Self {
+        self.z = z;
+        self
+    }
+
     /// Specifies the screen coordinates (in logical pixels) where the
     /// quad is drawn.
     pub fn with_coordinates<R: Into<Rect>>(mut self, rect: R) -> Self {
@@ -93,7 +118,7 @@ impl<'a, 'b> Sprite<'a, 'b> {
         self
     }
 
-    /// Rounds previously set cooordinates
+    /// Rounds previously set coordinates
     /// ([`with_coordinates`](#method.with_coordinates)) so that they
     /// align with the physical pixels of the monitor.
     ///
@@ -104,19 +129,23 @@ impl<'a, 'b> Sprite<'a, 'b> {
         let (x0, y0, x1, y1) = self.coords;
         let dpi_factor = self.renderer.dpi_factor;
         let round_px = |x: f32| (x * dpi_factor).round() / dpi_factor;
-        let (x0, y0, x1, y1) = (round_px(x0), round_px(y0), round_px(x1), round_px(y1));
+        let (w, h) = (round_px(x1 - x0), round_px(y1 - y0));
+        let (x0, y0) = (round_px(x0), round_px(y0));
+        let (x1, y1) = (x0 + w, y0 + h);
         self.coords = (x0, y0, x1, y1);
         self
     }
 
-    /// Specifies the texture coordinates (as UVs) from where the quad is sampled.
+    /// Specifies the texture coordinates (as UVs, ie. 0.0 - 1.0) from
+    /// where the quad is sampled.
     pub fn with_uvs<R: Into<Rect>>(mut self, rect: R) -> Self {
         self.texcoords = rect.into().into_corners();
         self
     }
 
     /// Specifies the clip area. Only the parts that overlap between
-    /// the clip area and this quad are rendered.
+    /// the clip area and the area specified by
+    /// [`with_coordinates`](#method.with_coordinates) are rendered.
     pub fn with_clip_area<R: Into<Rect>>(mut self, rect: R) -> Self {
         self.clip_area = Some(rect.into().into_corners());
         self
@@ -128,8 +157,8 @@ impl<'a, 'b> Sprite<'a, 'b> {
         self
     }
 
-    /// Specifies the rotation (in radians) and pivot (which is
-    /// relative to the quad's `x` and `y` coordinates) of the quad.
+    /// Specifies the rotation (in radians) and pivot of the quad,
+    /// relative to the sprite's origin.
     pub fn with_rotation(mut self, rotation: f32, pivot_x: f32, pivot_y: f32) -> Self {
         self.rotation = (rotation, pivot_x, pivot_y);
         self
