@@ -90,7 +90,6 @@ impl GraphicsContext {
     }
 }
 
-/// Metadata about the OpenGL context.
 impl GraphicsContext {
     /// Returns whether or not running in legacy mode (OpenGL 3.3+
     /// optimizations off).
@@ -101,6 +100,11 @@ impl GraphicsContext {
     /// Returns the OpenGL version if it could be parsed.
     pub fn get_opengl_version(&self) -> &OpenGlVersion {
         &self.renderer.version
+    }
+
+    /// Returns the glutin context.
+    pub fn window(&self) -> &WindowedContext<PossiblyCurrent> {
+        &self.window
     }
 }
 
