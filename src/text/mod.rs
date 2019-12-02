@@ -90,7 +90,7 @@ impl TextRenderer {
         let x = (x * self.dpi_factor) as i32;
         let y = (y * self.dpi_factor) as i32;
         let font_size = (font_size * self.dpi_factor) as i32;
-        Text::new(self, text.into(), x, y, z, font_size)
+        Text::new(self, text, x, y, z, font_size)
     }
 
     #[allow(clippy::too_many_arguments)]

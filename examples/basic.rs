@@ -30,8 +30,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
 
     window.run(move |ctx, event, _, control_flow| {
-        *control_flow = ControlFlow::Wait;
         if let Some(mut ctx) = ctx {
+            *control_flow = ControlFlow::Wait;
             sprite
                 .draw(&mut ctx)
                 .with_coordinates((0.0, 0.0, 640.0, 480.0))
@@ -42,14 +42,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .with_alignment(Alignment::Left)
                 .with_color((0.0, 0.5, 0.1, 1.0))
                 .finish();
-        } else {
-            if let Event::WindowEvent { event, .. } = event {
-                match event {
-                    WindowEvent::CloseRequested | WindowEvent::Destroyed => {
-                        *control_flow = ControlFlow::Exit
-                    }
-                    _ => {}
+        } else if let Event::WindowEvent { event, .. } = event {
+            match event {
+                WindowEvent::CloseRequested | WindowEvent::Destroyed => {
+                    *control_flow = ControlFlow::Exit;
                 }
+                _ => {}
             }
         }
     });
