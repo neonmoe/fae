@@ -1,5 +1,3 @@
-// TODO: Audit all unsafes
-
 use crate::gl;
 use crate::gl::types::*;
 use crate::gl_version::{self, OpenGlApi, OpenGlVersion};
@@ -12,9 +10,15 @@ use std::ptr;
 
 pub use crate::shaders::Shaders;
 
-type TextureHandle = GLuint;
-type VBOHandle = GLuint;
-type VAOHandle = GLuint;
+#[derive(Clone, Debug)]
+#[repr(transparent)]
+struct TextureHandle(GLuint);
+#[derive(Clone, Debug)]
+#[repr(transparent)]
+struct VboHandle(GLuint);
+#[derive(Clone, Debug)]
+#[repr(transparent)]
+struct VaoHandle(GLuint);
 
 /// A handle to a draw call. Can be used to draw sprites.
 #[derive(Clone, Debug)]
@@ -39,10 +43,10 @@ struct ShaderProgram {
 
 #[derive(Clone, Debug)]
 struct Attributes {
-    vbo: VBOHandle,
-    vbo_static: VBOHandle,
-    element_buffer: VBOHandle,
-    vao: VAOHandle,
+    vbo: VboHandle,
+    vbo_static: VboHandle,
+    element_buffer: VboHandle,
+    vao: VaoHandle,
     vbo_data: Vec<f32>,
     allocated_vbo_data_size: isize,
 }
@@ -58,39 +62,14 @@ struct DrawCall {
     highest_depth: f32,
 }
 
-#[derive(Clone, Debug)]
-struct OpenGLState {
-    // The fields below are settings set by other possible OpenGL
-    // calls made in the surrounding program, because the point of
-    // this crate is to behave well with other OpenGL code running
-    // alongside it.
-    pushed: bool,
-    depth_test: bool,
-    srgb: bool,
-    depth_func: GLint,
-    blend: bool,
-    blend_func: (GLint, GLint),
-    program: GLint,
-    vao: GLint,
-    texture: GLint,
-    vbo: GLint,
-    element_buffer: GLint,
-}
-
 /// Contains the data and functionality needed to draw rectangles with
 /// OpenGL.
 #[derive(Debug)]
 pub(crate) struct Renderer {
     calls: Vec<DrawCall>,
-    gl_state: OpenGLState,
     pub(crate) legacy: bool,
     pub(crate) version: OpenGlVersion,
     pub(crate) dpi_factor: f32,
-    /// Whether the Renderer should try to preserve the OpenGL
-    /// state. If you're using OpenGL yourself, set this to `true` to
-    /// avoid possible headaches. This is only best effort however,
-    /// don't trust this to make the state clean.
-    pub preserve_gl_state: bool,
 }
 
 /// Describes how textures are wrapped.
@@ -196,23 +175,9 @@ impl Renderer {
 
         Renderer {
             calls: Vec::with_capacity(2),
-            gl_state: OpenGLState {
-                pushed: false,
-                depth_test: false,
-                srgb: false,
-                depth_func: 0,
-                blend: false,
-                blend_func: (0, 0),
-                program: 0,
-                vao: 0,
-                texture: 0,
-                vbo: 0,
-                element_buffer: 0,
-            },
             legacy,
             version,
             dpi_factor: 1.0,
-            preserve_gl_state: false,
         }
     }
 
@@ -231,8 +196,6 @@ impl Renderer {
     /// sure to study the uniform variables and attributes of the
     /// default shaders before making your own.
     pub(crate) fn create_draw_call(&mut self, params: DrawCallParameters) -> DrawCallHandle {
-        self.gl_push();
-
         let (api, legacy) = (
             match self.version {
                 OpenGlVersion::Available { api, .. } => api,
@@ -270,7 +233,7 @@ impl Renderer {
 
         if let Some(image) = params.image {
             insert_texture(
-                self.calls[index].texture,
+                &self.calls[index].texture,
                 image.format,
                 image.pixel_type,
                 image.width,
@@ -284,7 +247,6 @@ impl Renderer {
             self.calls[index].texture_size = (image.width, image.height);
         }
 
-        self.gl_pop();
         DrawCallHandle { index }
     }
 
@@ -380,8 +342,6 @@ impl Renderer {
 
     /// Renders the queued draws.
     pub(crate) fn render(&mut self, width: f32, height: f32) {
-        self.gl_push();
-
         let m00 = 2.0 / width;
         let m11 = -2.0 / height;
         let matrix = [
@@ -439,11 +399,11 @@ impl Renderer {
                     matrix.as_ptr(),
                 );
                 if !legacy {
-                    gl::BindVertexArray(call.attributes.vao);
-                    gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, call.attributes.element_buffer);
+                    gl::BindVertexArray(call.attributes.vao.0);
+                    gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, call.attributes.element_buffer.0);
                 }
-                gl::BindTexture(gl::TEXTURE_2D, call.texture);
-                gl::BindBuffer(gl::ARRAY_BUFFER, call.attributes.vbo);
+                gl::BindTexture(gl::TEXTURE_2D, call.texture.0);
+                gl::BindBuffer(gl::ARRAY_BUFFER, call.attributes.vbo.0);
             }
             print_gl_errors(&format!("after initializing draw call #{}", i));
 
@@ -481,8 +441,6 @@ impl Renderer {
 
             print_gl_errors(&*format!("after render #{}", i));
         }
-
-        self.gl_pop();
     }
 
     /// Prepares the renderer for drawing.
@@ -501,11 +459,9 @@ impl Renderer {
     /// is more efficient, as there is less overdraw because of depth
     /// testing, but proper blending requires back to front ordering.
     pub(crate) fn finish_frame(&mut self) {
-        self.gl_push();
-
         for call in &mut self.calls {
             unsafe {
-                gl::BindBuffer(gl::ARRAY_BUFFER, call.attributes.vbo);
+                gl::BindBuffer(gl::ARRAY_BUFFER, call.attributes.vbo.0);
             }
 
             let len = (mem::size_of::<f32>() * call.attributes.vbo_data.len()) as isize;
@@ -522,8 +478,6 @@ impl Renderer {
             }
             print_gl_errors("after pushing vertex buffer");
         }
-
-        self.gl_pop();
     }
 
     /// Synchronizes the GPU and CPU state, ensuring that all OpenGL
@@ -593,7 +547,7 @@ impl Renderer {
             && region.y >= 0
         {
             insert_sub_texture(
-                self.calls[call.index].texture,
+                &self.calls[call.index].texture,
                 region.x,
                 region.y,
                 region.width,
@@ -617,88 +571,13 @@ impl Renderer {
         let (old_width, old_height) = self.calls[call.index].texture_size;
         if new_width >= old_width && new_height >= old_height {
             resize_texture(
-                self.calls[call.index].texture,
+                &self.calls[call.index].texture,
                 old_width,
                 old_height,
                 new_width,
                 new_height,
             );
             self.calls[call.index].texture_size = (new_width, new_height);
-        }
-    }
-
-    /// Saves the current OpenGL state for [`Renderer::gl_pop`] and
-    /// then sets some defaults used by this crate.
-    fn gl_push(&mut self) {
-        if !self.gl_state.pushed {
-            unsafe {
-                self.gl_state.depth_test = gl::IsEnabled(gl::DEPTH_TEST) != 0;
-                self.gl_state.blend = gl::IsEnabled(gl::BLEND) != 0;
-                self.gl_state.srgb = gl::IsEnabled(gl::FRAMEBUFFER_SRGB) != 0;
-                gl::GetIntegerv(gl::DEPTH_FUNC, &mut self.gl_state.depth_func);
-                let mut src = 0;
-                let mut dst = 0;
-                gl::GetIntegerv(gl::BLEND_SRC, &mut src);
-                gl::GetIntegerv(gl::BLEND_DST, &mut dst);
-                self.gl_state.blend_func = (src, dst);
-                gl::GetIntegerv(gl::CURRENT_PROGRAM, &mut self.gl_state.program);
-                if !self.legacy {
-                    gl::GetIntegerv(gl::VERTEX_ARRAY_BINDING, &mut self.gl_state.vao);
-                }
-                gl::GetIntegerv(gl::TEXTURE_BINDING_2D, &mut self.gl_state.texture);
-                gl::GetIntegerv(gl::ARRAY_BUFFER_BINDING, &mut self.gl_state.vbo);
-                gl::GetIntegerv(
-                    gl::ELEMENT_ARRAY_BUFFER_BINDING,
-                    &mut self.gl_state.element_buffer,
-                );
-            }
-
-            self.gl_state.pushed = true;
-            print_gl_errors("after glEnables");
-        }
-    }
-
-    /// Restores the OpenGL state saved in [`Renderer::gl_push`].
-    fn gl_pop(&mut self) {
-        if !self.preserve_gl_state {
-            return;
-        }
-
-        if self.gl_state.pushed {
-            unsafe {
-                if !self.gl_state.depth_test {
-                    gl::Disable(gl::DEPTH_TEST);
-                } else {
-                    gl::Enable(gl::DEPTH_TEST);
-                }
-                if !self.gl_state.blend {
-                    gl::Disable(gl::BLEND);
-                } else {
-                    gl::Enable(gl::BLEND);
-                }
-                if !self.gl_state.srgb {
-                    gl::Disable(gl::FRAMEBUFFER_SRGB);
-                } else {
-                    gl::Enable(gl::FRAMEBUFFER_SRGB);
-                }
-                gl::DepthFunc(self.gl_state.depth_func as GLuint);
-                gl::BlendFunc(
-                    self.gl_state.blend_func.0 as GLuint,
-                    self.gl_state.blend_func.1 as GLuint,
-                );
-                gl::UseProgram(self.gl_state.program as GLuint);
-                if !self.legacy {
-                    gl::BindVertexArray(self.gl_state.vao as GLuint);
-                }
-                gl::BindTexture(gl::TEXTURE_2D, self.gl_state.texture as GLuint);
-                gl::BindBuffer(gl::ARRAY_BUFFER, self.gl_state.vbo as GLuint);
-                gl::BindBuffer(
-                    gl::ELEMENT_ARRAY_BUFFER,
-                    self.gl_state.element_buffer as GLuint,
-                );
-            }
-            self.gl_state.pushed = false;
-            print_gl_errors("after restoring OpenGL state");
         }
     }
 }
@@ -724,16 +603,16 @@ impl Drop for Renderer {
                 element_buffer,
                 vao,
                 ..
-            } = call.attributes;
+            } = &call.attributes;
             unsafe {
                 gl::DeleteShader(vertex_shader);
                 gl::DeleteShader(fragment_shader);
                 gl::DeleteProgram(program);
-                gl::DeleteTextures(1, [call.texture].as_ptr());
-                gl::DeleteBuffers(1, [vbo].as_ptr());
+                gl::DeleteTextures(1, [call.texture.0].as_ptr());
+                gl::DeleteBuffers(1, [vbo.0].as_ptr());
                 if !legacy {
-                    gl::DeleteBuffers(2, [vbo_static, element_buffer].as_ptr());
-                    gl::DeleteVertexArrays(1, [vao].as_ptr());
+                    gl::DeleteBuffers(2, [vbo_static.0, element_buffer.0].as_ptr());
+                    gl::DeleteVertexArrays(1, [vao.0].as_ptr());
                 }
             }
         }
@@ -929,10 +808,10 @@ fn create_attributes(legacy: bool, program: ShaderProgram) -> Attributes {
     print_gl_errors("after attribute creation");
 
     Attributes {
-        vao,
-        vbo,
-        vbo_static,
-        element_buffer,
+        vao: VaoHandle(vao),
+        vbo: VboHandle(vbo),
+        vbo_static: VboHandle(vbo_static),
+        element_buffer: VboHandle(element_buffer),
         vbo_data: Vec::new(),
         allocated_vbo_data_size: 0,
     }
@@ -973,25 +852,25 @@ fn disable_vertex_attribs(attrib_locations: &[GLuint]) {
 }
 
 #[inline]
-fn create_texture(min_filter: GLint, mag_filter: GLint, wrap_s: GLint, wrap_t: GLint) -> GLuint {
+fn create_texture(min: GLint, mag: GLint, wrap_s: GLint, wrap_t: GLint) -> TextureHandle {
     let mut tex = 0;
     unsafe {
         gl::GenTextures(1, &mut tex);
         gl::BindTexture(gl::TEXTURE_2D, tex);
         gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::REPEAT as i32);
         gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, gl::REPEAT as i32);
-        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, min_filter);
-        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, mag_filter);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, min);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, mag);
         gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, wrap_s);
         gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, wrap_t);
     }
     print_gl_errors("after creating a texture");
-    tex
+    TextureHandle(tex)
 }
 
 #[inline]
 fn insert_texture(
-    tex: GLuint,
+    texture: &TextureHandle,
     format: GLuint,
     pixel_type: GLuint,
     w: GLint,
@@ -999,7 +878,7 @@ fn insert_texture(
     pixels: Option<&[u8]>,
 ) {
     unsafe {
-        gl::BindTexture(gl::TEXTURE_2D, tex);
+        gl::BindTexture(gl::TEXTURE_2D, texture.0);
         gl::PixelStorei(gl::UNPACK_ALIGNMENT, 1);
         gl::TexImage2D(
             gl::TEXTURE_2D,
@@ -1025,7 +904,7 @@ fn insert_texture(
 }
 
 fn insert_sub_texture(
-    texture: GLuint,
+    texture: &TextureHandle,
     x: i32,
     y: i32,
     width: i32,
@@ -1034,7 +913,7 @@ fn insert_sub_texture(
     data: &[u8],
 ) {
     unsafe {
-        gl::BindTexture(gl::TEXTURE_2D, texture);
+        gl::BindTexture(gl::TEXTURE_2D, texture.0);
         gl::PixelStorei(gl::UNPACK_ALIGNMENT, 1);
         gl::TexSubImage2D(
             gl::TEXTURE_2D,            // target
@@ -1052,7 +931,7 @@ fn insert_sub_texture(
 }
 
 fn resize_texture(
-    texture: GLuint,
+    texture: &TextureHandle,
     old_width: i32,
     old_height: i32,
     new_width: i32,
@@ -1064,14 +943,14 @@ fn resize_texture(
         // Create framebuffer and attach the original texture onto it
         gl::GenFramebuffers(1, &mut fbo);
         gl::BindFramebuffer(gl::FRAMEBUFFER, fbo);
-        gl::FramebufferTexture(gl::FRAMEBUFFER, gl::COLOR_ATTACHMENT0, texture, 0);
+        gl::FramebufferTexture(gl::FRAMEBUFFER, gl::COLOR_ATTACHMENT0, texture.0, 0);
         // Create temp texture and copy over the texture from the framebuffer
         gl::GenTextures(1, &mut temp_tex);
         gl::BindTexture(gl::TEXTURE_2D, temp_tex);
         gl::ReadBuffer(gl::COLOR_ATTACHMENT0);
         gl::CopyTexImage2D(gl::TEXTURE_2D, 0, gl::RED, 0, 0, old_width, old_height, 0);
         // Re-create the original texture
-        gl::BindTexture(gl::TEXTURE_2D, texture);
+        gl::BindTexture(gl::TEXTURE_2D, texture.0);
         gl::TexImage2D(
             gl::TEXTURE_2D,
             0,
