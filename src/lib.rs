@@ -4,6 +4,12 @@
 //! lot simpler. See the `basic` example for a quick overview of the
 //! crate's usage.
 
+// TODO(0.5.0): Pick a standard in builder and constructor function names, and ensure everything is named accordingly.
+// Builder function names: .with_x(), .x(), something else?
+// Constructor function names: .with_x(), .from_x(), something else?
+
+// TODO(0.5.0): Go through each file in the lib, and see if everything is in order.
+
 #![warn(missing_docs)]
 
 #[allow(missing_docs, unknown_lints, clippy::all)]

@@ -11,7 +11,8 @@ pub enum OpenGlApi {
     Desktop,
     /// OpenGL ES, which usually means the environment is mobile.
     ES,
-    // TODO: Add WebGL, which seems to be "WebGL ?.? (OpenGL ES ?.? ????)" maybe?
+    // TODO(0.6.0): Add WebGL.
+    // Version string seems to be of the form: "WebGL ?.? (OpenGL ES ?.? ????)" at a glance
 }
 
 /// Represents the parsed version of the OpenGL version

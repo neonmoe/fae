@@ -1,3 +1,5 @@
+<!-- TODO(0.5.0): Rewrite the readme? -->
+
 # Fae
 Fae is a simple, performant, and compatible 2D rendering crate built
 on top of `glutin`, with optional text rendering functionality.
@@ -27,16 +29,19 @@ come up with another name :)
 - The **png** feature implements the `Image::from_png` function, which
   allows you to load images from PNG data. This is a very convenient
   feature, but not necessarily a requirement for using the crate, so
-  it's optional. Also, it adds some executable size, so use with
-  caution, if you're going for minimalism.
+  it's optional. Also, it's a noticeable bump in executable size, so
+  use with caution, if you're going for minimal exes.
 - The **text** feature implements the `text` mod, which has
   functionality for drawing strings, including multi-line wrapping,
-  text alignment, and caching (both for individual glyphs and strings
-  of text). If `font8x8` is enabled as a feature, you can draw text
-  with a simple 8x8 bitmap-based font. If `ttf` is enabled, you can
-  draw text with any TTF font (which uses `rusttype`). Crate
-  recommendation for getting ttfs from the system:
-  [`font-loader`](https://crates.io/crates/font-loader).
+  text alignment, and glyph caching. It does not provide any
+  functionality for rasterizing glyphs from fonts.
+  - The **font8x8** feature provides text rendering with the
+    [`font8x8`](https://crates.io/crates/font8x8) font, via
+    `FontHandle::from_font8x8`.
+  - The **ttf** feature provides text rendering with any TTF font
+    (rasterized by `rusttype`), via `FontHandle::from_ttf`. Crate
+    recommendation for getting ttfs from the system:
+    [`font-loader`](https://crates.io/crates/font-loader).
 - The **profiler** feature implements the `profiler` mod.
   Everything in the `minreq::profiler` module is a no-op if this
   feature is disabled.

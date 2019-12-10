@@ -30,9 +30,7 @@ pub(crate) struct RustTypeProvider<'a> {
     units_per_em: i32,
     ascent: i32,
     descent: i32,
-    // TODO(optimization): Unused cached values should be dropped (rusttype metric cache)
     metrics: FnvHashMap<(GlyphId, FontSize), RectPx>,
-    // TODO(optimization): Unused cached values should be dropped (rusttype advance cache)
     advances: FnvHashMap<(GlyphId, GlyphId, FontSize), f32>,
 }
 

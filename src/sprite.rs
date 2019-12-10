@@ -1,7 +1,7 @@
 use crate::renderer::{DrawCallHandle, Renderer};
 use crate::types::*;
 
-// TODO: Add an anchoring system for sprites for smooth resizes
+// TODO(0.5.1): Add an anchoring system for sprites for smooth resizes.
 // - The simpler way, `with_anchor(x, y)`, would anchor the whole
 //   sprite to some corner.
 // - The more advanced version would involve specifying the
