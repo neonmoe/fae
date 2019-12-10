@@ -4,8 +4,7 @@ use crate::types::*;
 /// Text builder struct. Call
 /// [`finish`](struct.Text.html#method.finish) to draw the text.
 ///
-/// Created by
-/// [`FontHandle::draw`](struct.FontHandle.html#method.draw).
+/// Created by [`Font::draw`](struct.Font.html#method.draw).
 pub struct Text<'a> {
     renderer: &'a mut TextRenderer,
     data: TextData,
@@ -31,7 +30,6 @@ impl<'a> Text<'a> {
         text: String,
         x: i32,
         y: i32,
-        z: f32,
         font_size: i32,
     ) -> Text<'a> {
         Text {
@@ -40,7 +38,7 @@ impl<'a> Text<'a> {
                 text,
                 x,
                 y,
-                z,
+                z: 0.0,
                 font_size,
                 alignment: Alignment::Left,
                 max_line_width: None,
@@ -56,6 +54,12 @@ impl<'a> Text<'a> {
     /// drawn, if any were.
     pub fn finish(&mut self) -> Option<Rect> {
         self.renderer.draw_text(&self.data)
+    }
+
+    /// Sets the text's Z-coordinate.
+    pub fn z<'l>(&'l mut self, z: f32) -> &'l mut Self {
+        self.data.z = z;
+        self
     }
 
     /// Sets the text's color.

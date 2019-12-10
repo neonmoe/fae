@@ -1,27 +1,27 @@
-use crate::api::{DrawCallHandle, GraphicsContext};
+use crate::api::{GraphicsContext, Spritesheet};
 use crate::text::{Text, TextRenderer};
 
-/// A handle to a font. Can be used to draw strings of text.
-#[cfg(feature = "text")]
+/// Holds a font for rendering. See also:
+/// [`Font::draw`](struct.Font.html#method.draw).
 #[derive(Clone, Debug)]
-pub struct FontHandle {
+pub struct Font {
     /// Points to the GraphicsContext's internal Vec<TextRenderer>.
     index: usize,
+    /// Contains the draw call handle used by the TextRenderer.
+    spritesheet: Spritesheet,
 }
 
-#[cfg(feature = "text")]
-impl FontHandle {
+impl Font {
     /// Creates a new font renderer using the given .ttf file as a
     /// font.
     #[cfg(feature = "ttf")]
-    pub fn with_ttf(
-        ctx: &mut GraphicsContext,
-        ttf_data: Vec<u8>,
-    ) -> Result<FontHandle, rusttype::Error> {
+    pub fn with_ttf(ctx: &mut GraphicsContext, ttf_data: Vec<u8>) -> Result<Font, rusttype::Error> {
         let text = TextRenderer::with_ttf(&mut ctx.renderer, ttf_data)?;
+        let handle = text.draw_call().clone();
         ctx.text_renderers.push(text);
-        Ok(FontHandle {
+        Ok(Font {
             index: ctx.text_renderers.len() - 1,
+            spritesheet: Spritesheet { handle },
         })
     }
 
@@ -32,11 +32,13 @@ impl FontHandle {
     /// (smooth but blurry). If `false`, nearest-neighbor
     /// interpolation is used (crisp but pixelated).
     #[cfg(feature = "font8x8")]
-    pub fn with_font8x8(ctx: &mut GraphicsContext, smoothed: bool) -> FontHandle {
+    pub fn with_font8x8(ctx: &mut GraphicsContext, smoothed: bool) -> Font {
         let text = TextRenderer::with_font8x8(&mut ctx.renderer, smoothed);
+        let handle = text.draw_call().clone();
         ctx.text_renderers.push(text);
-        FontHandle {
+        Font {
             index: ctx.text_renderers.len() - 1,
+            spritesheet: Spritesheet { handle },
         }
     }
 
@@ -55,10 +57,9 @@ impl FontHandle {
         text: S,
         x: f32,
         y: f32,
-        z: f32,
         font_size: f32,
     ) -> Text<'a> {
-        ctx.text_renderers[self.index].draw(text.into(), x, y, z, font_size)
+        ctx.text_renderers[self.index].draw(text.into(), x, y, font_size)
     }
 
     /// Returns true if this font failed to draw a glyph last
@@ -80,7 +81,7 @@ impl FontHandle {
     /// Returns the underlying draw call of this font. Can be used to
     /// render the glyph cache texture, which could be useful for
     /// debugging.
-    pub fn draw_call(&self, ctx: &GraphicsContext) -> DrawCallHandle {
-        ctx.text_renderers[self.index].draw_call().clone()
+    pub fn spritesheet(&self) -> &Spritesheet {
+        &self.spritesheet
     }
 }

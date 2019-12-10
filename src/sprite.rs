@@ -10,9 +10,11 @@ use crate::types::*;
 //   of the way between the left/right and top/bottom edges of the
 //   window. See also: how Unity does its GUIs.
 
-/// Sprite builder struct. Call [`finish`](struct.Sprite.html#method.finish) to draw the sprite.
+/// Sprite builder struct. Call
+/// [`finish`](struct.Sprite.html#method.finish) to draw the sprite.
 ///
-/// Created by [`DrawCallHandle::draw`](struct.DrawCallHandle.html#method.draw).
+/// Created by
+/// [`Spritesheet::draw`](struct.Spritesheet.html#method.draw).
 pub struct Sprite<'a, 'b> {
     renderer: &'a mut Renderer,
     call: &'b DrawCallHandle,

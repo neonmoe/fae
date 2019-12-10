@@ -6,7 +6,7 @@ use crate::text::TextRenderer;
 use glutin::dpi::LogicalSize;
 use glutin::{PossiblyCurrent, WindowedContext};
 
-/// The graphics context: used to draw stuff on the screen.
+/// The graphics context draws stuff on the screen.
 ///
 /// Borrow this struct from:
 /// - [`Window::ctx`](struct.Window.html#field.ctx) before starting
@@ -16,8 +16,8 @@ use glutin::{PossiblyCurrent, WindowedContext};
 ///   loop).
 ///
 /// Then, pass it to:
-/// - [`DrawCallHandle::draw`](struct.DrawCallHandle.html#method.draw) to draw sprites,
-/// - [`FontHandle::draw`](struct.FontHandle.html#method.draw) to draw text.
+/// - [`Spritesheet::draw`](struct.Spritesheet.html#method.draw) to draw sprites,
+/// - [`Font::draw`](struct.Font.html#method.draw) to draw text.
 pub struct GraphicsContext {
     window: WindowedContext<PossiblyCurrent>,
     env_dpi_factor: f32,

@@ -2,7 +2,7 @@ use crate::error::GlyphNotRenderedError;
 use crate::gl;
 use crate::gl::types::*;
 use crate::image::Image;
-use crate::renderer::{DrawCallHandle, DrawCallParameters, Renderer, Shaders, TextureWrapping};
+use crate::renderer::{DrawCallHandle, Renderer, Shaders, TextureWrapping};
 use crate::text::types::*;
 use crate::types::*;
 
@@ -44,19 +44,19 @@ impl GlyphCache {
             (height as i32).min(max_size),
             gl::RED,
         );
-        let call = renderer.create_draw_call(DrawCallParameters {
-            image: Some(cache_image),
-            shaders: Shaders {
+        let call = renderer.create_draw_call(
+            Some(&cache_image),
+            Shaders {
                 fragment_shader_110: TEXT_FRAGMENT_SHADER_110,
                 fragment_shader_330: TEXT_FRAGMENT_SHADER_330,
                 ..Default::default()
             },
-            alpha_blending: true,
-            minification_smoothing: true,
-            magnification_smoothing: smoothed,
-            wrap: (TextureWrapping::Clamp, TextureWrapping::Clamp),
-            srgb: false,
-        });
+            true,
+            true,
+            smoothed,
+            (TextureWrapping::Clamp, TextureWrapping::Clamp),
+            false,
+        );
         let cache = GlyphCache {
             call,
             width,

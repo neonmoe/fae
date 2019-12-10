@@ -21,9 +21,8 @@ pub use self::text_builder::Text;
 pub use self::types::Alignment;
 
 use self::text_builder::TextData;
-use crate::api::DrawCallHandle;
 use crate::error::GlyphNotRenderedError;
-use crate::renderer::Renderer;
+use crate::renderer::{DrawCallHandle, Renderer};
 use crate::text::glyph_cache::*;
 use crate::text::layout::*;
 use crate::text::types::*;
@@ -73,18 +72,11 @@ impl TextRenderer {
         }
     }
 
-    pub(crate) fn draw(
-        &mut self,
-        text: String,
-        x: f32,
-        y: f32,
-        z: f32,
-        font_size: f32,
-    ) -> Text<'_> {
+    pub(crate) fn draw(&mut self, text: String, x: f32, y: f32, font_size: f32) -> Text<'_> {
         let x = (x * self.dpi_factor) as i32;
         let y = (y * self.dpi_factor) as i32;
         let font_size = (font_size * self.dpi_factor) as i32;
-        Text::new(self, text, x, y, z, font_size)
+        Text::new(self, text, x, y, font_size)
     }
 
     #[allow(clippy::too_many_arguments)]

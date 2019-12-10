@@ -62,18 +62,8 @@ struct DrawCall {
     highest_depth: f32,
 }
 
-/// Contains the data and functionality needed to draw rectangles with
-/// OpenGL.
-#[derive(Debug)]
-pub(crate) struct Renderer {
-    calls: Vec<DrawCall>,
-    pub(crate) legacy: bool,
-    pub(crate) version: OpenGlVersion,
-    pub(crate) dpi_factor: f32,
-}
-
 /// Describes how textures are wrapped.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum TextureWrapping {
     /// Corresponds to `GL_CLAMP_TO_EDGE`.
     Clamp,
@@ -83,67 +73,14 @@ pub enum TextureWrapping {
     RepeatMirrored,
 }
 
-/// Options which set capabilities, restrictions and resources for
-/// draw calls.
-///
-/// See also:
-/// [`DrawCallHandle::new`](struct.DrawCallHandle.html#method.new).
-#[derive(Debug, Clone)]
-pub struct DrawCallParameters {
-    /// The texture used when drawing with this handle. None can be
-    /// used if you want to just draw flat-color quads.
-    pub image: Option<Image>,
-    /// The shaders used when drawing with this handle.
-    pub shaders: Shaders,
-    /// Whether to blend with previously drawn pixels when drawing
-    /// over them, or just replace the color. Rule of thumb: if the
-    /// sprites only use alpha values of 0 and 255 (ie. fully
-    /// transparent and fully opaque), set this to false, and true
-    /// otherwise. In any case, alpha values of less than 1/256 will
-    /// be cut out and won't be rendered at all.
-    ///
-    /// Internally, this controls whether `GL_BLEND` and back-to-front
-    /// sorting are enabled.
-    pub alpha_blending: bool,
-    /// When drawing quads that are smaller than the texture provided,
-    /// use linear (true) or nearest neighbor (false) smoothing when
-    /// scaling? (Linear is probably always better.)
-    pub minification_smoothing: bool,
-    /// When drawing quads that are larger than the texture provided,
-    /// use linear (true) or nearest neighbor (false) smoothing when
-    /// scaling? (Tip: for pixel art or other textures that don't
-    /// suffer from jaggies, set this to `false` for the intended
-    /// look.)
-    pub magnification_smoothing: bool,
-    /// Sets the texture's behavior when sampling coordinates under
-    /// 0.0 or over 1.0, or smoothing over texture
-    /// boundaries. (Corresponds to `GL_TEXTURE_WRAP_S` and
-    /// `GL_TEXTURE_WRAP_T`, in that order.)
-    pub wrap: (TextureWrapping, TextureWrapping),
-    /// Controls whether the colors rendered by this draw call should
-    /// be converted into sRGB before display. This should generally
-    /// be true, unless you handle gamma in your shaders
-    /// yourself. Note that in any case, the fragment shader will
-    /// process fragments in linear space: this conversion happens
-    /// after blending.
-    ///
-    /// Internally, this controls whether or not `GL_FRAMEBUFFER_SRGB`
-    /// is enabled when drawing with this handle.
-    pub srgb: bool,
-}
-
-impl Default for DrawCallParameters {
-    fn default() -> DrawCallParameters {
-        DrawCallParameters {
-            image: None,
-            shaders: Default::default(),
-            alpha_blending: true,
-            minification_smoothing: true,
-            magnification_smoothing: false,
-            wrap: (TextureWrapping::Clamp, TextureWrapping::Clamp),
-            srgb: true,
-        }
-    }
+/// Contains the data and functionality needed to draw rectangles with
+/// OpenGL.
+#[derive(Debug)]
+pub(crate) struct Renderer {
+    calls: Vec<DrawCall>,
+    pub(crate) legacy: bool,
+    pub(crate) version: OpenGlVersion,
+    pub(crate) dpi_factor: f32,
 }
 
 impl Renderer {
@@ -181,21 +118,16 @@ impl Renderer {
         }
     }
 
-    /// Creates a new draw call in the pipeline, and returns a handle
-    /// to use it with.
-    ///
-    /// Using the handle, you can call
-    /// [`Renderer::draw`](struct.Renderer.html#method.draw) to draw
-    /// sprites from your image. As a rule of thumb, try to minimize
-    /// the amount of draw calls.
-    ///
-    /// If you want to use your own GLSL shaders, you can provide them
-    /// with the `shaders` parameter. The `Shaders` struct implements
-    /// `Default`, so you can replace only the shaders you want to
-    /// replace, which usually means just the fragment shaders. Make
-    /// sure to study the uniform variables and attributes of the
-    /// default shaders before making your own.
-    pub(crate) fn create_draw_call(&mut self, params: DrawCallParameters) -> DrawCallHandle {
+    pub(crate) fn create_draw_call(
+        &mut self,
+        image: Option<&Image>,
+        shaders: Shaders,
+        alpha_blending: bool,
+        minification_smoothing: bool,
+        magnification_smoothing: bool,
+        wrap: (TextureWrapping, TextureWrapping),
+        srgb: bool,
+    ) -> DrawCallHandle {
         let (api, legacy) = (
             match self.version {
                 OpenGlVersion::Available { api, .. } => api,
@@ -203,35 +135,35 @@ impl Renderer {
             },
             self.legacy,
         );
-        let vert = params.shaders.create_vert_string(api, legacy);
-        let frag = params.shaders.create_frag_string(api, legacy);
+        let vert = shaders.create_vert_string(api, legacy);
+        let frag = shaders.create_frag_string(api, legacy);
         let index = self.calls.len();
 
         let program = create_program(&vert, &frag, self.legacy);
         let attributes = create_attributes(self.legacy, program);
         let filter = |smoothed| if smoothed { gl::LINEAR } else { gl::NEAREST } as i32;
-        let wrap = |wrap_type| match wrap_type {
+        let get_wrap = |wrap_type| match wrap_type {
             TextureWrapping::Clamp => gl::CLAMP_TO_EDGE,
             TextureWrapping::Repeat => gl::REPEAT,
             TextureWrapping::RepeatMirrored => gl::MIRRORED_REPEAT,
         };
         let texture = create_texture(
-            filter(params.minification_smoothing),
-            filter(params.magnification_smoothing),
-            wrap(params.wrap.0) as i32,
-            wrap(params.wrap.1) as i32,
+            filter(minification_smoothing),
+            filter(magnification_smoothing),
+            get_wrap(wrap.0) as i32,
+            get_wrap(wrap.1) as i32,
         );
         self.calls.push(DrawCall {
             texture,
             texture_size: (0, 0),
             program,
             attributes,
-            blend: params.alpha_blending,
-            srgb: params.srgb,
+            blend: alpha_blending,
+            srgb: srgb,
             highest_depth: -1.0,
         });
 
-        if let Some(image) = params.image {
+        if let Some(image) = image {
             insert_texture(
                 &self.calls[index].texture,
                 image.format,
@@ -567,7 +499,7 @@ impl Renderer {
         call: &DrawCallHandle,
         new_width: i32,
         new_height: i32,
-    ) {
+    ) -> bool {
         let (old_width, old_height) = self.calls[call.index].texture_size;
         if new_width >= old_width && new_height >= old_height {
             resize_texture(
@@ -578,6 +510,9 @@ impl Renderer {
                 new_height,
             );
             self.calls[call.index].texture_size = (new_width, new_height);
+            true
+        } else {
+            false
         }
     }
 }

@@ -8,23 +8,23 @@ use fae::glutin::*;
 pub use create_font::*;
 #[cfg(feature = "text")]
 mod create_font {
-    use fae::{FontHandle, GraphicsContext};
+    use fae::{Font, GraphicsContext};
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "ttf")] {
-            pub fn create_font(ctx: &mut GraphicsContext) -> FontHandle {
+            pub fn create_font(ctx: &mut GraphicsContext) -> Font {
                 use font_loader::system_fonts;
                 let property = system_fonts::FontPropertyBuilder::new()
                     .build();
                 let (font_bytes, _) = system_fonts::get(&property).unwrap();
-                FontHandle::with_ttf(ctx, font_bytes).unwrap()
+                Font::with_ttf(ctx, font_bytes).unwrap()
             }
         } else if #[cfg(feature = "font8x8")] {
-            pub fn create_font(ctx: &mut GraphicsContext) -> FontHandle {
-                FontHandle::with_font8x8(ctx, true)
+            pub fn create_font(ctx: &mut GraphicsContext) -> Font {
+                Font::with_font8x8(ctx, true)
             }
         } else {
-            pub fn create_font(_ctx: &mut GraphicsContext) -> FontHandle {
+            pub fn create_font(_ctx: &mut GraphicsContext) -> Font {
                 panic!("no font feature (`font8x8` or `ttf`) enabled")
             }
         }

@@ -1,13 +1,13 @@
-mod draw_call_handle;
 #[cfg(feature = "text")]
-mod font_handle;
+mod font;
 mod graphics_context;
+mod spritesheet;
 mod window;
 
-pub use draw_call_handle::{DrawCallHandle, DrawCallParameters};
 #[cfg(feature = "text")]
-pub use font_handle::FontHandle;
+pub use font::Font;
 pub use graphics_context::GraphicsContext;
+pub use spritesheet::{Spritesheet, SpritesheetBuilder};
 pub use window::Window;
 
 // Re-exports from other parts of the crate

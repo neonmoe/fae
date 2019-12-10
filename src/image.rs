@@ -123,7 +123,7 @@ impl Image {
     /// GPU during initialization.
     ///
     /// See also:
-    /// [`DrawCallHandle::upload_texture_region`](struct.DrawCallHandle.html#method.upload_texture_region).
+    /// [`Spritesheet::upload_texture_region`](struct.Spritesheet.html#method.upload_texture_region).
     pub fn with_null_texture(width: i32, height: i32, format: GLuint) -> Image {
         Image {
             pixels: Vec::new(),

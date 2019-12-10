@@ -37,9 +37,9 @@ come up with another name :)
   functionality for rasterizing glyphs from fonts.
   - The **font8x8** feature provides text rendering with the
     [`font8x8`](https://crates.io/crates/font8x8) font, via
-    `FontHandle::with_font8x8`.
+    `Font::with_font8x8`.
   - The **ttf** feature provides text rendering with any TTF font
-    (rasterized by `rusttype`), via `FontHandle::with_ttf`. Crate
+    (rasterized by `rusttype`), via `Font::with_ttf`. Crate
     recommendation for getting ttfs from the system:
     [`font-loader`](https://crates.io/crates/font-loader).
 - The **profiler** feature implements the `profiler` mod.
