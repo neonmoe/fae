@@ -11,6 +11,7 @@ pub use spritesheet::{Spritesheet, SpritesheetBuilder};
 pub use window::Window;
 
 // Re-exports from other parts of the crate
+pub use crate::error::ImageCreationError;
 #[cfg(feature = "png")]
 pub use crate::error::ImageLoadingError;
 pub use crate::gl_version::{OpenGlApi, OpenGlVersion};

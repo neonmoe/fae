@@ -1,3 +1,4 @@
+use crate::error::ImageCreationError;
 #[cfg(feature = "png")]
 use crate::error::ImageLoadingError;
 use crate::gl;
@@ -6,8 +7,6 @@ use crate::gl::types::*;
 use png;
 
 /// Contains the raw pixel color data of an image.
-///
-/// See also: [`DrawCallParameters`](struct.DrawCallParameters.html).
 #[derive(Clone, Debug)]
 pub struct Image {
     /// The pixels of the image.
@@ -19,19 +18,31 @@ pub struct Image {
     /// The OpenGL format of the image.
     pub format: GLuint,
     /// The OpenGL type of the pixels of the image.
-    pub(crate) pixel_type: GLuint,
+    pub pixel_type: GLuint,
     /// Whether the image represents a null pointer for
     /// glTexImage2D. If true, the memory for the texture of width x
     /// height will be allocated, but will probably be garbage.
-    pub(crate) null_data: bool,
+    pub null_data: bool,
 }
 
 impl Image {
     /// Parses a PNG image and makes an `Image` out of it.
     ///
-    /// This function assumes that the `Image` is in SRGB space. If
-    /// you want to change this, use
-    /// [`Image::with_format`](struct.Image.html#method.with_format).
+    /// This function assumes that the `Image` is in SRGB space, so
+    /// the image `format` is either `SRGB` or `SRGB_ALPHA` by
+    /// default.
+    ///
+    /// # Color type note
+    ///
+    /// If your image has a
+    /// [`ColorType`](https://docs.rs/png/0.15.2/png/enum.ColorType.html)
+    /// of Grayscale, Indexed or GrayscaleAlpha, it will not display
+    /// as you would imagine with the default shaders. These images
+    /// will use `GL_RED`, `GL_RED`, and `GL_RG` as their format when
+    /// uploading the texture, so you need to take that into account
+    /// in your shaders (eg. when using GrayscaleAlpha, you'd use the
+    /// `color.g` value as your alpha, and `color.r` as your grayscale
+    /// value).
     ///
     /// # Errors
     ///
@@ -39,9 +50,6 @@ impl Image {
     /// will be returned if the data couldn't be read for some reason
     /// by the `png` crate (most probably, `bytes` doesn't describe a
     /// valid PNG image). An
-    /// [`UnsupportedFormat`](enum.ImageLoadingError.html#variant.UnsupportedFormat)
-    /// error will be returned if the PNG isn't in either RGB or RGBA
-    /// space. An
     /// [`UnsupportedBitDepth`](enum.ImageLoadingError.html#variant.UnsupportedBitDepth)
     /// error will be returned if the PNG bit depth isn't 8 or 16 bits
     /// per channel.
@@ -60,7 +68,8 @@ impl Image {
         let format = match info.color_type {
             ColorType::RGB => gl::SRGB,
             ColorType::RGBA => gl::SRGB_ALPHA,
-            format => return Err(ImageLoadingError::UnsupportedFormat(format)),
+            ColorType::Grayscale | ColorType::Indexed => gl::RED,
+            ColorType::GrayscaleAlpha => gl::RG,
         };
         let pixel_type = match info.bit_depth {
             BitDepth::Eight => gl::UNSIGNED_BYTE,
@@ -81,14 +90,17 @@ impl Image {
 
     /// Creates a solid color image.
     ///
-    /// The color can be 1-4 items long, and will be interpreted as
-    /// being in SRGB color space. If the length of `color` isn't 4,
-    /// or you wish to enter a color in linear color space, use
-    /// [`with_format`](struct.Image.html#method.with_format).
+    /// The color can be 1-4 items long, and will be interpreted in
+    /// the following order: red, green, blue, alpha.
     ///
-    /// The color is interpreted as SRGB by default to be consistent
-    /// with loading images from the disk, which are assumed to be in
-    /// SRGB space by default.
+    /// The color is interpreted as SRGB when 3 or 4 color components
+    /// are provided, to be consistent with loading images from the
+    /// disk, which are assumed to be in SRGB space by default.
+    ///
+    /// Based on the length of the `color` slice, the format of the
+    /// resulting image will be `gl::RED`, `gl::RG`, `gl::SRGB`, or
+    /// `gl::SRGB_ALPHA`. This can be changed with
+    /// [`format()`](struct.Image.html#method.format).
     ///
     /// # Example
     /// ```
@@ -96,24 +108,26 @@ impl Image {
     /// let image = Image::with_color(128, 128, &[0xB4, 0x6E, 0xC8, 0xFF]);
     /// // image now represents a 128px by 128px image that consists of fully opaque violet pixels.
     /// ```
-    pub fn with_color(width: i32, height: i32, color: &[u8]) -> Image {
+    pub fn with_color(width: i32, height: i32, color: &[u8]) -> Result<Image, ImageCreationError> {
+        let format = match color.len() {
+            4 => gl::SRGB_ALPHA,
+            3 => gl::SRGB,
+            2 => gl::RG,
+            1 => gl::RED,
+            _ => return Err(ImageCreationError::InvalidColorComponentCount),
+        };
         let mut pixels = vec![0; (width * height) as usize * color.len()];
         for i in 0..pixels.len() {
             pixels[i] = color[i % color.len()];
         }
-        let format = if color.len() == 3 {
-            gl::SRGB
-        } else {
-            gl::SRGB_ALPHA
-        };
-        Image {
+        Ok(Image {
             pixels,
             width,
             height,
             format,
             pixel_type: gl::UNSIGNED_BYTE,
             null_data: false,
-        }
+        })
     }
 
     /// Creates an image with a specified width, height and a format,

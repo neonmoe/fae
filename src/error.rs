@@ -10,6 +10,15 @@ pub(crate) enum GlyphNotRenderedError {
     GlyphCacheFull,
 }
 
+/// Describes errors during the creation of an image.
+#[derive(Debug)]
+pub enum ImageCreationError {
+    /// The color assigned to the image consisted of more than 4
+    /// components (only red, green, blue and alpha components are
+    /// supported) or no components at all.
+    InvalidColorComponentCount,
+}
+
 #[cfg(feature = "png")]
 pub use png_errors::*;
 #[cfg(feature = "png")]
@@ -20,8 +29,6 @@ mod png_errors {
     /// Describes errors related to parsing image files.
     #[derive(Debug)]
     pub enum ImageLoadingError {
-        /// Only RGB and RGBA images are supported.
-        UnsupportedFormat(png::ColorType),
         /// Only 8bpc and 16bpc images are supported.
         UnsupportedBitDepth(png::BitDepth),
         /// If the data isn't a valid PNG image, this will describe the
@@ -33,11 +40,6 @@ mod png_errors {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             use ImageLoadingError::*;
             match self {
-                UnsupportedFormat(color_type) => write!(
-                    f,
-                    "unsupported color type (not RGB or RGBA): {:?}",
-                    color_type
-                ),
                 UnsupportedBitDepth(bit_depth) => {
                     write!(f, "unsupported bit depth (not 8 or 16): {:?}", bit_depth)
                 }
