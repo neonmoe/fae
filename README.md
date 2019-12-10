@@ -26,7 +26,7 @@ any kind of usage yet. It's on crates.io mostly so I don't have to
 come up with another name :)
 
 ## Cargo features
-- The **png** feature implements the `Image::from_png` function, which
+- The **png** feature implements the `Image::with_png` function, which
   allows you to load images from PNG data. This is a very convenient
   feature, but not necessarily a requirement for using the crate, so
   it's optional. Also, it's a noticeable bump in executable size, so
@@ -37,9 +37,9 @@ come up with another name :)
   functionality for rasterizing glyphs from fonts.
   - The **font8x8** feature provides text rendering with the
     [`font8x8`](https://crates.io/crates/font8x8) font, via
-    `FontHandle::from_font8x8`.
+    `FontHandle::with_font8x8`.
   - The **ttf** feature provides text rendering with any TTF font
-    (rasterized by `rusttype`), via `FontHandle::from_ttf`. Crate
+    (rasterized by `rusttype`), via `FontHandle::with_ttf`. Crate
     recommendation for getting ttfs from the system:
     [`font-loader`](https://crates.io/crates/font-loader).
 - The **profiler** feature implements the `profiler` mod.

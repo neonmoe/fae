@@ -35,7 +35,6 @@ use fnv::FnvHashMap;
 pub(crate) struct TextRenderer {
     pub glyph_cache_filled: bool,
     cache: GlyphCache,
-    call: DrawCallHandle,
     glyphs: Vec<Glyph>,
     draw_datas: Vec<TextDrawData>,
     font: Box<dyn FontProvider>,
@@ -46,30 +45,25 @@ pub(crate) struct TextRenderer {
 
 impl TextRenderer {
     #[cfg(feature = "font8x8")]
-    pub(crate) fn from_font8x8(renderer: &mut Renderer, smoothed: bool) -> TextRenderer {
-        let (cache, call) = GlyphCache::create_cache_and_draw_call(renderer, 64, 64, smoothed);
-        TextRenderer::with_params(cache, call, Box::new(fonts::Font8x8Provider::new()))
+    pub(crate) fn with_font8x8(renderer: &mut Renderer, smoothed: bool) -> TextRenderer {
+        let cache = GlyphCache::new(renderer, 64, 64, smoothed);
+        TextRenderer::with_params(cache, Box::new(fonts::Font8x8Provider::new()))
     }
 
     #[cfg(feature = "ttf")]
-    pub(crate) fn from_ttf(
+    pub(crate) fn with_ttf(
         renderer: &mut Renderer,
         ttf_data: Vec<u8>,
     ) -> Result<TextRenderer, rusttype::Error> {
-        let (cache, call) = GlyphCache::create_cache_and_draw_call(renderer, 256, 256, true);
-        let font = Box::new(fonts::RustTypeProvider::from_ttf(ttf_data)?);
-        Ok(TextRenderer::with_params(cache, call, font))
+        let cache = GlyphCache::new(renderer, 256, 256, true);
+        let font = Box::new(fonts::RustTypeProvider::new(ttf_data)?);
+        Ok(TextRenderer::with_params(cache, font))
     }
 
-    fn with_params(
-        cache: GlyphCache,
-        call: DrawCallHandle,
-        font: Box<dyn FontProvider>,
-    ) -> TextRenderer {
+    fn with_params(cache: GlyphCache, font: Box<dyn FontProvider>) -> TextRenderer {
         TextRenderer {
             cache,
             glyph_cache_filled: false,
-            call,
             glyphs: Vec::new(),
             draw_datas: Vec::new(),
             font,
@@ -94,20 +88,21 @@ impl TextRenderer {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub(crate) fn draw_text(&mut self, data: TextData) -> Option<Rect> {
-        let TextData {
+    pub(crate) fn draw_text(&mut self, data: &TextData) -> Option<Rect> {
+        let &TextData {
             x,
             y,
             z,
             font_size,
-            text,
             alignment,
             max_line_width,
             color,
             rotation,
             clip_area,
             visible,
+            ..
         } = data;
+        let text = &data.text;
 
         if text.is_empty() {
             return None;
@@ -296,18 +291,18 @@ impl TextRenderer {
                 .render_glyph(renderer, &mut self.cache, glyph.id, font_size)
             {
                 Ok(texcoords) => {
-                    let mut sprite = renderer
-                        .draw(&self.call)
-                        .with_z(z)
-                        .with_physical_coordinates(screen_location)
-                        .with_color(color);
+                    let mut sprite = renderer.draw(&self.cache.call);
+                    sprite.z(z);
+                    sprite.color(color);
+                    sprite.physical_coordinates(screen_location);
+
                     if radians != 0.0 {
                         let dx = screen_location.x / self.dpi_factor - base_x;
                         let dy = screen_location.y / self.dpi_factor - base_y;
-                        sprite = sprite.with_rotation(radians, pivot_x - dx, pivot_y - dy);
+                        sprite.rotation(radians, pivot_x - dx, pivot_y - dy);
                     }
                     if let Some(area) = self.draw_datas[glyph.draw_data].clip_area {
-                        sprite = sprite.with_clip_area(area);
+                        sprite.clip_area(area);
                     }
 
                     let texcoords = Rect {
@@ -316,7 +311,7 @@ impl TextRenderer {
                         width: texcoords.width as f32 + 1.0,
                         height: texcoords.height as f32 + 1.0,
                     };
-                    sprite.with_texture_coordinates(texcoords).finish();
+                    sprite.texture_coordinates(texcoords).finish();
                 }
                 Err(err) => match err {
                     GlyphNotRenderedError::GlyphCacheFull => self.glyph_cache_filled = true,
@@ -343,6 +338,6 @@ impl TextRenderer {
     }
 
     pub(crate) fn draw_call(&self) -> &DrawCallHandle {
-        &self.call
+        &self.cache.call
     }
 }

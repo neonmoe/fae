@@ -1,7 +1,7 @@
 use crate::gl_version::OpenGlApi;
 
 /// Represents the shader code for a shader. Used in
-/// [`GraphicsContext::create_draw_call`](struct.GraphicsContext.html#method.create_draw_call).
+/// [`DrawCallHandle::new`](struct.DrawCallHandle.html#method.new).
 #[derive(Clone, Copy, Debug)]
 pub struct Shaders {
     /// The GLSL 3.30 version of the vertex shader. Ensure that the

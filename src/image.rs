@@ -49,11 +49,11 @@ impl Image {
     /// # Example
     /// ```no_run
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let sprite = fae::Image::from_png(&std::fs::read("sprite.png")?)?;
+    /// let sprite = fae::Image::with_png(&std::fs::read("sprite.png")?)?;
     /// # Ok(()) }
     /// ```
     #[cfg(feature = "png")]
-    pub fn from_png(bytes: &[u8]) -> Result<Image, ImageLoadingError> {
+    pub fn with_png(bytes: &[u8]) -> Result<Image, ImageLoadingError> {
         use png::{BitDepth, ColorType, Decoder};
         let decoder = Decoder::new(bytes);
         let (info, mut reader) = decoder.read_info()?;
@@ -93,10 +93,10 @@ impl Image {
     /// # Example
     /// ```
     /// use fae::Image;
-    /// let image = Image::from_color(128, 128, &[0xB4, 0x6E, 0xC8, 0xFF]);
+    /// let image = Image::with_color(128, 128, &[0xB4, 0x6E, 0xC8, 0xFF]);
     /// // image now represents a 128px by 128px image that consists of fully opaque violet pixels.
     /// ```
-    pub fn from_color(width: i32, height: i32, color: &[u8]) -> Image {
+    pub fn with_color(width: i32, height: i32, color: &[u8]) -> Image {
         let mut pixels = vec![0; (width * height) as usize * color.len()];
         for i in 0..pixels.len() {
             pixels[i] = color[i % color.len()];
@@ -124,7 +124,7 @@ impl Image {
     ///
     /// See also:
     /// [`DrawCallHandle::upload_texture_region`](struct.DrawCallHandle.html#method.upload_texture_region).
-    pub fn create_null(width: i32, height: i32, format: GLuint) -> Image {
+    pub fn with_null_texture(width: i32, height: i32, format: GLuint) -> Image {
         Image {
             pixels: Vec::new(),
             width,
@@ -144,10 +144,10 @@ impl Image {
     /// # Example
     /// ```
     /// use fae::{gl, Image};
-    /// let image = Image::from_color(128, 128, &[0x88]).with_format(gl::RED);
+    /// let image = Image::with_color(128, 128, &[0x88]).format(gl::RED);
     /// // image now represents a 128px by 128px image that consists of half-red pixels taking up only one byte per pixel.
     /// ```
-    pub fn with_format(mut self, format: GLuint) -> Image {
+    pub fn format<'a>(&'a mut self, format: GLuint) -> &'a mut Self {
         self.format = format;
         self
     }

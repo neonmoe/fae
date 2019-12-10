@@ -1,3 +1,5 @@
+// TODO(0.5.0): Rewrite text_layout.rs after other todos.
+
 //! This example writes text in varying ways to test that the layout
 //! functionality works correctly.
 

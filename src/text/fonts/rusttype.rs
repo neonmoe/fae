@@ -35,7 +35,7 @@ pub(crate) struct RustTypeProvider<'a> {
 }
 
 impl<'a> RustTypeProvider<'a> {
-    pub fn from_ttf(ttf_data: Vec<u8>) -> Result<RustTypeProvider<'a>, rusttype::Error> {
+    pub fn new(ttf_data: Vec<u8>) -> Result<RustTypeProvider<'a>, rusttype::Error> {
         let font = FontCollection::from_bytes(ttf_data)?.into_font()?;
         if log::log_enabled!(log::Level::Info) {
             log::info!("Loading font: {}", get_font_name(&font));

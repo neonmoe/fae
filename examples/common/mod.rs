@@ -17,11 +17,11 @@ mod create_font {
                 let property = system_fonts::FontPropertyBuilder::new()
                     .build();
                 let (font_bytes, _) = system_fonts::get(&property).unwrap();
-                FontHandle::from_ttf(ctx, font_bytes).unwrap()
+                FontHandle::with_ttf(ctx, font_bytes).unwrap()
             }
         } else if #[cfg(feature = "font8x8")] {
             pub fn create_font(ctx: &mut GraphicsContext) -> FontHandle {
-                FontHandle::from_font8x8(ctx, true)
+                FontHandle::with_font8x8(ctx, true)
             }
         } else {
             pub fn create_font(_ctx: &mut GraphicsContext) -> FontHandle {

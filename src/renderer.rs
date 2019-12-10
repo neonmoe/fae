@@ -87,7 +87,7 @@ pub enum TextureWrapping {
 /// draw calls.
 ///
 /// See also:
-/// [`DrawCallHandle::create`](struct.DrawCallHandle.html#method.create).
+/// [`DrawCallHandle::new`](struct.DrawCallHandle.html#method.new).
 #[derive(Debug, Clone)]
 pub struct DrawCallParameters {
     /// The texture used when drawing with this handle. None can be
@@ -251,7 +251,7 @@ impl Renderer {
     }
 
     pub(crate) fn draw<'a, 'b>(&'a mut self, call: &'b DrawCallHandle) -> Sprite<'a, 'b> {
-        Sprite::create(self, call)
+        Sprite::new(self, call)
     }
 
     #[allow(clippy::too_many_arguments)]

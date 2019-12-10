@@ -24,7 +24,7 @@ const TEXT_FRAGMENT_SHADER_330: &str = include_str!("../shaders/text.frag");
 /// cached glyph (2 bytes from the CacheIdentifier + 17 bytes from the
 /// GlyphSpot).
 pub(crate) struct GlyphCache {
-    call: DrawCallHandle,
+    pub(crate) call: DrawCallHandle,
     width: i32,
     height: i32,
     max_size: i32,
@@ -35,16 +35,11 @@ pub(crate) struct GlyphCache {
 }
 
 impl GlyphCache {
-    pub fn create_cache_and_draw_call(
-        renderer: &mut Renderer,
-        width: i32,
-        height: i32,
-        smoothed: bool,
-    ) -> (GlyphCache, DrawCallHandle) {
+    pub fn new(renderer: &mut Renderer, width: i32, height: i32, smoothed: bool) -> GlyphCache {
         let mut max_size = 0 as GLint;
         unsafe { gl::GetIntegerv(gl::MAX_TEXTURE_SIZE, &mut max_size) };
 
-        let cache_image = Image::create_null(
+        let cache_image = Image::with_null_texture(
             (width as i32).min(max_size),
             (height as i32).min(max_size),
             gl::RED,
@@ -63,7 +58,7 @@ impl GlyphCache {
             srgb: false,
         });
         let cache = GlyphCache {
-            call: call.clone(),
+            call,
             width,
             height,
             max_size,
@@ -72,7 +67,7 @@ impl GlyphCache {
             cache: FnvHashMap::default(),
             requested_resize: None,
         };
-        (cache, call)
+        cache
     }
 
     pub fn resize_if_needed(&mut self, renderer: &mut Renderer) {

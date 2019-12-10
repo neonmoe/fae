@@ -1,3 +1,5 @@
+// TODO(0.5.0): Rewrite benchmarker.rs after other todos.
+
 //! This is less of an example and more of a benchmark.
 //!
 //! Note: this example will be pretty much entirely rewritten once

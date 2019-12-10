@@ -12,7 +12,7 @@ impl DrawCallHandle {
     /// you specify the parts you want to customize. For basic colored
     /// rectangle rendering, the default configuration is all you
     /// need.
-    pub fn create(ctx: &mut GraphicsContext, params: DrawCallParameters) -> DrawCallHandle {
+    pub fn new(ctx: &mut GraphicsContext, params: DrawCallParameters) -> DrawCallHandle {
         ctx.renderer.create_draw_call(params)
     }
 
@@ -23,8 +23,8 @@ impl DrawCallHandle {
     /// # Usage
     /// ```ignore
     /// draw_call_handle.draw(&mut ctx)
-    ///     .with_coordinates((100.0, 100.0, 16.0, 16.0))
-    ///     .with_texture_coordinates((0, 0, 16, 16))
+    ///     .coordinates((100.0, 100.0, 16.0, 16.0))
+    ///     .texture_coordinates((0, 0, 16, 16))
     ///     .finish();
     /// ```
     ///
@@ -49,7 +49,7 @@ impl DrawCallHandle {
     /// this function will do nothing and return false.
     ///
     /// See also:
-    /// [`Image::create_null`](struct.Image.html#method.create_null).
+    /// [`Image::with_null_texture`](struct.Image.html#method.with_null_texture).
     pub fn upload_texture_region(
         &self,
         ctx: &mut GraphicsContext,

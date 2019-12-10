@@ -14,11 +14,11 @@ impl FontHandle {
     /// Creates a new font renderer using the given .ttf file as a
     /// font.
     #[cfg(feature = "ttf")]
-    pub fn from_ttf(
+    pub fn with_ttf(
         ctx: &mut GraphicsContext,
         ttf_data: Vec<u8>,
     ) -> Result<FontHandle, rusttype::Error> {
-        let text = TextRenderer::from_ttf(&mut ctx.renderer, ttf_data)?;
+        let text = TextRenderer::with_ttf(&mut ctx.renderer, ttf_data)?;
         ctx.text_renderers.push(text);
         Ok(FontHandle {
             index: ctx.text_renderers.len() - 1,
@@ -32,8 +32,8 @@ impl FontHandle {
     /// (smooth but blurry). If `false`, nearest-neighbor
     /// interpolation is used (crisp but pixelated).
     #[cfg(feature = "font8x8")]
-    pub fn from_font8x8(ctx: &mut GraphicsContext, smoothed: bool) -> FontHandle {
-        let text = TextRenderer::from_font8x8(&mut ctx.renderer, smoothed);
+    pub fn with_font8x8(ctx: &mut GraphicsContext, smoothed: bool) -> FontHandle {
+        let text = TextRenderer::with_font8x8(&mut ctx.renderer, smoothed);
         ctx.text_renderers.push(text);
         FontHandle {
             index: ctx.text_renderers.len() - 1,
@@ -46,7 +46,7 @@ impl FontHandle {
     /// # Usage
     /// ```ignore
     /// font.draw(&mut ctx, "Hello, World!", 10.0, 10.0, 0.0, 12.0)
-    ///     .with_color((0.8, 0.5, 0.1, 1.0))
+    ///     .color((0.8, 0.5, 0.1, 1.0))
     ///     .finish();
     /// ```
     pub fn draw<'a, S: Into<String>>(
