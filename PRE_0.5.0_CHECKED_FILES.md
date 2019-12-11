@@ -5,7 +5,7 @@ last-minute bugs.
 - [x] src/gl_version.rs
 - [x] src/image.rs
 - [ ] src/lib.rs
-- [ ] src/profiler.rs
+- [x] src/profiler.rs
 - [ ] src/renderer.rs
 - [ ] src/shaders.rs
 - [ ] src/sprite.rs

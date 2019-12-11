@@ -17,6 +17,7 @@ pub mod errors {
     pub use crate::error::PngLoadingError;
     pub use crate::error::{GlutinError, ImageCreationError};
 }
+pub use crate::error::Error;
 pub use crate::gl_version::{OpenGlApi, OpenGlVersion};
 pub use crate::image::Image;
 pub use crate::sprite::Sprite;

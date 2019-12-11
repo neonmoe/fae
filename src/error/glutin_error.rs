@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::fmt;
 
-/// Describes an error during window creation.
+/// Describes errors during window creation.
 #[derive(Debug)]
 pub enum GlutinError {
     /// [`glutin::Context::make_current`](https://docs.rs/glutin/0.22.0-alpha5/glutin/struct.Context.html#method.make_current)

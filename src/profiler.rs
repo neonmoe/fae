@@ -8,27 +8,31 @@
 #[derive(Clone, Debug)]
 pub struct ProfilingData {
     /// The amount of glyphs that had to be rasterized during this
-    /// frame (ie. they weren't in the glyph cache).
+    /// frame (ie. they weren't in the glyph cache, and drawing the
+    /// glyph was slow, as it had to be rasterized).
     pub glyph_cache_misses: u32,
     /// The amount of glyphs that didn't have to rasterized during
-    /// this frame (ie. they were in the glyph cache).
+    /// this frame (ie. they were in the glyph cache, and drawing the
+    /// glyph was very fast).
     pub glyph_cache_hits: u32,
-    /// The amount of glyphs that were drawn during this frame.
+    /// The amount of glyphs that were rendered during this frame.
     pub glyphs_drawn: u32,
-    /// The amount of quads that were drawn during this frame overall.
+    /// The amount of quads that were rendered during this frame
+    /// (includes the glyphs, each one is a quad).
     pub quads_drawn: u32,
-    /// The amount of times a glyph had to be rendered in the application so far.
-    pub glyphs_drawn_overall: u32,
+    /// The amount of times a glyph had to be rasterized in the
+    /// application so far.
+    pub glyphs_rasterized: u32,
 }
 
 impl ProfilingData {
-    fn cleared() -> ProfilingData {
+    const fn cleared() -> ProfilingData {
         ProfilingData {
             glyph_cache_misses: 0,
             glyph_cache_hits: 0,
             glyphs_drawn: 0,
             quads_drawn: 0,
-            glyphs_drawn_overall: 0,
+            glyphs_rasterized: 0,
         }
     }
 }
@@ -42,14 +46,15 @@ pub use dummy::*;
 mod dummy {
     use super::ProfilingData;
 
+    static CLEARED_DATA: ProfilingData = ProfilingData::cleared();
+
     pub(crate) fn refresh() {}
     pub(crate) fn write<F: FnOnce(&mut ProfilingData) + Copy>(_f: F) {}
 
     /// Returns a copy of the last frame's profiling data. If the
-    /// `profiler` feature is disabled, it will always be zeroed and
-    /// initialized on the spot.
+    /// `profiler` feature is disabled, it will always be zeroed.
     pub fn read() -> ProfilingData {
-        ProfilingData::cleared()
+        CLEARED_DATA.clone()
     }
 }
 
@@ -74,13 +79,11 @@ mod actual {
     }
 
     pub(crate) fn refresh() {
-        if let Ok(ref mut front) = FRONT.lock() {
-            if let Ok(ref mut back) = BACK.lock() {
-                let temp = back.glyphs_drawn_overall;
-                front.copy_from(back);
-                back.clear();
-                back.glyphs_drawn_overall = temp;
-            }
+        if let (Ok(ref mut front), Ok(ref mut back)) = (FRONT.lock(), BACK.lock()) {
+            let temp = back.glyphs_rasterized;
+            front.copy_from(back);
+            back.clear();
+            back.glyphs_rasterized = temp;
         }
     }
 

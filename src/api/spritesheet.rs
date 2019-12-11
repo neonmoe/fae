@@ -81,7 +81,7 @@ impl Spritesheet {
     }
 }
 
-/// A builder for the [`Spritesheet`](struct.Spritesheet.html).
+/// A builder for [`Spritesheet`](struct.Spritesheet.html).
 pub struct SpritesheetBuilder {
     /// The texture used when drawing with this handle. None can be
     /// used if you want to just draw flat-color quads.

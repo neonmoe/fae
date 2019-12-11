@@ -159,8 +159,10 @@ impl Image {
     /// # Example
     /// ```
     /// use fae::{gl, Image};
-    /// let image = Image::with_color(128, 128, &[0x88]).format(gl::RED);
+    /// # fn main() -> Result<(), fae::Error> {
+    /// let image = Image::with_color(128, 128, &[0x88])?.format(gl::RED);
     /// // image now represents a 128px by 128px image that consists of half-red pixels taking up only one byte per pixel.
+    /// # Ok(()) }
     /// ```
     pub fn format<'a>(&'a mut self, format: GLuint) -> &'a mut Self {
         self.format = format;

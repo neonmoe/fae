@@ -1,5 +1,8 @@
 //! The error types that `fae` can return.
 
+mod fae_error;
+pub use fae_error::Error;
+
 mod glutin_error;
 pub use glutin_error::GlutinError;
 

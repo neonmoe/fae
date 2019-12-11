@@ -20,12 +20,30 @@ pub struct Window<T: 'static> {
 }
 
 impl Window<()> {
-    /// Creates a new `Window`.
+    /// Creates a new `Window` with the default parameters set by
+    /// winit.
+    ///
+    /// See
+    /// [`Window::with_builders`](struct.Window.html#method.with_builders)
+    /// for more control in the window creation.
     ///
     /// # Errors
     ///
     /// See the [`GlutinError`](enum.GlutinError.html) variants.
-    pub fn new(
+    pub fn new() -> Result<Window<()>, GlutinError> {
+        Window::with_event_loop(
+            EventLoop::new(),
+            (WindowBuilder::new(), ContextBuilder::new()),
+        )
+    }
+
+    /// Creates a new `Window` with the specified WindowBuilder and
+    /// ContextBuilder.
+    ///
+    /// # Errors
+    ///
+    /// See the [`GlutinError`](enum.GlutinError.html) variants.
+    pub fn with_builders(
         (window_builder, context_builder): (WindowBuilder, ContextBuilder<'_, NotCurrent>),
     ) -> Result<Window<()>, GlutinError> {
         Window::with_event_loop(EventLoop::new(), (window_builder, context_builder))

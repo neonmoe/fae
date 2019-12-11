@@ -148,7 +148,7 @@ impl GlyphCache {
                 })
             {
                 self.cache.insert(id, Rc::downgrade(&uvs));
-                crate::profiler::write(|p| p.glyphs_drawn_overall += 1);
+                crate::profiler::write(|p| p.glyphs_rasterized += 1);
                 Ok((uvs.texcoords, true))
             } else {
                 Err(GlyphRenderingError::GlyphCacheFull)

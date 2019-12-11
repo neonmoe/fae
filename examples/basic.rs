@@ -6,19 +6,18 @@ use fae::glutin::event_loop::ControlFlow;
 #[cfg(feature = "text")]
 use fae::{Alignment, Font};
 use fae::{Image, Spritesheet, SpritesheetBuilder, Window};
-use std::error::Error;
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<(), fae::Error> {
     env_logger::from_env(env_logger::Env::default().default_filter_or("trace")).init();
 
-    let mut window = Window::new(WindowSettings::default().into())?;
+    let mut window = Window::with_builders(WindowSettings::default().into())?;
 
     #[cfg(feature = "text")]
     let mut font: Font = common::create_font(window.ctx());
     #[cfg(feature = "png")]
     let image = Image::with_png(include_bytes!("res/sprite.png"))?;
     #[cfg(not(feature = "png"))]
-    let image = Image::with_color(16, 16, &[0xFF, 0xFF, 0x00, 0xFF]);
+    let image = Image::with_color(16, 16, &[0xFF, 0xFF, 0x00, 0xFF])?;
 
     let spritesheet: Spritesheet = SpritesheetBuilder::new()
         .image(image)

@@ -6,10 +6,10 @@ use crate::text::TextRenderer;
 use glutin::dpi::LogicalSize;
 use glutin::{PossiblyCurrent, WindowedContext};
 
-/// The graphics context draws stuff on the screen.
+/// Draw stuff on the screen with this.
 ///
 /// Borrow this struct from:
-/// - [`Window::ctx`](struct.Window.html#field.ctx) before starting
+/// - [`Window::ctx`](struct.Window.html#method.ctx) before starting
 ///   the event loop,
 /// - The first parameter of the closure in
 ///   [`Window::run`](struct.Window.html#method.run) (during the event
