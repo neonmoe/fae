@@ -6,7 +6,7 @@ last-minute bugs.
 - [x] src/image.rs
 - [x] src/lib.rs
 - [x] src/profiler.rs
-- [ ] src/renderer.rs
+- [x] src/renderer.rs
 - [x] src/shaders.rs
 - [ ] src/sprite.rs
 - [ ] src/types.rs

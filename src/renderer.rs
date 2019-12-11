@@ -3,7 +3,7 @@ use crate::gl::types::*;
 use crate::gl_version::{self, OpenGlApi, OpenGlVersion};
 use crate::image::Image;
 use crate::sprite::Sprite;
-use crate::types::*;
+use crate::types::RectPx;
 
 use std::mem;
 use std::ptr;
@@ -20,13 +20,12 @@ struct VboHandle(GLuint);
 #[repr(transparent)]
 struct VaoHandle(GLuint);
 
-/// A handle to a draw call. Can be used to draw sprites.
 #[derive(Clone, Debug)]
-pub struct DrawCallHandle {
+pub(crate) struct DrawCallHandle {
     index: usize,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 struct ShaderProgram {
     program: GLuint,
     vertex_shader: GLuint,
@@ -88,7 +87,6 @@ impl Renderer {
         let version = gl_version::get_version();
         let legacy = match &version {
             OpenGlVersion::Available { api, major, minor } => {
-                // TODO(0.5.0): Ensure legacy rendering works.
                 let legacy = match api {
                     OpenGlApi::Desktop => *major < 3 || (*major == 3 && *minor < 3),
                     OpenGlApi::ES => *major < 3,
@@ -112,7 +110,7 @@ impl Renderer {
         };
 
         Renderer {
-            calls: Vec::with_capacity(2),
+            calls: Vec::new(),
             legacy,
             version,
             dpi_factor: 1.0,
@@ -140,8 +138,8 @@ impl Renderer {
         let frag = shaders.create_frag_string(api, legacy);
         let index = self.calls.len();
 
-        let program = create_program(&vert, &frag, self.legacy);
-        let attributes = create_attributes(self.legacy, program);
+        let program = create_program(&vert, &frag, legacy);
+        let attributes = create_attributes(legacy, &program);
         let filter = |smoothed| if smoothed { gl::LINEAR } else { gl::NEAREST } as i32;
         let get_wrap = |wrap_type| match wrap_type {
             TextureWrapping::Clamp => gl::CLAMP_TO_EDGE,
@@ -160,7 +158,7 @@ impl Renderer {
             program,
             attributes,
             blend: alpha_blending,
-            srgb: srgb,
+            srgb,
             highest_depth: -1.0,
         });
 
@@ -242,18 +240,19 @@ impl Renderer {
         if self.legacy {
             let (pivot_x, pivot_y) = (pivot_x + x0, pivot_y + y0);
 
-            // 6 vertices, each of which consist of: position (x, y,
-            // z), texcoord (x, y), colors (r, g, b, a), rotation
-            // rads, rotation pivot (x, y)
-            //
-            // I apologize for this mess.
             let quad = [
-                x0, y0, depth, tx0, ty0, red, green, blue, alpha, rads, pivot_x, pivot_y, x1, y0,
-                depth, tx1, ty0, red, green, blue, alpha, rads, pivot_x, pivot_y, x1, y1, depth,
-                tx1, ty1, red, green, blue, alpha, rads, pivot_x, pivot_y, x0, y0, depth, tx0, ty0,
-                red, green, blue, alpha, rads, pivot_x, pivot_y, x1, y1, depth, tx1, ty1, red,
-                green, blue, alpha, rads, pivot_x, pivot_y, x0, y1, depth, tx0, ty1, red, green,
-                blue, alpha, rads, pivot_x, pivot_y,
+                x0, y0, depth, tx0, ty0, red, green, blue, alpha, rads, pivot_x,
+                pivot_y, // Top-left vertex
+                x1, y0, depth, tx1, ty0, red, green, blue, alpha, rads, pivot_x,
+                pivot_y, // Top-right vertex
+                x1, y1, depth, tx1, ty1, red, green, blue, alpha, rads, pivot_x,
+                pivot_y, // Bottom-right vertex
+                x0, y0, depth, tx0, ty0, red, green, blue, alpha, rads, pivot_x,
+                pivot_y, // Top-left vertex
+                x1, y1, depth, tx1, ty1, red, green, blue, alpha, rads, pivot_x,
+                pivot_y, // Bottom-right vertex
+                x0, y1, depth, tx0, ty1, red, green, blue, alpha, rads, pivot_x,
+                pivot_y, // Bottom-left vertex
             ];
 
             self.calls[call.index]
@@ -464,7 +463,6 @@ impl Renderer {
         self.calls[call.index].texture_size
     }
 
-    // Documentation: GraphicsContext::upload_texture_region
     pub(crate) fn upload_texture_region(
         &self,
         call: &DrawCallHandle,
@@ -494,7 +492,6 @@ impl Renderer {
         }
     }
 
-    // Documentation: GraphicsContext::resize_texture
     pub(crate) fn resize_texture(
         &mut self,
         call: &DrawCallHandle,
@@ -526,7 +523,7 @@ impl Drop for Renderer {
             return;
         }
         let legacy = self.legacy;
-        for call in self.calls.iter() {
+        for call in &self.calls {
             let ShaderProgram {
                 program,
                 vertex_shader,
@@ -676,7 +673,7 @@ fn create_program(vert_source: &str, frag_source: &str, legacy: bool) -> ShaderP
 }
 
 #[inline]
-fn create_attributes(legacy: bool, program: ShaderProgram) -> Attributes {
+fn create_attributes(legacy: bool, program: &ShaderProgram) -> Attributes {
     let mut vao = 0;
     if !legacy {
         unsafe {
@@ -793,8 +790,6 @@ fn create_texture(min: GLint, mag: GLint, wrap_s: GLint, wrap_t: GLint) -> Textu
     unsafe {
         gl::GenTextures(1, &mut tex);
         gl::BindTexture(gl::TEXTURE_2D, tex);
-        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::REPEAT as i32);
-        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, gl::REPEAT as i32);
         gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, min);
         gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, mag);
         gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, wrap_s);
@@ -809,8 +804,8 @@ fn insert_texture(
     texture: &TextureHandle,
     format: GLuint,
     pixel_type: GLuint,
-    w: GLint,
-    h: GLint,
+    width: GLint,
+    height: GLint,
     pixels: Option<&[u8]>,
 ) {
     unsafe {
@@ -820,8 +815,8 @@ fn insert_texture(
             gl::TEXTURE_2D,
             0,
             format as GLint,
-            w,
-            h,
+            width,
+            height,
             0,
             match format {
                 gl::SRGB => gl::RGB,
