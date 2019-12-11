@@ -15,7 +15,7 @@ last-minute bugs.
 - [ ] src/api/graphics_context.rs
 - [ ] src/api/mod.rs
 - [ ] src/api/spritesheet.rs
-- [ ] src/api/window.rs
+- [x] src/api/window.rs
 
 - [ ] src/text/glyph_cache.rs
 - [ ] src/text/layout.rs

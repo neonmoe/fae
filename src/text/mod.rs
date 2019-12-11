@@ -21,7 +21,6 @@ pub use self::text_builder::Text;
 pub use self::types::Alignment;
 
 use self::text_builder::TextData;
-use crate::error::GlyphNotRenderedError;
 use crate::renderer::{DrawCallHandle, Renderer};
 use crate::text::glyph_cache::*;
 use crate::text::layout::*;
@@ -306,7 +305,7 @@ impl TextRenderer {
                     sprite.texture_coordinates(texcoords).finish();
                 }
                 Err(err) => match err {
-                    GlyphNotRenderedError::GlyphCacheFull => self.glyph_cache_filled = true,
+                    GlyphRenderingError::GlyphCacheFull => self.glyph_cache_filled = true,
                 },
             }
         }

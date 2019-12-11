@@ -1,4 +1,3 @@
-use crate::error::GlyphNotRenderedError;
 use crate::gl;
 use crate::gl::types::*;
 use crate::image::Image;
@@ -89,7 +88,7 @@ impl GlyphCache {
         id: CacheIdentifier,
         width: i32,
         height: i32,
-    ) -> Result<(RectPx, bool), GlyphNotRenderedError> {
+    ) -> Result<(RectPx, bool), GlyphRenderingError> {
         if let Some(uvs) = self
             // First try to find the uvs from the cache
             .get_uvs_from_cache(id)
@@ -152,7 +151,7 @@ impl GlyphCache {
                 crate::profiler::write(|p| p.glyphs_drawn_overall += 1);
                 Ok((uvs.texcoords, true))
             } else {
-                Err(GlyphNotRenderedError::GlyphCacheFull)
+                Err(GlyphRenderingError::GlyphCacheFull)
             }
         }
     }

@@ -109,7 +109,7 @@ impl GraphicsContext {
 }
 
 impl GraphicsContext {
-    /// Returns whether or not running in legacy mode (OpenGL 3.3+
+    /// Returns true when running in legacy mode (OpenGL 3.3+
     /// optimizations off).
     pub fn is_legacy(&self) -> bool {
         self.renderer.legacy

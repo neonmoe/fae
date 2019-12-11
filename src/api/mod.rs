@@ -11,9 +11,12 @@ pub use spritesheet::{Spritesheet, SpritesheetBuilder};
 pub use window::Window;
 
 // Re-exports from other parts of the crate
-pub use crate::error::ImageCreationError;
-#[cfg(feature = "png")]
-pub use crate::error::ImageLoadingError;
+pub mod errors {
+    //! The errors that fae can return.
+    #[cfg(feature = "png")]
+    pub use crate::error::PngLoadingError;
+    pub use crate::error::{GlutinError, ImageCreationError};
+}
 pub use crate::gl_version::{OpenGlApi, OpenGlVersion};
 pub use crate::image::Image;
 pub use crate::sprite::Sprite;

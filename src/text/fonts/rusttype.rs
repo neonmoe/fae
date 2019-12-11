@@ -1,4 +1,3 @@
-use crate::error::GlyphNotRenderedError;
 use crate::renderer::Renderer;
 use crate::text::types::*;
 use crate::text::GlyphCache;
@@ -128,7 +127,7 @@ impl<'a> FontProvider for RustTypeProvider<'a> {
         cache: &mut GlyphCache,
         glyph_id: GlyphId,
         font_size: i32,
-    ) -> Result<RectPx, GlyphNotRenderedError> {
+    ) -> Result<RectPx, GlyphRenderingError> {
         let metric = self.get_metric(glyph_id, font_size);
 
         let id = CacheIdentifier::new(glyph_id, Some(font_size));

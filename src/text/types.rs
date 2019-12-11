@@ -1,4 +1,3 @@
-use crate::error::GlyphNotRenderedError;
 use crate::renderer::Renderer;
 use crate::text::GlyphCache;
 use crate::types::*;
@@ -36,6 +35,11 @@ pub(crate) struct TextDrawData {
     pub z: f32,
 }
 
+#[derive(Debug)]
+pub(crate) enum GlyphRenderingError {
+    GlyphCacheFull,
+}
+
 pub(crate) trait FontProvider {
     fn get_glyph_id(&mut self, c: char) -> GlyphId;
     fn get_line_advance(&self, font_size: i32) -> Advance;
@@ -47,7 +51,7 @@ pub(crate) trait FontProvider {
         cache: &mut GlyphCache,
         id: GlyphId,
         font_size: i32,
-    ) -> Result<RectPx, GlyphNotRenderedError>;
+    ) -> Result<RectPx, GlyphRenderingError>;
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

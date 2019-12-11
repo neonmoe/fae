@@ -11,10 +11,10 @@ use std::error::Error;
 fn main() -> Result<(), Box<dyn Error>> {
     env_logger::from_env(env_logger::Env::default().default_filter_or("trace")).init();
 
-    let mut window = Window::create(WindowSettings::default().into()).unwrap();
+    let mut window = Window::new(WindowSettings::default().into())?;
 
     #[cfg(feature = "text")]
-    let mut font: Font = common::create_font(&mut window.ctx);
+    let mut font: Font = common::create_font(window.ctx());
     #[cfg(feature = "png")]
     let image = Image::with_png(include_bytes!("res/sprite.png"))?;
     #[cfg(not(feature = "png"))]
@@ -23,7 +23,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let spritesheet: Spritesheet = SpritesheetBuilder::new()
         .image(image)
         .alpha_blending(false)
-        .build(&mut window.ctx);
+        .build(window.ctx());
 
     window.run(move |ctx, event, _, control_flow| {
         if let Some(mut ctx) = ctx {

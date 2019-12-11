@@ -17,7 +17,7 @@ pub enum OpenGlApi {
 
 /// Represents the parsed version of the OpenGL version
 /// string. Returned by
-/// [`GraphicsContext::get_opengl_version`](../struct.GraphicsContext.html#method.get_opengl_version).
+/// [`GraphicsContext::get_opengl_version`](struct.GraphicsContext.html#method.get_opengl_version).
 #[derive(Clone, Debug, PartialEq)]
 pub enum OpenGlVersion {
     /// Represents a version of the OpenGL api.

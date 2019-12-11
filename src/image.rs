@@ -1,6 +1,6 @@
 use crate::error::ImageCreationError;
 #[cfg(feature = "png")]
-use crate::error::ImageLoadingError;
+use crate::error::PngLoadingError;
 use crate::gl;
 use crate::gl::types::*;
 #[cfg(feature = "png")]
@@ -21,7 +21,8 @@ pub struct Image {
     pub pixel_type: GLuint,
     /// Whether the image represents a null pointer for
     /// glTexImage2D. If true, the memory for the texture of width x
-    /// height will be allocated, but will probably be garbage.
+    /// height will be allocated on the GPU, but will probably be
+    /// garbage.
     pub null_data: bool,
 }
 
@@ -46,11 +47,11 @@ impl Image {
     ///
     /// # Errors
     ///
-    /// A [`PngError`](enum.ImageLoadingError.html#variant.PngError)
+    /// A [`PngError`](enum.PngLoadingError.html#variant.PngError)
     /// will be returned if the data couldn't be read for some reason
     /// by the `png` crate (most probably, `bytes` doesn't describe a
     /// valid PNG image). An
-    /// [`UnsupportedBitDepth`](enum.ImageLoadingError.html#variant.UnsupportedBitDepth)
+    /// [`UnsupportedBitDepth`](enum.PngLoadingError.html#variant.UnsupportedBitDepth)
     /// error will be returned if the PNG bit depth isn't 8 or 16 bits
     /// per channel.
     ///
@@ -61,7 +62,7 @@ impl Image {
     /// # Ok(()) }
     /// ```
     #[cfg(feature = "png")]
-    pub fn with_png(bytes: &[u8]) -> Result<Image, ImageLoadingError> {
+    pub fn with_png(bytes: &[u8]) -> Result<Image, PngLoadingError> {
         use png::{BitDepth, ColorType, Decoder};
         let decoder = Decoder::new(bytes);
         let (info, mut reader) = decoder.read_info()?;
@@ -74,7 +75,7 @@ impl Image {
         let pixel_type = match info.bit_depth {
             BitDepth::Eight => gl::UNSIGNED_BYTE,
             BitDepth::Sixteen => gl::UNSIGNED_SHORT,
-            bitdepth => return Err(ImageLoadingError::UnsupportedBitDepth(bitdepth)),
+            bitdepth => return Err(PngLoadingError::UnsupportedBitDepth(bitdepth)),
         };
         let mut pixels = vec![0; info.buffer_size()];
         reader.next_frame(&mut pixels)?;
@@ -114,7 +115,7 @@ impl Image {
             3 => gl::SRGB,
             2 => gl::RG,
             1 => gl::RED,
-            _ => return Err(ImageCreationError::InvalidColorComponentCount),
+            n => return Err(ImageCreationError::InvalidColorComponentCount(n)),
         };
         let mut pixels = vec![0; (width * height) as usize * color.len()];
         for i in 0..pixels.len() {
