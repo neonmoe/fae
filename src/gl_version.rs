@@ -2,8 +2,9 @@
 use crate::gl;
 use std::ffi::CStr;
 
-/// Represents the two different variants of OpenGL. Contained within
-/// [`OpenGlVersion`](enum.OpenGlVersion.html).
+/// Represents the two different variants of OpenGL.
+///
+/// Contained within [`OpenGlVersion`](enum.OpenGlVersion.html).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum OpenGlApi {
     /// "Normal" OpenGL, which usually means the environment is
@@ -16,7 +17,9 @@ pub enum OpenGlApi {
 }
 
 /// Represents the parsed version of the OpenGL version
-/// string. Returned by
+/// string.
+///
+/// Returned by
 /// [`GraphicsContext::get_opengl_version`](struct.GraphicsContext.html#method.get_opengl_version).
 #[derive(Clone, Debug, PartialEq)]
 pub enum OpenGlVersion {
@@ -34,7 +37,7 @@ pub enum OpenGlVersion {
     /// This is what is returned when the OpenGL version string can't
     /// be read. Please open an issue at
     /// [https://github.com/neonmoe/fae](https://github.com/neonmoe/fae)
-    /// and provide the value of `version_string` if you run across
+    /// and provide the value of `version_string` if you come across
     /// this.
     Unavailable {
         /// The version string that could not be parsed.

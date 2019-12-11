@@ -4,7 +4,7 @@ last-minute bugs.
 - [x] src/error.rs
 - [x] src/gl_version.rs
 - [x] src/image.rs
-- [ ] src/lib.rs
+- [x] src/lib.rs
 - [x] src/profiler.rs
 - [ ] src/renderer.rs
 - [x] src/shaders.rs

@@ -43,7 +43,7 @@ cfg-if = "^0.1.10"
 font-loader = "^0.8.0"
 
 [build-dependencies]
-gl_generator = "^0.11.0"
+gl_generator = "^0.14.0"
 
 [[example]]
 name = "basic"
