@@ -1,4 +1,4 @@
-#version 330
+// Version preprocessor automatically added by fae, either 300 es or 330.
 
 // Per-vertex attributes:
 in vec2 shared_position;

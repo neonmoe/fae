@@ -1,4 +1,4 @@
-#version 330
+// Version preprocessor automatically added by fae, either 300 es or 330.
 
 out vec4 out_color;
 in vec2 frag_texcoord;

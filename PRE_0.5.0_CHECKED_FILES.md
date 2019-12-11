@@ -7,7 +7,7 @@ last-minute bugs.
 - [ ] src/lib.rs
 - [x] src/profiler.rs
 - [ ] src/renderer.rs
-- [ ] src/shaders.rs
+- [x] src/shaders.rs
 - [ ] src/sprite.rs
 - [ ] src/types.rs
 

@@ -1,4 +1,4 @@
-#version 110
+// Version preprocessor automatically added by fae, either 100 or 110.
 
 attribute vec3 position;
 attribute vec2 texcoord;

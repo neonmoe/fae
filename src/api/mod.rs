@@ -20,6 +20,8 @@ pub mod errors {
 pub use crate::error::Error;
 pub use crate::gl_version::{OpenGlApi, OpenGlVersion};
 pub use crate::image::Image;
+pub use crate::renderer::TextureWrapping;
+pub use crate::shaders::{ShaderPair, Shaders};
 pub use crate::sprite::Sprite;
 #[cfg(feature = "text")]
 pub use crate::text::{Alignment, Text};

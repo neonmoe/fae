@@ -43,13 +43,16 @@ impl GlyphCache {
             (height as i32).min(max_size),
             gl::RED,
         );
+
+        let mut shaders = Shaders::default();
+        shaders.shader_110.fragment_shader = TEXT_FRAGMENT_SHADER_110.to_string();
+        shaders.shader_100_es.fragment_shader = TEXT_FRAGMENT_SHADER_110.to_string();
+        shaders.shader_330.fragment_shader = TEXT_FRAGMENT_SHADER_330.to_string();
+        shaders.shader_300_es.fragment_shader = TEXT_FRAGMENT_SHADER_330.to_string();
+
         let call = renderer.create_draw_call(
             Some(&cache_image),
-            Shaders {
-                fragment_shader_110: TEXT_FRAGMENT_SHADER_110,
-                fragment_shader_330: TEXT_FRAGMENT_SHADER_330,
-                ..Default::default()
-            },
+            &shaders,
             true,
             true,
             smoothed,

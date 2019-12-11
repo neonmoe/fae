@@ -144,7 +144,7 @@ impl SpritesheetBuilder {
         Spritesheet {
             handle: ctx.renderer.create_draw_call(
                 self.image.as_ref(),
-                self.shaders,
+                &self.shaders,
                 self.alpha_blending,
                 self.minification_smoothing,
                 self.magnification_smoothing,

@@ -1,4 +1,4 @@
-#version 110
+// Version preprocessor automatically added by fae, either 100 or 110.
 
 varying vec2 frag_texcoord;
 varying vec4 frag_color;

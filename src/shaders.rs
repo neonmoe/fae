@@ -1,85 +1,145 @@
 use crate::gl_version::OpenGlApi;
 
-/// Represents the shader code for a shader. Used in
-/// [`DrawCallHandle::new`](struct.DrawCallHandle.html#method.new).
-#[derive(Clone, Copy, Debug)]
+/// Contains the shader code for a spritesheet.
+///
+/// Passed to the renderer with
+/// [`SpritesheetBuilder::shaders`](struct.SpritesheetBuilder.html#method.shaders).
+///
+/// # The GLSL versions
+///
+/// As you might need to include tweaks for every GLSL version, you
+/// can provide versions of your shader code for each. However,
+/// usually the `#version 100`/`#version 110` and `#version 300
+/// es`/`#version 330` shaders are identical aside from the version
+/// string. To make this use-case more ergonomic, you can just leave
+/// the version preprocessor line out, and the relevant one is
+/// inserted during runtime. Then you can use the same
+/// [`ShaderPair`](struct.ShaderPair.html) for `shader_110` and
+/// `shader_100`, for example.
+///
+/// Additionally: if you don't include a version preprocessor,
+/// `precision mediump float;` is added to the shader's OpenGL ES
+/// version (in addition to the automatically inserted version
+/// preprocessor), as it's required in OpenGL ES shaders but not
+/// desktop OpenGL ones.
+///
+/// As an example, the following `shader_300_es` code:
+/// ```glsl, ignore
+/// void main() {}
+/// ```
+/// Will be modified into the following in an OpenGL ES 3.0 context:
+/// ```glsl, ignore
+/// #version 300 es
+/// precision mediump float;
+/// void main() {}
+/// ```
+#[derive(Clone, Debug)]
 pub struct Shaders {
-    /// The GLSL 3.30 version of the vertex shader. Ensure that the
-    /// first line is `#version 330`!
-    pub vertex_shader_330: &'static str,
-    /// The GLSL 3.30 version of the fragment shader. Ensure that the
-    /// first line is `#version 330`!
-    pub fragment_shader_330: &'static str,
-    /// The GLSL 1.10 version of the vertex shader. Ensure that the
-    /// first line is `#version 110`!
-    pub vertex_shader_110: &'static str,
-    /// The GLSL 1.10 version of the fragment shader. Ensure that the
-    /// first line is `#version 110`!
-    pub fragment_shader_110: &'static str,
+    /// The `#version 330` version of the shader, for OpenGL 3.3 and above.
+    pub shader_330: ShaderPair,
+    /// The `#version 110` version of the shader, for OpenGL versions before 3.3.
+    pub shader_110: ShaderPair,
+    /// The `#version 300 es` version of the shader, for OpenGL ES 3.0 and WebGL 2.0.
+    pub shader_300_es: ShaderPair,
+    /// The `#version 100` version of the shader, for OpenGL ES 2.0 and WebGL 1.0.
+    pub shader_100_es: ShaderPair,
 }
 
-static DEFAULT_SHADERS: [&str; 4] = [
-    include_str!("shaders/legacy/texquad.vert"),
-    include_str!("shaders/legacy/texquad.frag"),
-    include_str!("shaders/texquad.vert"),
-    include_str!("shaders/texquad.frag"),
-];
+enum ShaderType {
+    Vertex,
+    Fragment,
+}
+
+/// Contains the code for a vertex shader and a fragment shader.
+///
+/// See also: [`Shaders`](struct.Shaders.html).
+#[derive(Clone, Debug)]
+pub struct ShaderPair {
+    /// The vertex shader code.
+    pub vertex_shader: String,
+    /// The fragment shader code.
+    pub fragment_shader: String,
+}
+
+impl ShaderPair {
+    fn get_shader(&self, shader_type: ShaderType) -> &str {
+        match shader_type {
+            ShaderType::Vertex => &self.vertex_shader,
+            ShaderType::Fragment => &self.fragment_shader,
+        }
+    }
+}
+
 impl Default for Shaders {
     fn default() -> Self {
+        let legacy = ShaderPair {
+            vertex_shader: include_str!("shaders/legacy/texquad.vert").to_string(),
+            fragment_shader: include_str!("shaders/legacy/texquad.frag").to_string(),
+        };
+        let modern = ShaderPair {
+            vertex_shader: include_str!("shaders/texquad.vert").to_string(),
+            fragment_shader: include_str!("shaders/texquad.frag").to_string(),
+        };
         Shaders {
-            vertex_shader_110: DEFAULT_SHADERS[0],
-            fragment_shader_110: DEFAULT_SHADERS[1],
-            vertex_shader_330: DEFAULT_SHADERS[2],
-            fragment_shader_330: DEFAULT_SHADERS[3],
+            shader_330: modern.clone(),
+            shader_110: legacy.clone(),
+            shader_300_es: modern,
+            shader_100_es: legacy,
         }
     }
 }
 
 impl Shaders {
     pub(crate) fn create_vert_string(&self, api: OpenGlApi, legacy: bool) -> String {
-        create_string(api, legacy, self.vertex_shader_110, self.vertex_shader_330)
+        self.create_string(api, legacy, ShaderType::Vertex)
     }
 
     pub(crate) fn create_frag_string(&self, api: OpenGlApi, legacy: bool) -> String {
-        create_string(
-            api,
-            legacy,
-            self.fragment_shader_110,
-            self.fragment_shader_330,
-        )
+        self.create_string(api, legacy, ShaderType::Fragment)
     }
-}
 
-fn create_string(
-    api: OpenGlApi,
-    legacy: bool,
-    legacy_str: &'static str,
-    modern_str: &'static str,
-) -> String {
-    let base_string = if legacy { legacy_str } else { modern_str };
+    fn create_string(&self, api: OpenGlApi, legacy: bool, shader_type: ShaderType) -> String {
+        let (base_string, version_string) = match api {
+            OpenGlApi::Desktop => {
+                if legacy {
+                    (self.shader_110.get_shader(shader_type), "#version 110")
+                } else {
+                    (self.shader_330.get_shader(shader_type), "#version 330")
+                }
+            }
+            OpenGlApi::ES => {
+                if legacy {
+                    (self.shader_100_es.get_shader(shader_type), "#version 100")
+                } else {
+                    (
+                        self.shader_300_es.get_shader(shader_type),
+                        "#version 300 es",
+                    )
+                }
+            }
+        };
 
-    match api {
-        OpenGlApi::Desktop => base_string.to_string(),
-        OpenGlApi::ES => base_string
-            .to_string()
-            .lines()
-            .map(|line| replace_version(line, legacy))
-            .fold(
-                // The 28 here is the maximum amount of bytes added by replace_version
-                String::with_capacity(base_string.len() + 28),
-                |acc, line| acc + line + "\n",
-            ),
-    }
-}
-
-fn replace_version(line: &str, legacy: bool) -> &str {
-    if line.starts_with("#version") {
-        if legacy {
-            "#version 100"
+        if base_string.contains("#version") {
+            if cfg!(debug_assertions) && !base_string.contains(version_string) {
+                // There is a #version but it isn't what we'd expect.
+                if let Some(shader_version) = base_string
+                    .lines()
+                    .find(|line| line.starts_with("#version"))
+                {
+                    log::warn!(
+                        "Shader has version: '{}', expected '{}'.",
+                        shader_version,
+                        version_string
+                    );
+                }
+            }
+            base_string.to_string()
         } else {
-            "#version 300 es\nprecision mediump float;"
+            let mut header = version_string.to_string() + "\n";
+            if api != OpenGlApi::Desktop {
+                header += "precision mediump float;\n";
+            }
+            header + base_string
         }
-    } else {
-        line
     }
 }

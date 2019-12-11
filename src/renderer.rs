@@ -88,6 +88,7 @@ impl Renderer {
         let version = gl_version::get_version();
         let legacy = match &version {
             OpenGlVersion::Available { api, major, minor } => {
+                // TODO(0.5.0): Ensure legacy rendering works.
                 let legacy = match api {
                     OpenGlApi::Desktop => *major < 3 || (*major == 3 && *minor < 3),
                     OpenGlApi::ES => *major < 3,
@@ -121,7 +122,7 @@ impl Renderer {
     pub(crate) fn create_draw_call(
         &mut self,
         image: Option<&Image>,
-        shaders: Shaders,
+        shaders: &Shaders,
         alpha_blending: bool,
         minification_smoothing: bool,
         magnification_smoothing: bool,
