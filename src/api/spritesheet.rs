@@ -41,6 +41,8 @@ impl Spritesheet {
         ctx.renderer.draw(&self.handle)
     }
 
+    // TODO(0.6.0): Add a function to render inside a spritesheet in when not in legacy mode
+
     /// Upload an image into the specified region in the spritesheet.
     ///
     /// If the width and height of `region` and `image` don't match,

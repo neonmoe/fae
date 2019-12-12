@@ -83,6 +83,7 @@ pub(crate) struct Renderer {
 }
 
 impl Renderer {
+    // TODO(0.6.0): Add a new renderer constructor that fails on legacy contexts.
     pub(crate) fn new() -> Renderer {
         let version = gl_version::get_version();
         let legacy = match &version {
@@ -279,6 +280,10 @@ impl Renderer {
         let matrix = [
             m00, 0.0, 0.0, -1.0, 0.0, m11, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
         ];
+
+        unsafe {
+            gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
+        }
 
         unsafe {
             gl::ClearColor(1.0, 1.0, 1.0, 1.0);
