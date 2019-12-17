@@ -1,14 +1,20 @@
+//! Types used throughout the crate.
+
 /// Represents a rectangle.
 ///
 /// # Usage
 /// ```
 /// # use fae::Rect;
 /// // Rects can be defined via the struct
-/// let rect = Rect { x: 0.0, y: 0.0, width: 1.0, height: 1.0 };
+/// let rect = Rect { x: 1.0, y: 1.0, width: 5.0, height: 5.0 };
 /// // And via a tuple as well (x, y, width, height):
-/// let rect_ = (0.0, 0.0, 1.0, 1.0).into();
+/// let rect_ = (1.0, 1.0, 5.0, 5.0).into();
 /// assert_eq!(rect, rect_);
 /// ```
+///
+/// Tip: Many functions in `fae` take `Into<Rect>` as a parameter, in
+/// which case it is often cleaner to pass in a tuple, like `rect_`
+/// above, but without the `.into()`.
 // Note: Only axis-aligned rectangles are allowed (rotation is
 // specified via another parameter) because this is much more
 // optimizable, and I don't intend to support
@@ -64,29 +70,9 @@ impl From<RectPx> for Rect {
     }
 }
 
-impl From<Rect> for (f32, f32, f32, f32) {
-    fn from(from: Rect) -> Self {
-        (from.x, from.y, from.width, from.height)
-    }
-}
-
-/// Represents a rectangle in a coordinate space that consists of
-/// integers.
-///
-/// Useful for when you want to be sure all operations are
-/// `i32`-based. Internally used in texture/sprite handling.
-///
-/// # Usage
-/// ```
-/// # use fae::RectPx;
-/// // RectPxs can be defined via the struct
-/// let rect = RectPx { x: 0, y: 0, width: 16, height: 16 };
-/// // And via a tuple as well (x, y, width, height):
-/// let rect_ = (0, 0, 16, 16).into();
-/// assert_eq!(rect, rect_);
-/// ```
+/// Like Rect, but i32-based. Internal use only, at least currently.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct RectPx {
+pub(crate) struct RectPx {
     /// The x-coordinate of the top-left corner of this rectangle.
     pub x: i32,
     /// The y-coordinate of the top-left corner of this rectangle.

@@ -9,7 +9,7 @@ last-minute bugs.
 - [x] src/renderer.rs
 - [x] src/shaders.rs
 - [ ] src/sprite.rs
-- [ ] src/types.rs
+- [x] src/types.rs
 
 - [ ] src/api/font.rs
 - [ ] src/api/graphics_context.rs

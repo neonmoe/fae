@@ -1,7 +1,7 @@
 use crate::api::GraphicsContext;
 use crate::image::Image;
 use crate::sprite::Sprite;
-use crate::types::RectPx;
+use crate::types::{Rect, RectPx};
 
 use crate::renderer::{DrawCallHandle, Shaders, TextureWrapping};
 
@@ -45,18 +45,34 @@ impl Spritesheet {
 
     /// Upload an image into the specified region in the spritesheet.
     ///
+    /// As the inner values of `region` will be floored before use, it
+    /// is recommended to use a `(i32, i32, i32, i32)` as the `region`
+    /// parameter to ensure expected behavior.
+    ///
     /// If the width and height of `region` and `image` don't match,
     /// or the `region` isn't completely contained within the texture,
     /// this function will do nothing and return false.
     ///
     /// See also:
     /// [`Image::with_null_texture`](struct.Image.html#method.with_null_texture).
-    pub fn upload_texture_region(
+    pub fn upload_texture_region<R: Into<Rect>>(
         &self,
         ctx: &mut GraphicsContext,
-        region: RectPx,
+        region: R,
         image: &Image,
     ) -> bool {
+        let Rect {
+            x,
+            y,
+            width,
+            height,
+        } = region.into();
+        let region = RectPx {
+            x: x.floor() as i32,
+            y: y.floor() as i32,
+            width: width.floor() as i32,
+            height: height.floor() as i32,
+        };
         ctx.renderer
             .upload_texture_region(&self.handle, region, image)
     }

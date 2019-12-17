@@ -25,7 +25,7 @@ pub use crate::shaders::{ShaderPair, Shaders};
 pub use crate::sprite::Sprite;
 #[cfg(feature = "text")]
 pub use crate::text::{Alignment, Text};
-pub use crate::types::{Rect, RectPx};
+pub use crate::types::Rect;
 
 // Re-export Glutin
 pub use glutin;

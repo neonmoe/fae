@@ -1,3 +1,5 @@
+//! Types used throughout the text module.
+
 use crate::renderer::Renderer;
 use crate::text::GlyphCache;
 use crate::types::*;

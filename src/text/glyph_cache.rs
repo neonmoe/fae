@@ -576,7 +576,7 @@ impl GlyphLine {
 }
 
 pub struct GlyphSpot {
-    pub texcoords: RectPx,
+    texcoords: RectPx,
     status: Cell<ExpiryStatus>,
 }
 
