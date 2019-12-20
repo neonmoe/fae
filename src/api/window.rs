@@ -29,7 +29,7 @@ impl Window<()> {
     ///
     /// # Errors
     ///
-    /// See the [`GlutinError`](enum.GlutinError.html) variants.
+    /// See the [`GlutinError`](errors/enum.GlutinError.html) variants.
     pub fn new() -> Result<Window<()>, GlutinError> {
         Window::with_event_loop(
             EventLoop::new(),
@@ -42,7 +42,7 @@ impl Window<()> {
     ///
     /// # Errors
     ///
-    /// See the [`GlutinError`](enum.GlutinError.html) variants.
+    /// See the [`GlutinError`](errors/enum.GlutinError.html) variants.
     pub fn with_builders(
         (window_builder, context_builder): (WindowBuilder, ContextBuilder<'_, NotCurrent>),
     ) -> Result<Window<()>, GlutinError> {
@@ -56,7 +56,7 @@ impl<T> Window<T> {
     ///
     /// # Errors
     ///
-    /// See the [`GlutinError`](enum.GlutinError.html) variants.
+    /// See the [`GlutinError`](errors/enum.GlutinError.html) variants.
     pub fn with_event_loop(
         event_loop: EventLoop<T>,
         (window_builder, context_builder): (WindowBuilder, ContextBuilder<'_, NotCurrent>),

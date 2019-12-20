@@ -21,7 +21,12 @@ impl Spritesheet {
     /// pattern](https://doc.rust-lang.org/1.0.0/style/ownership/builders.html).
     ///
     /// # Usage
-    /// ```ignore
+    /// ```no_run
+    /// # let mut ctx = fae::GraphicsContext::dummy();
+    /// // Initialize the spritesheet once somewhere, usually before the game loop:
+    /// let spritesheet = fae::SpritesheetBuilder::new().build(&mut ctx);
+    ///
+    /// // Then in rendering code, call draw:
     /// spritesheet.draw(&mut ctx)
     ///     .coordinates((100.0, 100.0, 16.0, 16.0))
     ///     .texture_coordinates((0, 0, 16, 16))
@@ -29,14 +34,22 @@ impl Spritesheet {
     /// ```
     ///
     /// ## Optimization tips
-    /// - Draw the sprites in front first. This way you'll avoid
-    ///   rendering over already drawn pixels. If you're rendering
-    ///   *lots* of sprites, this is a good place to start optimizing.
+    ///
     /// - If possible, make your textures without using alpha values
-    ///   between 1 and 0 (ie. use only 100% and 0% opacity), and
-    ///   disable `alpha_blending` in your draw call. These kinds of
-    ///   sprites can be drawn much more efficiently when it comes to
-    ///   overdraw.
+    /// between 1 and 0 (ie. use only 100% and 0% opacity), and
+    /// disable `alpha_blending` in
+    /// [`SpritesheetBuilder`](struct.SpritesheetBuilder.html#method.alpha_blending). These
+    /// kinds of sprites can be drawn much more efficiently when it
+    /// comes to overdraw.
+    ///
+    /// - If `alpha_blending` is disabled, draw the sprites in front
+    /// first. This way you'll avoid rendering over already drawn
+    /// pixels. If you're rendering *lots* of sprites, this is a good
+    /// place to start optimizing.
+    ///
+    ///   - Note: if `alpha_blending` is *enabled*, the you should
+    ///   draw the sprites in the *back* first, to ensure correct
+    ///   rendering.
     pub fn draw<'a, 'b>(&'b self, ctx: &'a mut GraphicsContext) -> Sprite<'a, 'b> {
         ctx.renderer.draw(&self.handle)
     }

@@ -8,13 +8,13 @@ last-minute bugs.
 - [x] src/profiler.rs
 - [x] src/renderer.rs
 - [x] src/shaders.rs
-- [ ] src/sprite.rs
+- [x] src/sprite.rs
 - [x] src/types.rs
 
-- [ ] src/api/font.rs
-- [ ] src/api/graphics_context.rs
-- [ ] src/api/mod.rs
-- [ ] src/api/spritesheet.rs
+- [x] src/api/font.rs
+- [x] src/api/graphics_context.rs
+- [x] src/api/mod.rs
+- [x] src/api/spritesheet.rs
 - [x] src/api/window.rs
 
 - [ ] src/text/glyph_cache.rs

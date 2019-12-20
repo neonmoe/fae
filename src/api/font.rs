@@ -25,7 +25,8 @@ impl Font {
         })
     }
 
-    /// Creates a new font renderer using the font8x8 font.
+    /// Creates a new font renderer using the
+    /// [`font8x8`](https://crates.io/crates/font8x8) font.
     ///
     /// If `smoothed` is `true`, glyphs which are bigger than 8
     /// physical pixels will be linearly interpolated when stretching
@@ -46,8 +47,13 @@ impl Font {
     /// specifying your parameters by modifying it.
     ///
     /// # Usage
-    /// ```ignore
-    /// font.draw(&mut ctx, "Hello, World!", 10.0, 10.0, 0.0, 12.0)
+    /// ```no_run
+    /// # let mut ctx = fae::GraphicsContext::dummy();
+    /// // Initialize the font once somewhere, usually before the game loop:
+    /// let font = fae::Font::with_font8x8(&mut ctx, true);
+    ///
+    /// // Then in rendering code, call draw:
+    /// font.draw(&mut ctx, "Hello, World!", 10.0, 10.0, 12.0)
     ///     .color((0.8, 0.5, 0.1, 1.0))
     ///     .finish();
     /// ```
@@ -79,8 +85,9 @@ impl Font {
     }
 
     /// Returns the underlying draw call of this font. Can be used to
-    /// render the glyph cache texture, which could be useful for
-    /// debugging.
+    /// render the glyph cache texture, which is useful for debugging
+    /// rasterization, glyph rendering, or other glyph-cache-related
+    /// problems.
     pub fn spritesheet(&self) -> &Spritesheet {
         &self.spritesheet
     }

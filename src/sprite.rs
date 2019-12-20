@@ -14,7 +14,11 @@ use crate::types::*;
 /// [`finish`](struct.Sprite.html#method.finish) to draw the sprite.
 ///
 /// Created by
-/// [`Spritesheet::draw`](struct.Spritesheet.html#method.draw).
+/// [`Spritesheet::draw`](struct.Spritesheet.html#method.draw), and
+/// usually used as a temporary value, as this is a builder
+/// struct. See the
+/// [`Spritesheet::draw`](struct.Spritesheet.html#method.draw)
+/// documentation for examples.
 pub struct Sprite<'a, 'b> {
     renderer: &'a mut Renderer,
     call: &'b DrawCallHandle,
@@ -40,8 +44,7 @@ impl<'a, 'b> Sprite<'a, 'b> {
         }
     }
 
-    /// Renders the quad specified by this struct using the given draw
-    /// call and z coordinate. Smaller Z-values are rendered on top.
+    /// Renders the quad specified by this struct.
     pub fn finish(&mut self) {
         if let Some(area) = self.clip_area {
             self.renderer.draw_quad_clipped(

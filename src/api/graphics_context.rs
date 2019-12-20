@@ -19,12 +19,12 @@ use glutin::{PossiblyCurrent, WindowedContext};
 /// - [`Spritesheet::draw`](struct.Spritesheet.html#method.draw) to draw sprites,
 /// - [`Font::draw`](struct.Font.html#method.draw) to draw text.
 pub struct GraphicsContext {
-    window: WindowedContext<PossiblyCurrent>,
+    window: Option<WindowedContext<PossiblyCurrent>>,
     env_dpi_factor: f32,
 
+    pub(crate) renderer: Renderer,
     #[cfg(feature = "text")]
     pub(crate) text_renderers: Vec<TextRenderer>,
-    pub(crate) renderer: Renderer,
 
     /// The width of the window in logical coordinates. Multiply with
     /// `dpi_factor` to get the width in physical pixels.
@@ -49,25 +49,55 @@ impl GraphicsContext {
         };
 
         let size = context.window().inner_size();
+        let dpi_factor = env_dpi_factor * context.window().hidpi_factor() as f32;
         let (width, height) = (size.width as f32, size.height as f32);
-        let renderer = Renderer::new();
-
-        context.window().set_visible(true);
 
         GraphicsContext {
             env_dpi_factor,
-            window: context,
-            renderer,
+            window: Some(context),
+            renderer: Renderer::new(),
             #[cfg(feature = "text")]
             text_renderers: Vec::new(),
             width,
             height,
+            dpi_factor,
+        }
+    }
+
+    /// Creates a dummy version of the GraphicsContext for no_run
+    /// doctest usage. This will cause panics everywhere.
+    #[doc(hidden)]
+    pub fn dummy() -> GraphicsContext {
+        GraphicsContext {
+            env_dpi_factor: 1.0,
+            window: None,
+            renderer: Renderer::new(),
+            #[cfg(feature = "text")]
+            text_renderers: Vec::new(),
+            width: 0.0,
+            height: 0.0,
             dpi_factor: 1.0,
         }
     }
 
+    /// Returns true when running in legacy mode (OpenGL 3.3+
+    /// optimizations off).
+    pub fn is_legacy(&self) -> bool {
+        self.renderer.legacy
+    }
+
+    /// Returns the OpenGL version if it could be parsed.
+    pub fn get_opengl_version(&self) -> &OpenGlVersion {
+        &self.renderer.version
+    }
+
+    /// Returns the glutin context.
+    pub fn glutin_context(&self) -> &WindowedContext<PossiblyCurrent> {
+        self.inner()
+    }
+
     pub(crate) fn swap_buffers(&mut self) {
-        let _ = self.window.swap_buffers();
+        let _ = self.inner().swap_buffers();
         self.renderer.synchronize();
     }
 
@@ -76,14 +106,14 @@ impl GraphicsContext {
     }
 
     pub(crate) fn resize(&mut self, logical_size: Option<LogicalSize>, dpi_factor: Option<f64>) {
-        let logical_size = logical_size.unwrap_or_else(|| self.window.window().inner_size());
-        let dpi_factor = dpi_factor.unwrap_or_else(|| self.window.window().hidpi_factor());
+        let logical_size = logical_size.unwrap_or_else(|| self.inner().window().inner_size());
+        let dpi_factor = dpi_factor.unwrap_or_else(|| self.inner().window().hidpi_factor());
         let physical_size = logical_size.to_physical(dpi_factor);
         let (width, height): (u32, u32) = physical_size.into();
         unsafe {
             crate::gl::Viewport(0, 0, width as i32, height as i32);
         }
-        self.window.resize(physical_size);
+        self.inner().resize(physical_size);
         self.width = logical_size.width as f32 / self.env_dpi_factor;
         self.height = logical_size.height as f32 / self.env_dpi_factor;
         self.dpi_factor = dpi_factor as f32 * self.env_dpi_factor;
@@ -104,25 +134,13 @@ impl GraphicsContext {
             font.compose_draw_call(&mut self.renderer);
         }
         self.renderer.finish_frame();
-        self.window.window().request_redraw();
-    }
-}
-
-impl GraphicsContext {
-    /// Returns true when running in legacy mode (OpenGL 3.3+
-    /// optimizations off).
-    pub fn is_legacy(&self) -> bool {
-        self.renderer.legacy
+        self.inner().window().request_redraw();
     }
 
-    /// Returns the OpenGL version if it could be parsed.
-    pub fn get_opengl_version(&self) -> &OpenGlVersion {
-        &self.renderer.version
-    }
-
-    /// Returns the glutin context.
-    pub fn window(&self) -> &WindowedContext<PossiblyCurrent> {
-        &self.window
+    fn inner(&self) -> &WindowedContext<PossiblyCurrent> {
+        self.window
+            .as_ref()
+            .expect("failed to get windowed context; probably using a dummy context")
     }
 }
 

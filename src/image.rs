@@ -29,9 +29,9 @@ pub struct Image {
 impl Image {
     /// Parses a PNG image and makes an `Image` out of it.
     ///
-    /// This function assumes that the `Image` is in SRGB space, so
-    /// the image `format` is either `SRGB` or `SRGB_ALPHA` by
-    /// default.
+    /// This function assumes that the image is in SRGB space, so the
+    /// image `format` defaults to `SRGB` or `SRGB_ALPHA` if the image
+    /// contains the RGB or RGBA components.
     ///
     /// # Color type note
     ///

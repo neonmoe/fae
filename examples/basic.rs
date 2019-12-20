@@ -13,7 +13,7 @@ fn main() -> Result<(), fae::Error> {
     let mut window = Window::with_builders(WindowSettings::default().into())?;
 
     #[cfg(feature = "text")]
-    let mut font: Font = common::create_font(window.ctx());
+    let font: Font = common::create_font(window.ctx());
     #[cfg(feature = "png")]
     let image = Image::with_png(include_bytes!("res/sprite.png"))?;
     #[cfg(not(feature = "png"))]
@@ -24,6 +24,7 @@ fn main() -> Result<(), fae::Error> {
         .alpha_blending(false)
         .build(window.ctx());
 
+    window.ctx().glutin_context().window().set_visible(true);
     window.run(move |ctx, event, _, control_flow| {
         if let Some(mut ctx) = ctx {
             *control_flow = ControlFlow::Wait;

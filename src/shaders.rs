@@ -33,6 +33,29 @@ use crate::gl_version::OpenGlApi;
 /// precision mediump float;
 /// void main() {}
 /// ```
+///
+/// # Example
+/// ```no_run
+#[doc = "# let mut ctx = fae::GraphicsContext::dummy();
+# let fragment_shader_code_330 = String::new();
+# let fragment_shader_code_110 = String::new();
+use fae::{Shaders, SpritesheetBuilder};
+
+// If you want to just change the fragment shaders, create a default Shaders:
+let mut shaders = Shaders::default();
+
+// And then apply your changes:
+shaders.shader_330.fragment_shader = fragment_shader_code_330.clone();
+shaders.shader_300_es.fragment_shader = fragment_shader_code_330;
+shaders.shader_110.fragment_shader = fragment_shader_code_110.clone();
+shaders.shader_100_es.fragment_shader = fragment_shader_code_110;
+
+// Then you can use the shaders when creating a Spritesheet:
+let spritesheet = SpritesheetBuilder::new()
+    .shaders(shaders)
+    .build(&mut ctx);
+"]
+/// ```
 #[derive(Clone, Debug)]
 pub struct Shaders {
     /// The `#version 330` version of the shader, for OpenGL 3.3 and above.
