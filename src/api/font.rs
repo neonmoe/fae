@@ -52,7 +52,7 @@ impl Font {
     ///     .finish();
     /// ```
     pub fn draw<'a, S: Into<String>>(
-        &mut self,
+        &self,
         ctx: &'a mut GraphicsContext,
         text: S,
         x: f32,

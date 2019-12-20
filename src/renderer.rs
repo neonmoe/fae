@@ -728,6 +728,8 @@ fn create_attributes(legacy: bool, program: &ShaderProgram) -> Attributes {
     }
 
     if !legacy {
+        // TODO: Some vertex attributes might be optimized out if not used in shaders, which will cause a GL error.
+        // Maybe make the vertex attributes Options, and only enable them when they're Some?
         enable_vertex_attribs(&[
             (program.position_attrib_location, 4),
             (program.texcoord_attrib_location, 4),
