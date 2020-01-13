@@ -14,6 +14,9 @@ pub struct Font {
 impl Font {
     /// Creates a new font renderer using the given .ttf file as a
     /// font.
+    ///
+    /// The font is rasterized with
+    /// [`rusttype`](https://crates.io/crates/rusttype).
     #[cfg(feature = "ttf")]
     pub fn with_ttf(ctx: &mut GraphicsContext, ttf_data: Vec<u8>) -> Result<Font, rusttype::Error> {
         let text = TextRenderer::with_ttf(&mut ctx.renderer, ttf_data)?;

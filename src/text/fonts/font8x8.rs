@@ -6,13 +6,6 @@ use crate::text::*;
 use fnv::FnvHashMap;
 
 /// An implementation of FontProvider that uses `font8x8` as the font.
-///
-/// Contains a metric cache in the form of a HashMap, which takes up
-/// 17 bytes per glyph (1 byte from the GlyphId, 16 bytes from the
-/// RectPx) plus the HashMap's overhead. This cache improves
-/// performance a lot, as the metrics are accessed multiple times per
-/// glyph, every frame in the worst case. As no glyphs in the font8x8
-/// font rely on font size, this cache can't get very big.
 pub(crate) struct Font8x8Provider {
     metrics: FnvHashMap<GlyphId, RectPx>,
 }
@@ -73,7 +66,7 @@ impl FontProvider for Font8x8Provider {
         if let Some(bitmap) = get_bitmap(id) {
             self.render_bitmap(renderer, cache, id, bitmap)
         } else {
-            self.render_bitmap(renderer, cache, id, get_missing_bitmap())
+            self.render_bitmap(renderer, cache, id, MISSING_BITMAP)
         }
     }
 }
@@ -171,18 +164,16 @@ fn get_empty_pixels_top_bottom(id: GlyphId) -> Option<(i32, i32)> {
     Some((top? as i32, 7 - bottom? as i32))
 }
 
-fn get_missing_bitmap() -> [u8; 8] {
-    // Produces a bitmap of a rectangle, looks like:
-    // ........
-    // .######.
-    // .#....#.
-    // .#....#.
-    // .#....#.
-    // .######.
-    // ........
-    // ........
-    [0x7E, 0x42, 0x42, 0x42, 0x42, 0x42, 0x7E, 0x0]
-}
+// The bitmap defined below looks like this:
+// ........
+// .######.
+// .#....#.
+// .#....#.
+// .#....#.
+// .######.
+// ........
+// ........
+const MISSING_BITMAP: [u8; 8] = [0x7E, 0x42, 0x42, 0x42, 0x42, 0x42, 0x7E, 0x0];
 
 // This function provides glyphs for 558 characters (for calculating
 // the cache texture size)
@@ -190,7 +181,7 @@ fn get_missing_bitmap() -> [u8; 8] {
 pub fn get_bitmap(id: GlyphId) -> Option<[u8; 8]> {
     let u = id as usize;
     let bitmap = match u {
-        0 => Some(get_missing_bitmap()), // Standard missing glyph id
+        0 => Some(MISSING_BITMAP), // Standard missing glyph id
         1..=0x7F => Some(font8x8::legacy::BASIC_LEGACY[u]),
         0x80..=0x9F => Some(font8x8::legacy::CONTROL_LEGACY[u - 0x80]),
         0xA0..=0xFF => Some(font8x8::legacy::LATIN_LEGACY[u - 0xA0]),
@@ -225,7 +216,7 @@ pub fn get_bitmap(id: GlyphId) -> Option<[u8; 8]> {
 }
 
 #[test]
-fn get_font8x8_bitmap_works() {
+fn get_font8x8_bitmap_does_not_panic() {
     for u in 0..0xFFFF as GlyphId {
         get_bitmap(u);
     }

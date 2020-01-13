@@ -9,20 +9,8 @@ use rusttype::{Font, FontCollection, Scale};
 type FontSize = i32;
 
 /// An implementation of FontProvider that uses a TTF as the font, and
-/// uses `rusttype` for parsing and rasterizing it.
-///
-/// Contains three HashMaps for caching:
-/// - Metrics, 24 bytes per GlyphId + font size combination
-/// - Advance widths, 16 bytes per GlyphId pair\* + font size combination
-/// - Glyph ids, 4 bytes per character
-///
-/// And of course, the whatever overhead each of these HashMaps will
-/// have because of them being HashMaps. At least in the amount of
-/// text rendered in fae's examples, these caches don't seem to have
-/// much of an impact in the total memory usage of the application,
-/// but they do improve performance a lot.
-///
-/// \* The pairs consist of each rendered glyph and the one before it.
+/// uses [`rusttype`](https://crates.io/crates/rusttype) for parsing
+/// and rasterizing it.
 pub(crate) struct RustTypeProvider<'a> {
     glyph_padding: f32,
     font: Font<'a>,
