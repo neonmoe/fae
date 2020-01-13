@@ -16,12 +16,6 @@ const TEXT_FRAGMENT_SHADER_110: &str = include_str!("../shaders/legacy/text.frag
 const TEXT_FRAGMENT_SHADER_330: &str = include_str!("../shaders/text.frag");
 
 /// Contains reserved UVs in a glyph cache texture.
-///
-/// GlyphCache holds the reserved UVs from the glyph cache
-/// texture. For performance reasons, a HashMap is used to cache
-/// previously allocated UVs. This will take roughly 19 bytes per
-/// cached glyph (2 bytes from the CacheIdentifier + 17 bytes from the
-/// GlyphSpot).
 pub(crate) struct GlyphCache {
     pub(crate) call: DrawCallHandle,
     width: i32,
@@ -65,7 +59,7 @@ impl GlyphCache {
             height,
             max_size,
             column_cursor: GLYPH_CACHE_GAP,
-            columns: Vec::new(),
+            columns: Vec::with_capacity(1),
             cache: FnvHashMap::default(),
             requested_resize: None,
         };
@@ -84,18 +78,16 @@ impl GlyphCache {
         }
     }
 
-    /// Returns a pointer to the GlyphSpot, and whether the spot was
-    /// reserved just now (and requires rendering into).
+    /// Returns the UV coordinates to render into, and whether the
+    /// spot was reserved just now (and requires rendering into).
     pub fn reserve(
         &mut self,
         id: CacheIdentifier,
         width: i32,
         height: i32,
     ) -> Result<(RectPx, bool), GlyphRenderingError> {
-        if let Some(uvs) = self
-            // First try to find the uvs from the cache
-            .get_uvs_from_cache(id)
-        {
+        // First try to find the uvs from the cache
+        if let Some(uvs) = self.get_uvs_from_cache(id) {
             Ok((uvs.texcoords, false))
         } else {
             // Crawl through the columns trying different ways to
@@ -126,7 +118,7 @@ impl GlyphCache {
                     // And finally, request a resize if it would be
                     // enough to fit the glyph, and then give
                     // up. Better luck next frame! (Then there should
-                    // be enough space.)
+                    // be enough space, after the resize.)
 
                     // Note: we do not resize here, because resizing
                     // during a frame will invalidate all the
@@ -575,13 +567,13 @@ impl GlyphLine {
     }
 }
 
-pub struct GlyphSpot {
+struct GlyphSpot {
     texcoords: RectPx,
     status: Cell<ExpiryStatus>,
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
-pub enum ExpiryStatus {
+enum ExpiryStatus {
     UsedDuringThisFrame,
     UsedDuringLastFrame,
     Expired,

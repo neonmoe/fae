@@ -17,7 +17,7 @@ last-minute bugs.
 - [x] src/api/spritesheet.rs
 - [x] src/api/window.rs
 
-- [ ] src/text/glyph_cache.rs
+- [x] src/text/glyph_cache.rs
 - [ ] src/text/layout.rs
 - [ ] src/text/mod.rs
 - [ ] src/text/text_builder.rs
@@ -26,3 +26,5 @@ last-minute bugs.
 - [ ] src/text/fonts/font8x8.rs
 - [ ] src/text/fonts/mod.rs
 - [ ] src/text/fonts/rusttype.rs
+
+...and remember to run clippy!
