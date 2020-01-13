@@ -30,14 +30,15 @@ struct ShaderProgram {
     program: GLuint,
     vertex_shader: GLuint,
     fragment_shader: GLuint,
-    projection_matrix_location: GLint,
-    position_attrib_location: GLuint,
-    texcoord_attrib_location: GLuint,
-    color_attrib_location: GLuint,
-    rotation_attrib_location: GLuint,
-    depth_attrib_location: GLuint,
-    shared_position_attrib_location: GLuint,
-    shared_texcoord_attrib_location: GLuint,
+
+    projection_matrix_location: Option<GLint>,
+    position_attrib_location: Option<GLuint>,
+    texcoord_attrib_location: Option<GLuint>,
+    color_attrib_location: Option<GLuint>,
+    rotation_attrib_location: Option<GLuint>,
+    depth_attrib_location: Option<GLuint>,
+    shared_position_attrib_location: Option<GLuint>,
+    shared_texcoord_attrib_location: Option<GLuint>,
 }
 
 #[derive(Clone, Debug)]
@@ -139,7 +140,7 @@ impl Renderer {
         let frag = shaders.create_frag_string(api, legacy);
         let index = self.calls.len();
 
-        let program = create_program(&vert, &frag, legacy);
+        let program = create_program(&vert, &frag);
         let attributes = create_attributes(legacy, &program);
         let filter = |smoothed| if smoothed { gl::LINEAR } else { gl::NEAREST } as i32;
         let get_wrap = |wrap_type| match wrap_type {
@@ -329,12 +330,9 @@ impl Renderer {
                     gl::Disable(gl::FRAMEBUFFER_SRGB);
                 }
                 gl::UseProgram(call.program.program);
-                gl::UniformMatrix4fv(
-                    call.program.projection_matrix_location,
-                    1,
-                    gl::FALSE,
-                    matrix.as_ptr(),
-                );
+                if let Some(location) = call.program.projection_matrix_location {
+                    gl::UniformMatrix4fv(location, 1, gl::FALSE, matrix.as_ptr());
+                }
                 if !legacy {
                     gl::BindVertexArray(call.attributes.vao.0);
                     gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, call.attributes.element_buffer.0);
@@ -558,7 +556,7 @@ impl Drop for Renderer {
 }
 
 #[inline]
-fn create_program(vert_source: &str, frag_source: &str, legacy: bool) -> ShaderProgram {
+fn create_program(vert_source: &str, frag_source: &str) -> ShaderProgram {
     let print_shader_error = |shader, shader_type| {
         let mut compilation_status = 0;
         unsafe {
@@ -630,50 +628,35 @@ fn create_program(vert_source: &str, frag_source: &str, legacy: bool) -> ShaderP
     }
     print_gl_errors("after shader program creation");
 
-    let projection_matrix_location;
-    let position_attrib_location;
-    let texcoord_attrib_location;
-    let color_attrib_location;
-    let rotation_attrib_location;
-    let mut depth_attrib_location = 0;
-    let mut shared_position_attrib_location = 0;
-    let mut shared_texcoord_attrib_location = 0;
     unsafe {
         gl::UseProgram(program);
-        projection_matrix_location =
-            gl::GetUniformLocation(program, "projection_matrix\0".as_ptr() as *const _);
-        position_attrib_location =
-            gl::GetAttribLocation(program, "position\0".as_ptr() as *const _) as GLuint;
-        texcoord_attrib_location =
-            gl::GetAttribLocation(program, "texcoord\0".as_ptr() as *const _) as GLuint;
-        color_attrib_location =
-            gl::GetAttribLocation(program, "color\0".as_ptr() as *const _) as GLuint;
-        rotation_attrib_location =
-            gl::GetAttribLocation(program, "rotation\0".as_ptr() as *const _) as GLuint;
-
-        if !legacy {
-            depth_attrib_location =
-                gl::GetAttribLocation(program, "depth\0".as_ptr() as *const _) as GLuint;
-            shared_position_attrib_location =
-                gl::GetAttribLocation(program, "shared_position\0".as_ptr() as *const _) as GLuint;
-            shared_texcoord_attrib_location =
-                gl::GetAttribLocation(program, "shared_texcoord\0".as_ptr() as *const _) as GLuint;
-        }
     }
-    print_gl_errors("after searching for attribute locations");
+    let get_attrib_location = |name_ptr: &str| {
+        let location = unsafe { gl::GetAttribLocation(program, name_ptr.as_ptr() as *const _) };
+        match location {
+            -1 => None,
+            x => Some(x as GLuint),
+        }
+    };
+    let projection_matrix_location = match unsafe {
+        gl::GetUniformLocation(program, "projection_matrix\0".as_ptr() as *const _)
+    } {
+        -1 => None,
+        x => Some(x),
+    };
 
     ShaderProgram {
         program,
         vertex_shader,
         fragment_shader,
         projection_matrix_location,
-        position_attrib_location,
-        texcoord_attrib_location,
-        color_attrib_location,
-        rotation_attrib_location,
-        depth_attrib_location,
-        shared_position_attrib_location,
-        shared_texcoord_attrib_location,
+        position_attrib_location: get_attrib_location("position\0"),
+        texcoord_attrib_location: get_attrib_location("texcoord\0"),
+        color_attrib_location: get_attrib_location("color\0"),
+        rotation_attrib_location: get_attrib_location("rotation\0"),
+        depth_attrib_location: get_attrib_location("depth\0"),
+        shared_position_attrib_location: get_attrib_location("shared_position\0"),
+        shared_texcoord_attrib_location: get_attrib_location("shared_texcoord\0"),
     }
 }
 
@@ -728,8 +711,6 @@ fn create_attributes(legacy: bool, program: &ShaderProgram) -> Attributes {
     }
 
     if !legacy {
-        // TODO: Some vertex attributes might be optimized out if not used in shaders, which will cause a GL error.
-        // Maybe make the vertex attributes Options, and only enable them when they're Some?
         enable_vertex_attribs(&[
             (program.position_attrib_location, 4),
             (program.texcoord_attrib_location, 4),
@@ -737,13 +718,19 @@ fn create_attributes(legacy: bool, program: &ShaderProgram) -> Attributes {
             (program.rotation_attrib_location, 3),
             (program.depth_attrib_location, 1),
         ]);
-        unsafe {
-            gl::VertexAttribDivisor(program.position_attrib_location, 1);
-            gl::VertexAttribDivisor(program.texcoord_attrib_location, 1);
-            gl::VertexAttribDivisor(program.color_attrib_location, 1);
-            gl::VertexAttribDivisor(program.rotation_attrib_location, 1);
-            gl::VertexAttribDivisor(program.depth_attrib_location, 1);
-        }
+
+        let setup_vertex_attrib_divisor = |location: Option<GLuint>| {
+            if let Some(location) = location {
+                unsafe {
+                    gl::VertexAttribDivisor(location, 1);
+                }
+            }
+        };
+        setup_vertex_attrib_divisor(program.position_attrib_location);
+        setup_vertex_attrib_divisor(program.texcoord_attrib_location);
+        setup_vertex_attrib_divisor(program.color_attrib_location);
+        setup_vertex_attrib_divisor(program.rotation_attrib_location);
+        setup_vertex_attrib_divisor(program.depth_attrib_location);
     }
     print_gl_errors("after attribute creation");
 
@@ -758,21 +745,25 @@ fn create_attributes(legacy: bool, program: &ShaderProgram) -> Attributes {
 }
 
 // (location, component_count)
-type AttribArray = (GLuint, GLint);
+type AttribArray = (Option<GLuint>, GLint);
 fn enable_vertex_attribs(attribs: &[AttribArray]) {
     let total_components = attribs.iter().map(|attrib| attrib.1 * 4).sum();
+
     let mut offset = 0;
     for attrib in attribs {
-        unsafe {
-            gl::VertexAttribPointer(
-                attrib.0,           /* Attrib location */
-                attrib.1,           /* Components */
-                gl::FLOAT,          /* Type */
-                gl::FALSE,          /* Normalize */
-                total_components,   /* Stride */
-                offset as *const _, /* Offset */
-            );
-            gl::EnableVertexAttribArray(attrib.0);
+        // Only enable the attributes that exist
+        if let Some(location) = attrib.0 {
+            unsafe {
+                gl::VertexAttribPointer(
+                    location,           /* Attrib location */
+                    attrib.1,           /* Components */
+                    gl::FLOAT,          /* Type */
+                    gl::FALSE,          /* Normalize */
+                    total_components,   /* Stride */
+                    offset as *const _, /* Offset */
+                );
+                gl::EnableVertexAttribArray(location);
+            }
         }
         let component_size = attrib.1 * 4;
         offset += component_size;
@@ -781,10 +772,12 @@ fn enable_vertex_attribs(attribs: &[AttribArray]) {
     print_gl_errors("after enabling vertex attributes");
 }
 
-fn disable_vertex_attribs(attrib_locations: &[GLuint]) {
+fn disable_vertex_attribs(attrib_locations: &[Option<GLuint>]) {
     for location in attrib_locations {
-        unsafe {
-            gl::DisableVertexAttribArray(*location);
+        if let Some(location) = location {
+            unsafe {
+                gl::DisableVertexAttribArray(*location);
+            }
         }
     }
 
