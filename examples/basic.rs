@@ -19,7 +19,7 @@ fn main() -> Result<(), fae::Error> {
     #[cfg(not(feature = "png"))]
     let image = Image::with_color(16, 16, &[0xFF, 0xFF, 0x00, 0xFF])?;
 
-    let spritesheet: Spritesheet = SpritesheetBuilder::new()
+    let spritesheet: Spritesheet = SpritesheetBuilder::default()
         .image(image)
         .alpha_blending(false)
         .build(window.ctx());

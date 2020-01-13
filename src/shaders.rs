@@ -51,7 +51,7 @@ shaders.shader_110.fragment_shader = fragment_shader_code_110.clone();
 shaders.shader_100_es.fragment_shader = fragment_shader_code_110;
 
 // Then you can use the shaders when creating a Spritesheet:
-let spritesheet = SpritesheetBuilder::new()
+let spritesheet = SpritesheetBuilder::default()
     .shaders(shaders)
     .build(&mut ctx);
 "]

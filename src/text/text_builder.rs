@@ -57,16 +57,13 @@ impl<'a> Text<'a> {
     }
 
     /// Sets the text's Z-coordinate.
-    pub fn z<'l>(&'l mut self, z: f32) -> &'l mut Self {
+    pub fn z(&mut self, z: f32) -> &mut Self {
         self.data.z = z;
         self
     }
 
     /// Sets the text's color.
-    pub fn color<'l>(
-        &'l mut self,
-        (red, green, blue, alpha): (f32, f32, f32, f32),
-    ) -> &'l mut Self {
+    pub fn color(&mut self, (red, green, blue, alpha): (f32, f32, f32, f32)) -> &mut Self {
         self.data.color = (red, green, blue, alpha);
         self
     }
@@ -75,13 +72,13 @@ impl<'a> Text<'a> {
     /// specified: the x-coordinate of this text is considered to be
     /// the left border, and the max width of the text + the
     /// x-coordinate the right.
-    pub fn alignment<'l>(&'l mut self, alignment: Alignment) -> &'l mut Self {
+    pub fn alignment(&mut self, alignment: Alignment) -> &mut Self {
         self.data.alignment = alignment;
         self
     }
 
     /// Sets the maximum width of this text.
-    pub fn max_width<'l>(&'l mut self, width: f32) -> &'l mut Self {
+    pub fn max_width(&mut self, width: f32) -> &mut Self {
         self.data.max_line_width = Some((width * self.renderer.dpi_factor) as i32);
         self
     }
@@ -89,7 +86,7 @@ impl<'a> Text<'a> {
     /// Sets the clipping area, ie. the area where the text will be
     /// rendered. Text that falls out of the clip area will be
     /// *clipped* off.
-    pub fn clip_area<'l, R: Into<Rect>>(&'l mut self, clip_area: R) -> &'l mut Self {
+    pub fn clip_area<R: Into<Rect>>(&mut self, clip_area: R) -> &mut Self {
         self.data.clip_area = Some(clip_area.into());
         self
     }
@@ -101,14 +98,14 @@ impl<'a> Text<'a> {
     /// Useful for measuring the bounding box of some piece of text,
     /// without spending performance drawing it with 0 alpha, which
     /// would make it invisible as well.
-    pub fn visibility<'l>(&'l mut self, visible: bool) -> &'l mut Self {
+    pub fn visibility(&mut self, visible: bool) -> &mut Self {
         self.data.visible = visible;
         self
     }
 
     /// Specifies the rotation (in radians) and pivot of the text,
     /// relative to the text's origin.
-    pub fn rotation<'l>(&'l mut self, rotation: f32, pivot_x: f32, pivot_y: f32) -> &'l mut Self {
+    pub fn rotation(&mut self, rotation: f32, pivot_x: f32, pivot_y: f32) -> &mut Self {
         self.data.rotation = (rotation, pivot_x, pivot_y);
         self
     }

@@ -119,6 +119,7 @@ impl Renderer {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn create_draw_call(
         &mut self,
         image: Option<&Image>,
@@ -931,12 +932,13 @@ fn gl_error_to_string(error: GLuint) -> String {
 }
 
 fn error_buffer_into_string(raw: Vec<i8>) -> String {
+    let original_len = raw.len();
     let len = raw
         .iter()
         .enumerate() // Enumerate: values are (index, &value)
         .find(|&(_, &v)| v == 0) // Find the nul byte
         .map(|(i, _)| i) // Get the index to use as the length
-        .unwrap_or(raw.len()); // If no nul byte was found, assume the whole buffer len
+        .unwrap_or(original_len); // If no nul byte was found, assume the whole buffer len
     let info: Vec<u8> = raw[0..len]
         .iter()
         .map(|&i| unsafe { mem::transmute::<i8, u8>(i) })

@@ -5,33 +5,46 @@ use crate::types::{Rect, RectPx};
 
 use crate::renderer::{DrawCallHandle, Shaders, TextureWrapping};
 
-/// Holds a texture for rendering. See also:
-/// [`Spritesheet::draw`](struct.Spritesheet.html#method.draw).
+/// Holds a texture for rendering.
 ///
-/// Constructed with a
+/// This struct is safe to clone in order to use elsewhere: the only
+/// data held by this struct is a handle to the internal draw
+/// call. Currently, it is not possible to delete draw calls, and the
+/// only way to create a new one is by using the
 /// [`SpritesheetBuilder`](struct.SpritesheetBuilder.html).
+///
+///
+/// # Example
+///
+/// ```no_run
+/// # let an_image = fae::Image::with_null_texture(16, 16, fae::gl::RED);
+/// # let mut ctx = fae::GraphicsContext::dummy();
+/// use fae::SpritesheetBuilder;
+///
+/// // Creating the spritesheet:
+/// let spritesheet = SpritesheetBuilder::default()
+///     .image(an_image)
+///     .alpha_blending(false)
+///     .build(&mut ctx);
+///
+/// // Later, in rendering code:
+/// spritesheet.draw(&mut ctx)
+///     .coordinates((100.0, 100.0, 16.0, 16.0))
+///     .texture_coordinates((0, 0, 16, 16))
+///     .finish();
+/// ```
 #[derive(Clone, Debug)]
 pub struct Spritesheet {
     pub(crate) handle: DrawCallHandle,
 }
 
 impl Spritesheet {
-    /// Creates a Sprite struct, which you can draw by calling
-    /// `.finish()`. The parameters are set using [the builder
+    /// Creates a Sprite struct, a builder struct which defines the
+    /// action "draw a sprite from this spritesheet onto the screen."
+    /// To "execute" the builder, call
+    /// [`finish()`](struct.Sprite.html#method.finish). The parameters
+    /// are set using [the builder
     /// pattern](https://doc.rust-lang.org/1.0.0/style/ownership/builders.html).
-    ///
-    /// # Usage
-    /// ```no_run
-    /// # let mut ctx = fae::GraphicsContext::dummy();
-    /// // Initialize the spritesheet once somewhere, usually before the game loop:
-    /// let spritesheet = fae::SpritesheetBuilder::new().build(&mut ctx);
-    ///
-    /// // Then in rendering code, call draw:
-    /// spritesheet.draw(&mut ctx)
-    ///     .coordinates((100.0, 100.0, 16.0, 16.0))
-    ///     .texture_coordinates((0, 0, 16, 16))
-    ///     .finish();
-    /// ```
     ///
     /// ## Optimization tips
     ///
@@ -156,9 +169,8 @@ pub struct SpritesheetBuilder {
     pub srgb: bool,
 }
 
-impl SpritesheetBuilder {
-    /// Creates a new SpritesheetBuilder.
-    pub fn new() -> SpritesheetBuilder {
+impl Default for SpritesheetBuilder {
+    fn default() -> SpritesheetBuilder {
         SpritesheetBuilder {
             image: None,
             shaders: Shaders::default(),
@@ -169,7 +181,9 @@ impl SpritesheetBuilder {
             srgb: true,
         }
     }
+}
 
+impl SpritesheetBuilder {
     /// Creates a new Spritesheet from this builder.
     pub fn build(&self, ctx: &mut GraphicsContext) -> Spritesheet {
         Spritesheet {
@@ -186,50 +200,47 @@ impl SpritesheetBuilder {
     }
 
     /// Sets the spritesheet's texture.
-    pub fn image<'a>(&'a mut self, image: Image) -> &'a mut SpritesheetBuilder {
+    pub fn image(&mut self, image: Image) -> &mut SpritesheetBuilder {
         self.image = Some(image);
         self
     }
 
     /// Sets the spritesheet's shaders.
-    pub fn shaders<'a>(&'a mut self, shaders: Shaders) -> &'a mut SpritesheetBuilder {
+    pub fn shaders(&mut self, shaders: Shaders) -> &mut SpritesheetBuilder {
         self.shaders = shaders;
         self
     }
 
     /// Toggles the spritesheet's alpha blending.
-    pub fn alpha_blending<'a>(&'a mut self, alpha_blending: bool) -> &'a mut SpritesheetBuilder {
+    pub fn alpha_blending(&mut self, alpha_blending: bool) -> &mut SpritesheetBuilder {
         self.alpha_blending = alpha_blending;
         self
     }
 
     /// Sets the spritesheet's minification filter.
-    pub fn minification_smoothing<'a>(&'a mut self, smoothing: bool) -> &'a mut SpritesheetBuilder {
+    pub fn minification_smoothing(&mut self, smoothing: bool) -> &mut SpritesheetBuilder {
         self.minification_smoothing = smoothing;
         self
     }
 
     /// Sets the spritesheet's magnification filter.
-    pub fn magnification_smoothing<'a>(
-        &'a mut self,
-        smoothing: bool,
-    ) -> &'a mut SpritesheetBuilder {
+    pub fn magnification_smoothing(&mut self, smoothing: bool) -> &mut SpritesheetBuilder {
         self.magnification_smoothing = smoothing;
         self
     }
 
     /// Sets the spritesheet texture's wrapping behavior.
-    pub fn wrapping_behavior<'a>(
-        &'a mut self,
+    pub fn wrapping_behavior(
+        &mut self,
         wrap_s: TextureWrapping,
         wrap_t: TextureWrapping,
-    ) -> &'a mut SpritesheetBuilder {
+    ) -> &mut SpritesheetBuilder {
         self.wrap = (wrap_s, wrap_t);
         self
     }
 
     /// Toggles the srgb-ness of the draw call.
-    pub fn srgb<'a>(&'a mut self, srgb: bool) -> &'a mut SpritesheetBuilder {
+    pub fn srgb(&mut self, srgb: bool) -> &mut SpritesheetBuilder {
         self.srgb = srgb;
         self
     }
