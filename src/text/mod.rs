@@ -53,7 +53,7 @@ impl TextRenderer {
         renderer: &mut Renderer,
         ttf_data: Vec<u8>,
     ) -> Result<TextRenderer, rusttype::Error> {
-        let cache = GlyphCache::new(renderer, 256, 256, true);
+        let cache = GlyphCache::new(renderer, 64, 64, true);
         let font = Box::new(fonts::RustTypeProvider::new(ttf_data)?);
         Ok(TextRenderer::with_params(cache, font))
     }

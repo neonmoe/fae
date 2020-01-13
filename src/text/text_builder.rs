@@ -84,7 +84,7 @@ impl<'a> Text<'a> {
     }
 
     /// Sets the clipping area, ie. the area where the text will be
-    /// rendered. Text that falls out of the clip area will be
+    /// rendered. Text that is not inside the clip area will be
     /// *clipped* off.
     pub fn clip_area<R: Into<Rect>>(&mut self, clip_area: R) -> &mut Self {
         self.data.clip_area = Some(clip_area.into());

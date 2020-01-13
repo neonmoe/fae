@@ -18,10 +18,10 @@ last-minute bugs.
 - [x] src/api/window.rs
 
 - [x] src/text/glyph_cache.rs
-- [ ] src/text/layout.rs
-- [ ] src/text/mod.rs
-- [ ] src/text/text_builder.rs
-- [ ] src/text/types.rs
+- [x] src/text/layout.rs
+- [x] src/text/mod.rs
+- [x] src/text/text_builder.rs
+- [x] src/text/types.rs
 
 - [ ] src/text/fonts/font8x8.rs
 - [ ] src/text/fonts/mod.rs
