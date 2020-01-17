@@ -49,5 +49,5 @@ gl_generator = "^0.14.0"
 name = "basic"
 required-features = []
 
-[profile.release]
-debug = true
+[package.metadata.docs.rs]
+all-features = true
