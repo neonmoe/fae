@@ -3,80 +3,68 @@ use crate::renderer::Renderer;
 #[cfg(feature = "text")]
 use crate::text::TextRenderer;
 
-use glutin::dpi::LogicalSize;
-use glutin::{PossiblyCurrent, WindowedContext};
-
-/// Draw stuff on the screen with this.
+/// The overarching state of the crate. Intended to live outside of
+/// the main game loop.
 ///
-/// Borrow this struct from:
-/// - [`Window::ctx`](struct.Window.html#method.ctx) before starting
-///   the event loop,
-/// - The first parameter of the closure in
-///   [`Window::run`](struct.Window.html#method.run) (during the event
-///   loop).
+/// This is the struct you can get a GraphicsContext from, and which
+/// should live as long as you're drawing anything. Illustrated:
+/// ```no_run
+/// use fae::Context;
+/// let mut fae_context: Context = Context::new();
+/// # let (width, height, dpi_factor) = (0.0, 0.0, 0.0);
+/// # let spritesheet = fae::SpritesheetBuilder::default().build(&mut fae_context);
 ///
-/// Then, pass it to:
-/// - [`Spritesheet::draw`](struct.Spritesheet.html#method.draw) to draw sprites,
-/// - [`Font::draw`](struct.Font.html#method.draw) to draw text.
-pub struct GraphicsContext {
-    window: Option<WindowedContext<PossiblyCurrent>>,
-    env_dpi_factor: f32,
-
+/// loop {
+///     // Here's your gameloop, and now you want to draw something.
+///
+///     // First, create the GraphicsContext with start_frame.
+///     let mut ctx: GraphicsContext = fae_context.start_frame(width, height, dpi_factor);
+///
+///     // Then do your rendering stuff.
+///     spritesheet.draw(&mut ctx)
+///         /* ... */
+///         .finish();
+///
+///     // Finish frame and consume the GraphicsContext.
+///     ctx.finish_frame();
+///
+///     // swap buffers, fae_context.synchronize(), etc.
+/// }
+/// ```
+///
+/// This construct makes the state of fae more clear, as you can only
+/// have access to either the Context or the GraphicsContext, as
+/// well as providing a good synchronization point (start_frame) where
+/// the window's state is passed to fae, ensuring that all rendering
+/// operations are done based on up-to-date information.
+pub struct Context {
     pub(crate) renderer: Renderer,
     #[cfg(feature = "text")]
     pub(crate) text_renderers: Vec<TextRenderer>,
-
-    /// The width of the window in logical coordinates. Multiply with
-    /// `dpi_factor` to get the width in physical pixels.
-    pub width: f32,
-    /// The height of the window in logical coordinates. Multiply with
-    /// `dpi_factor` to get the height in physical pixels.
-    pub height: f32,
-    /// The dpi multiplier of the window.
-    pub dpi_factor: f32,
 }
 
-impl GraphicsContext {
-    pub(crate) fn new(context: WindowedContext<PossiblyCurrent>) -> GraphicsContext {
-        let env_dpi_factor = {
-            let multiplier = get_env_dpi();
-            let size = context.window().inner_size();
-            let (w, h): (f64, f64) = size.into();
-            context
-                .window()
-                .set_inner_size((w * f64::from(multiplier), h * f64::from(multiplier)).into());
-            multiplier
-        };
-
-        let size = context.window().inner_size();
-        let dpi_factor = env_dpi_factor * context.window().hidpi_factor() as f32;
-        let (width, height) = (size.width as f32, size.height as f32);
-
-        GraphicsContext {
-            env_dpi_factor,
-            window: Some(context),
+impl Context {
+    /// Creates a new GraphicsContext. See the Safety section.
+    ///
+    /// # Safety
+    ///
+    /// Basically everything in fae assumes that it can call OpenGL,
+    /// so please ensure you have called something along the lines of:
+    ///
+    /// ```ignore
+    /// unsafe { fae::gl::load_with(|symbol| context.get_proc_address(symbol) as *const _); }
+    /// ```
+    ///
+    /// Before creating a Context.
+    ///
+    /// The width, height and dpi_factor are only initial values; they
+    /// are updated in the call to
+    /// [`Context::start_frame()`](struct.Context.html#method.start_frame).
+    pub fn new() -> Context {
+        Context {
             renderer: Renderer::new(),
             #[cfg(feature = "text")]
             text_renderers: Vec::new(),
-            width,
-            height,
-            dpi_factor,
-        }
-    }
-
-    /// Creates a dummy version of the GraphicsContext for no_run
-    /// doctest usage. This will cause panics everywhere.
-    #[doc(hidden)]
-    pub fn dummy() -> GraphicsContext {
-        GraphicsContext {
-            env_dpi_factor: 1.0,
-            window: None,
-            renderer: Renderer::new(),
-            #[cfg(feature = "text")]
-            text_renderers: Vec::new(),
-            width: 0.0,
-            height: 0.0,
-            dpi_factor: 1.0,
         }
     }
 
@@ -91,77 +79,92 @@ impl GraphicsContext {
         &self.renderer.version
     }
 
-    /// Returns the glutin context.
-    pub fn glutin_context(&self) -> &WindowedContext<PossiblyCurrent> {
-        self.inner()
-    }
-
-    pub(crate) fn swap_buffers(&mut self) {
-        let _ = self.inner().swap_buffers();
+    /// Tries to ensure that all the commands queued in the GPU have been processed.
+    ///
+    /// Call this after swap_buffers to ensure that everything after
+    /// this happens only after the frame has been sent to the screen,
+    /// but don't trust this to actually work. Doing vsync properly
+    /// with OpenGL is a mess, as far as I know.
+    pub fn synchronize(&mut self) {
         self.renderer.synchronize();
     }
 
-    pub(crate) fn render(&mut self) {
-        self.renderer.render(self.width, self.height);
-    }
-
-    pub(crate) fn resize(&mut self, logical_size: Option<LogicalSize>, dpi_factor: Option<f64>) {
-        let logical_size = logical_size.unwrap_or_else(|| self.inner().window().inner_size());
-        let dpi_factor = dpi_factor.unwrap_or_else(|| self.inner().window().hidpi_factor());
-        let physical_size = logical_size.to_physical(dpi_factor);
-        let (width, height): (u32, u32) = physical_size.into();
-        unsafe {
-            crate::gl::Viewport(0, 0, width as i32, height as i32);
-        }
-        self.inner().resize(physical_size);
-        self.width = logical_size.width as f32 / self.env_dpi_factor;
-        self.height = logical_size.height as f32 / self.env_dpi_factor;
-        self.dpi_factor = dpi_factor as f32 * self.env_dpi_factor;
-    }
-
-    pub(crate) fn prepare_frame(&mut self) {
-        self.renderer.prepare_new_frame(self.dpi_factor);
+    /// Creates a GraphicsContext for this frame.
+    ///
+    /// The parameters `width` and `height` are the dimensions of the
+    /// window, and dpi_factor is a multiplier, such that: `width *
+    /// dpi_factor` is the window's width in physical pixels, and
+    /// `height * dpi_factor` is the height in physical pixels.
+    pub fn start_frame(&mut self, width: f32, height: f32, dpi_factor: f32) -> GraphicsContext {
+        self.renderer.prepare_new_frame(dpi_factor);
 
         #[cfg(feature = "text")]
         for font in &mut self.text_renderers {
-            font.prepare_new_frame(&mut self.renderer, self.dpi_factor, self.width, self.height);
+            font.prepare_new_frame(&mut self.renderer, dpi_factor, width, height);
+        }
+
+        GraphicsContext {
+            renderer: &mut self.renderer,
+            #[cfg(feature = "text")]
+            text_renderers: &mut self.text_renderers,
+            width,
+            height,
+            dpi_factor,
         }
     }
 
-    pub(crate) fn finish_frame(&mut self) {
-        #[cfg(feature = "text")]
-        for font in &mut self.text_renderers {
-            font.compose_draw_call(&mut self.renderer);
-        }
-        self.renderer.finish_frame();
-        self.inner().window().request_redraw();
-    }
-
-    fn inner(&self) -> &WindowedContext<PossiblyCurrent> {
-        self.window
-            .as_ref()
-            .expect("failed to get windowed context; probably using a dummy context")
+    /// Renders the frame with the given `width` and `height`.
+    ///
+    /// See
+    /// [`Context::start_frame`](struct.Context.html#method.start_frame)
+    /// for more information on what `width` and `height` are,
+    /// specifically.
+    ///
+    /// This should generally be called after
+    /// [`GraphicsContext::finish_frame`](struct.GraphicsContext.html#method.finish_frame),
+    /// but can also be used to redraw the previous frame.
+    pub fn render(&mut self, width: f32, height: f32) {
+        self.renderer.render(width, height);
     }
 }
 
-fn get_env_dpi() -> f32 {
-    let get_var = |name: &str| {
-        std::env::var(name)
-            .ok()
-            .and_then(|var| var.parse::<f32>().ok())
-            .filter(|f| *f > 0.0)
-    };
-    if let Some(dpi_factor) = get_var("QT_AUTO_SCREEN_SCALE_FACTOR") {
-        return dpi_factor;
+/// Draw stuff on the screen with this.
+///
+/// Create this struct with
+/// [`Context::start_frame()`](struct.Context.html#method.start_frame).
+///
+/// Then, pass it to:
+/// - [`Spritesheet::draw`](struct.Spritesheet.html#method.draw) to draw sprites,
+/// - [`Font::draw`](struct.Font.html#method.draw) to draw text.
+///
+/// And after doing all the drawing, call
+/// [`GraphicsContext::finish_frame()`](struct.GraphicsContext.html#method.finish_frame)
+/// to flush all the rendering operations.
+pub struct GraphicsContext<'a> {
+    pub(crate) renderer: &'a mut Renderer,
+    #[cfg(feature = "text")]
+    pub(crate) text_renderers: &'a mut Vec<TextRenderer>,
+
+    /// The width of the window in logical coordinates. Multiply with
+    /// `dpi_factor` to get the width in physical pixels.
+    pub width: f32,
+    /// The height of the window in logical coordinates. Multiply with
+    /// `dpi_factor` to get the height in physical pixels.
+    pub height: f32,
+    /// The dpi multiplier of the window.
+    pub dpi_factor: f32,
+}
+
+impl GraphicsContext<'_> {
+    /// Consume this GraphicsContext to render everything that has
+    /// been queued with `draw` calls so far. Call
+    /// [`Context::render()`](struct.Context.html#method.render)
+    /// and swap buffers after this.
+    pub fn finish_frame(self) {
+        #[cfg(feature = "text")]
+        for font in self.text_renderers {
+            font.compose_draw_call(self.renderer);
+        }
+        self.renderer.finish_frame();
     }
-    if let Some(dpi_factor) = get_var("QT_SCALE_FACTOR") {
-        return dpi_factor;
-    }
-    if let Some(dpi_factor) = get_var("GDK_SCALE") {
-        return dpi_factor;
-    }
-    if let Some(dpi_factor) = get_var("ELM_SCALE") {
-        return dpi_factor;
-    }
-    1.0
 }

@@ -3,9 +3,6 @@
 mod fae_error;
 pub use fae_error::Error;
 
-mod glutin_error;
-pub use glutin_error::GlutinError;
-
 mod image_creation_error;
 pub use image_creation_error::ImageCreationError;
 

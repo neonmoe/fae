@@ -1,4 +1,4 @@
-use crate::api::GraphicsContext;
+use crate::api::{Context, GraphicsContext};
 use crate::image::Image;
 use crate::sprite::Sprite;
 use crate::types::{Rect, RectPx};
@@ -18,7 +18,7 @@ use crate::renderer::{DrawCallHandle, Shaders, TextureWrapping};
 ///
 /// ```no_run
 /// # let an_image = fae::Image::with_null_texture(16, 16, fae::gl::RED);
-/// # let mut ctx = fae::GraphicsContext::dummy();
+/// let mut ctx = fae::Context::new();
 /// use fae::SpritesheetBuilder;
 ///
 /// // Creating the spritesheet:
@@ -28,6 +28,8 @@ use crate::renderer::{DrawCallHandle, Shaders, TextureWrapping};
 ///     .build(&mut ctx);
 ///
 /// // Later, in rendering code:
+/// # let (width, height, dpi_factor) = (0.0, 0.0, 0.0);
+/// let mut ctx = ctx.start_frame(width, height, dpi_factor);
 /// spritesheet.draw(&mut ctx)
 ///     .coordinates((100.0, 100.0, 16.0, 16.0))
 ///     .texture_coordinates((0, 0, 16, 16))
@@ -185,7 +187,7 @@ impl Default for SpritesheetBuilder {
 
 impl SpritesheetBuilder {
     /// Creates a new Spritesheet from this builder.
-    pub fn build(&self, ctx: &mut GraphicsContext) -> Spritesheet {
+    pub fn build(&self, ctx: &mut Context) -> Spritesheet {
         Spritesheet {
             handle: ctx.renderer.create_draw_call(
                 self.image.as_ref(),

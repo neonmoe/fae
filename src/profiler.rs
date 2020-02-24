@@ -2,6 +2,10 @@
 //! `profiler` feature is disabled, all the functions are no-ops, and
 //! there will be no profiling overhead. Probably not very useful
 //! outside of this crate's development.
+//!
+//! If using this, remember to call
+//! [`profiler::refresh()`](fn.refresh.html) at the start of each
+//! frame!
 
 /// The data collected by `fae` internals. Returned by
 /// [`profiler::read`](fn.read.html).
@@ -48,7 +52,8 @@ mod dummy {
 
     static CLEARED_DATA: ProfilingData = ProfilingData::cleared();
 
-    pub(crate) fn refresh() {}
+    /// Resets frame-specific counters.
+    pub fn refresh() {}
     pub(crate) fn write<F: FnOnce(&mut ProfilingData) + Copy>(_f: F) {}
 
     /// Returns a copy of the last frame's profiling data. If the
@@ -78,7 +83,8 @@ mod actual {
         static ref BACK: Mutex<ProfilingData> = Mutex::new(ProfilingData::cleared());
     }
 
-    pub(crate) fn refresh() {
+    /// Resets frame-specific counters.
+    pub fn refresh() {
         if let (Ok(ref mut front), Ok(ref mut back)) = (FRONT.lock(), BACK.lock()) {
             let temp = back.glyphs_rasterized;
             front.copy_from(back);

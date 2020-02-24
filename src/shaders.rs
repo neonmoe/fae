@@ -36,7 +36,7 @@ use crate::gl_version::OpenGlApi;
 ///
 /// # Example
 /// ```no_run
-#[doc = "# let mut ctx = fae::GraphicsContext::dummy();
+#[doc = "# let mut ctx = fae::Context::new();
 # let fragment_shader_code_330 = String::new();
 # let fragment_shader_code_110 = String::new();
 use fae::{Shaders, SpritesheetBuilder};

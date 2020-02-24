@@ -1,4 +1,4 @@
-use crate::api::{GraphicsContext, Spritesheet};
+use crate::api::{Context, GraphicsContext, Spritesheet};
 use crate::text::{Text, TextRenderer};
 
 /// Holds a font for rendering. See also:
@@ -18,7 +18,7 @@ impl Font {
     /// The font is rasterized with
     /// [`rusttype`](https://crates.io/crates/rusttype).
     #[cfg(feature = "ttf")]
-    pub fn with_ttf(ctx: &mut GraphicsContext, ttf_data: Vec<u8>) -> Result<Font, rusttype::Error> {
+    pub fn with_ttf(ctx: &mut Context, ttf_data: Vec<u8>) -> Result<Font, rusttype::Error> {
         let text = TextRenderer::with_ttf(&mut ctx.renderer, ttf_data)?;
         let handle = text.draw_call().clone();
         ctx.text_renderers.push(text);
@@ -36,7 +36,7 @@ impl Font {
     /// (smooth but blurry). If `false`, nearest-neighbor
     /// interpolation is used (crisp but pixelated).
     #[cfg(feature = "font8x8")]
-    pub fn with_font8x8(ctx: &mut GraphicsContext, smoothed: bool) -> Font {
+    pub fn with_font8x8(ctx: &mut Context, smoothed: bool) -> Font {
         let text = TextRenderer::with_font8x8(&mut ctx.renderer, smoothed);
         let handle = text.draw_call().clone();
         ctx.text_renderers.push(text);

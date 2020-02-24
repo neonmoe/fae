@@ -25,7 +25,6 @@ stb_truetype = { version = "^0.3", optional = true}
 
 # Now, the normal [dependencies] section
 log = "^0.4.8"
-glutin = "^0.22.0-alpha5"
 fnv = { version = "^1.0.6", optional = true }
 png = { version = "^0.15.0", optional = true }
 font8x8 = { version = "^0.2.5", optional = true, default_features = false, features = ["std"] }
@@ -41,13 +40,14 @@ ttf = ["rusttype", "stb_truetype"]
 env_logger = "^0.7.1"
 cfg-if = "^0.1.10"
 font-loader = "^0.8.0"
+glutin = "^0.23.0"
 
 [build-dependencies]
 gl_generator = "^0.14.0"
 
 [[example]]
-name = "basic"
-required-features = []
+name = "glutin"
+required-features = ["text"]
 
 [package.metadata.docs.rs]
 all-features = true
