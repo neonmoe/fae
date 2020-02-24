@@ -17,16 +17,16 @@ maintenance = { status = "experimental" }
 [dependencies]
 # Glutin depends on andrew on linux, which depends on rusttype 0.7.9,
 # which depends on rusttype ^0.8, so this should match that. No dupes.
-rusttype = { version = "0.8.1", optional = true }
-# And rusttype 0.8.1 depends on this version of stb_truetype, and
+rusttype = { version = "^0.8.2", optional = true }
+# And rusttype 0.8.2 depends on this version of stb_truetype, and
 # we need to explicitly depend on it to be able to use its types.
-stb_truetype = { version = "^0.3", optional = true}
+stb_truetype = { version = "^0.3.1", optional = true}
 # *sigh*
 
 # Now, the normal [dependencies] section
 log = "^0.4.8"
 fnv = { version = "^1.0.6", optional = true }
-png = { version = "^0.15.0", optional = true }
+png = { version = "^0.15.3", optional = true }
 font8x8 = { version = "^0.2.5", optional = true, default_features = false, features = ["std"] }
 lazy_static = { version = "^1.4.0", optional = true }
 

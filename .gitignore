@@ -3,3 +3,4 @@
 perf.data*
 flame-graph.html
 *.exe
+Cargo.lock
