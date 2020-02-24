@@ -51,11 +51,13 @@ impl Font {
     ///
     /// # Usage
     /// ```no_run
-    /// # let mut ctx = fae::GraphicsContext::dummy();
+    /// # let mut ctx = fae::Context::new();
     /// // Initialize the font once somewhere, usually before the game loop:
     /// let font = fae::Font::with_font8x8(&mut ctx, true);
     ///
     /// // Then in rendering code, call draw:
+    /// # let (width, height, dpi_factor) = (0.0, 0.0, 0.0);
+    /// let mut ctx = ctx.start_frame(width, height, dpi_factor);
     /// font.draw(&mut ctx, "Hello, World!", 10.0, 10.0, 12.0)
     ///     .color((0.8, 0.5, 0.1, 1.0))
     ///     .finish();

@@ -18,7 +18,7 @@ use crate::text::TextRenderer;
 ///     // Here's your gameloop, and now you want to draw something.
 ///
 ///     // First, create the GraphicsContext with start_frame.
-///     let mut ctx: GraphicsContext = fae_context.start_frame(width, height, dpi_factor);
+///     let mut ctx: fae::GraphicsContext = fae_context.start_frame(width, height, dpi_factor);
 ///
 ///     // Then do your rendering stuff.
 ///     spritesheet.draw(&mut ctx)
