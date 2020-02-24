@@ -26,3 +26,26 @@ mod create_font {
         }
     }
 }
+
+use std::time::{Duration, Instant};
+pub struct FpsCounter {
+    timestamps: Vec<Instant>,
+}
+
+impl FpsCounter {
+    pub fn new() -> FpsCounter {
+        FpsCounter {
+            timestamps: Vec::new(),
+        }
+    }
+
+    pub fn record_frame(&mut self) {
+        self.timestamps.push(Instant::now());
+    }
+
+    pub fn get_fps(&mut self) -> usize {
+        let second_ago = Instant::now() - Duration::from_secs(1);
+        self.timestamps.retain(|timestamp| *timestamp > second_ago);
+        self.timestamps.len()
+    }
+}

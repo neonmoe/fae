@@ -37,16 +37,21 @@ profiler = ["lazy_static"]
 ttf = ["rusttype", "stb_truetype"]
 
 [dev-dependencies]
-env_logger = "^0.7.1"
 cfg-if = "^0.1.10"
 font-loader = "^0.8.0"
 glutin = "^0.23.0"
+sdl2 = { version = "^0.33.0", features = ["static-link", "bundled"] }
+glfw = "^0.36.0"
 
 [build-dependencies]
 gl_generator = "^0.14.0"
 
 [[example]]
 name = "glutin"
+required-features = ["text"]
+
+[[example]]
+name = "sdl"
 required-features = ["text"]
 
 [package.metadata.docs.rs]
