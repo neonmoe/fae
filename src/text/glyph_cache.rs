@@ -28,15 +28,16 @@ pub(crate) struct GlyphCache {
 }
 
 impl GlyphCache {
-    pub fn new(renderer: &mut Renderer, width: i32, height: i32, smoothed: bool) -> GlyphCache {
+    pub fn new(renderer: &mut Renderer, smoothed: bool) -> GlyphCache {
         let mut max_size = 0 as GLint;
         unsafe { gl::GetIntegerv(gl::MAX_TEXTURE_SIZE, &mut max_size) };
+        let size = if renderer.legacy {
+            max_size
+        } else {
+            64.min(max_size)
+        };
 
-        let cache_image = Image::with_null_texture(
-            (width as i32).min(max_size),
-            (height as i32).min(max_size),
-            gl::RED,
-        );
+        let cache_image = Image::with_null_texture(size, size, gl::RED);
 
         let mut shaders = Shaders::default();
         shaders.shader_110.fragment_shader = TEXT_FRAGMENT_SHADER_110.to_string();
@@ -55,8 +56,8 @@ impl GlyphCache {
         );
         let cache = GlyphCache {
             call,
-            width,
-            height,
+            width: size,
+            height: size,
             max_size,
             column_cursor: GLYPH_CACHE_GAP,
             columns: Vec::with_capacity(1),

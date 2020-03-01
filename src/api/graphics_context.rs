@@ -113,7 +113,11 @@ impl Context {
         }
     }
 
-    /// Renders the frame with the given `width` and `height`.
+    /// Renders the frame with the given `width`, `height` and
+    /// `clear_color`.
+    ///
+    /// The `clear_color` is defined between 0.0 and 1.0, and the
+    /// components are (red, green, blue, alpha).
     ///
     /// See
     /// [`Context::start_frame`](struct.Context.html#method.start_frame)
@@ -123,8 +127,8 @@ impl Context {
     /// This should generally be called after
     /// [`GraphicsContext::finish_frame`](struct.GraphicsContext.html#method.finish_frame),
     /// but can also be used to redraw the previous frame.
-    pub fn render(&mut self, width: f32, height: f32) {
-        self.renderer.render(width, height);
+    pub fn render(&mut self, width: f32, height: f32, clear_color: (f32, f32, f32, f32)) {
+        self.renderer.render(width, height, clear_color);
     }
 }
 

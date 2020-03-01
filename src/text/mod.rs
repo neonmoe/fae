@@ -44,7 +44,7 @@ pub(crate) struct TextRenderer {
 impl TextRenderer {
     #[cfg(feature = "font8x8")]
     pub(crate) fn with_font8x8(renderer: &mut Renderer, smoothed: bool) -> TextRenderer {
-        let cache = GlyphCache::new(renderer, 64, 64, smoothed);
+        let cache = GlyphCache::new(renderer, smoothed);
         TextRenderer::with_params(cache, Box::new(fonts::Font8x8Provider::new()))
     }
 
@@ -53,7 +53,7 @@ impl TextRenderer {
         renderer: &mut Renderer,
         ttf_data: Vec<u8>,
     ) -> Result<TextRenderer, rusttype::Error> {
-        let cache = GlyphCache::new(renderer, 64, 64, true);
+        let cache = GlyphCache::new(renderer, true);
         let font = Box::new(fonts::RustTypeProvider::new(ttf_data)?);
         Ok(TextRenderer::with_params(cache, font))
     }

@@ -173,6 +173,9 @@ fn get_font_name(font: &Font) -> String {
         })
         .collect::<Vec<(&str, u16)>>();
     font_name_parts.dedup_by(|(_, a), (_, b)| a == b);
-    debug_assert!(font_name_parts.len() == 1);
-    font_name_parts[0].0.to_string()
+    if font_name_parts.len() > 0 {
+        font_name_parts[0].0.to_string()
+    } else {
+        "<font name not found>".to_owned()
+    }
 }

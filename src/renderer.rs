@@ -276,7 +276,7 @@ impl Renderer {
     }
 
     /// Renders the queued draws.
-    pub(crate) fn render(&mut self, width: f32, height: f32) {
+    pub(crate) fn render(&mut self, width: f32, height: f32, clear_color: (f32, f32, f32, f32)) {
         let m00 = 2.0 / width;
         let m11 = -2.0 / height;
         let matrix = [
@@ -288,7 +288,7 @@ impl Renderer {
         }
 
         unsafe {
-            gl::ClearColor(1.0, 1.0, 1.0, 1.0);
+            gl::ClearColor(clear_color.0, clear_color.1, clear_color.2, clear_color.3);
             gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
         }
 
@@ -503,7 +503,9 @@ impl Renderer {
         new_height: i32,
     ) -> bool {
         let (old_width, old_height) = self.calls[call.index].texture_size;
-        if new_width >= old_width && new_height >= old_height {
+        if self.legacy {
+            false
+        } else if new_width >= old_width && new_height >= old_height {
             resize_texture(
                 &self.calls[call.index].texture,
                 old_width,

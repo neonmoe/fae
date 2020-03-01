@@ -35,8 +35,9 @@ fn main() {
                     break 'game_loop;
                 }
                 Event::Window { win_event, .. } => match win_event {
-                    WindowEvent::SizeChanged(width, height) => unsafe {
-                        fae::gl::Viewport(0, 0, width, height);
+                    WindowEvent::Resized(_, _) => unsafe {
+                        let (width, height) = window.drawable_size();
+                        fae::gl::Viewport(0, 0, width as i32, height as i32);
                     },
                     _ => {}
                 },
