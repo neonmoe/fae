@@ -32,6 +32,7 @@ struct ShaderProgram {
     fragment_shader: GLuint,
 
     projection_matrix_location: Option<GLint>,
+    gamma_correction_location: Option<GLint>,
     position_attrib_location: Option<GLuint>,
     texcoord_attrib_location: Option<GLuint>,
     color_attrib_location: Option<GLuint>,
@@ -325,15 +326,27 @@ impl Renderer {
                     gl::Disable(gl::BLEND);
                     gl::DepthFunc(gl::LESS);
                 }
-                if call.srgb {
-                    gl::Enable(gl::FRAMEBUFFER_SRGB);
-                } else {
-                    gl::Disable(gl::FRAMEBUFFER_SRGB);
-                }
                 gl::UseProgram(call.program.program);
+
+                if !legacy {
+                    if call.srgb {
+                        gl::Enable(gl::FRAMEBUFFER_SRGB);
+                    } else {
+                        gl::Disable(gl::FRAMEBUFFER_SRGB);
+                    }
+                } else if let Some(gamma_correction_location) =
+                    call.program.gamma_correction_location
+                {
+                    if call.srgb {
+                        gl::Uniform1i(gamma_correction_location, 1);
+                    } else {
+                        gl::Uniform1i(gamma_correction_location, 0);
+                    }
+                }
                 if let Some(location) = call.program.projection_matrix_location {
                     gl::UniformMatrix4fv(location, 1, gl::FALSE, matrix.as_ptr());
                 }
+
                 if !legacy {
                     gl::BindVertexArray(call.attributes.vao.0);
                     gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, call.attributes.element_buffer.0);
@@ -641,18 +654,20 @@ fn create_program(vert_source: &str, frag_source: &str) -> ShaderProgram {
             x => Some(x as GLuint),
         }
     };
-    let projection_matrix_location = match unsafe {
-        gl::GetUniformLocation(program, "projection_matrix\0".as_ptr() as *const _)
-    } {
-        -1 => None,
-        x => Some(x),
+    let get_uniform_location = |name_ptr: &str| {
+        let location = unsafe { gl::GetUniformLocation(program, name_ptr.as_ptr() as *const _) };
+        match location {
+            -1 => None,
+            x => Some(x),
+        }
     };
 
     ShaderProgram {
         program,
         vertex_shader,
         fragment_shader,
-        projection_matrix_location,
+        projection_matrix_location: get_uniform_location("projection_matrix\0"),
+        gamma_correction_location: get_uniform_location("gamma_correct\0"),
         position_attrib_location: get_attrib_location("position\0"),
         texcoord_attrib_location: get_attrib_location("texcoord\0"),
         color_attrib_location: get_attrib_location("color\0"),
