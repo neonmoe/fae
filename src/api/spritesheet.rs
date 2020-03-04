@@ -127,7 +127,18 @@ impl Spritesheet {
     }
 }
 
+/// Describes how a spritesheet should be blended with the background.
+#[derive(Clone, Copy)]
+pub struct AlphaBlending {
+    /// Whether to blend the sprites. (That is, GL_BLEND.)
+    pub blend: bool,
+    /// Whether to sort the sprites so that transparency works as
+    /// expected.
+    pub sort: bool,
+}
+
 /// A builder for [`Spritesheet`](struct.Spritesheet.html).
+#[derive(Clone)]
 pub struct SpritesheetBuilder {
     /// The texture used when drawing with this handle. None can be
     /// used if you want to just draw flat-color quads.
@@ -143,7 +154,7 @@ pub struct SpritesheetBuilder {
     ///
     /// Internally, this controls whether `GL_BLEND` and back-to-front
     /// sorting are enabled.
-    pub alpha_blending: bool,
+    pub alpha_blending: AlphaBlending,
     /// When drawing quads that are smaller than the texture provided,
     /// use linear (true) or nearest neighbor (false) smoothing when
     /// scaling? (Linear is probably always better.)
@@ -176,7 +187,10 @@ impl Default for SpritesheetBuilder {
         SpritesheetBuilder {
             image: None,
             shaders: Shaders::default(),
-            alpha_blending: true,
+            alpha_blending: AlphaBlending {
+                blend: true,
+                sort: true,
+            },
             minification_smoothing: true,
             magnification_smoothing: true,
             wrap: (TextureWrapping::Clamp, TextureWrapping::Clamp),
@@ -214,8 +228,8 @@ impl SpritesheetBuilder {
     }
 
     /// Toggles the spritesheet's alpha blending.
-    pub fn alpha_blending(&mut self, alpha_blending: bool) -> &mut SpritesheetBuilder {
-        self.alpha_blending = alpha_blending;
+    pub fn alpha_blending(&mut self, blend: bool, sort: bool) -> &mut SpritesheetBuilder {
+        self.alpha_blending = AlphaBlending { blend, sort };
         self
     }
 

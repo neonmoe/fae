@@ -1,3 +1,4 @@
+use crate::api::AlphaBlending;
 use crate::gl;
 use crate::gl::types::*;
 use crate::image::Image;
@@ -48,7 +49,10 @@ impl GlyphCache {
         let call = renderer.create_draw_call(
             Some(&cache_image),
             &shaders,
-            true,
+            AlphaBlending {
+                blend: true,
+                sort: true,
+            },
             true,
             smoothed,
             (TextureWrapping::Clamp, TextureWrapping::Clamp),

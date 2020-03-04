@@ -6,7 +6,7 @@ mod spritesheet;
 #[cfg(feature = "text")]
 pub use font::Font;
 pub use graphics_context::{Context, GraphicsContext};
-pub use spritesheet::{Spritesheet, SpritesheetBuilder};
+pub use spritesheet::{AlphaBlending, Spritesheet, SpritesheetBuilder};
 
 // Re-exports from other parts of the crate
 pub mod errors {

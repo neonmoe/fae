@@ -1,3 +1,4 @@
+use crate::api::AlphaBlending;
 use crate::gl;
 use crate::gl::types::*;
 use crate::gl_version::{self, OpenGlApi, OpenGlVersion};
@@ -59,6 +60,7 @@ struct DrawCall {
     program: ShaderProgram,
     attributes: Attributes,
     blend: bool,
+    sort: bool,
     srgb: bool,
     highest_depth: f32,
 }
@@ -125,7 +127,7 @@ impl Renderer {
         &mut self,
         image: Option<&Image>,
         shaders: &Shaders,
-        alpha_blending: bool,
+        alpha_blending: AlphaBlending,
         minification_smoothing: bool,
         magnification_smoothing: bool,
         wrap: (TextureWrapping, TextureWrapping),
@@ -161,7 +163,8 @@ impl Renderer {
             texture_size: (0, 0),
             program,
             attributes,
-            blend: alpha_blending,
+            blend: alpha_blending.blend,
+            sort: alpha_blending.sort,
             srgb,
             highest_depth: -1.0,
         });
@@ -305,9 +308,9 @@ impl Renderer {
             let call_a = &self.calls[*a];
             let call_b = &self.calls[*b];
             let a = call_a.highest_depth;
-            let a = if call_a.blend { a } else { -2.0 - a };
+            let a = if call_a.sort { a } else { -2.0 - a };
             let b = call_b.highest_depth;
-            let b = if call_b.blend { b } else { -2.0 - b };
+            let b = if call_b.sort { b } else { -2.0 - b };
             a.partial_cmp(&b).unwrap()
         });
 
