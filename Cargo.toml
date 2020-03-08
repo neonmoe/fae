@@ -1,6 +1,6 @@
 [package]
 name = "fae"
-version = "0.5.0"
+version = "0.6.0"
 authors = ["Jens Pitkanen <jens@neon.moe>"]
 edition = "2018"
 description = "A simple and fast 2D rendering crate with optional window creation and text rendering functionality."
