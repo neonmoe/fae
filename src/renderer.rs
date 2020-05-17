@@ -280,7 +280,12 @@ impl Renderer {
     }
 
     /// Renders the queued draws.
-    pub(crate) fn render(&mut self, width: f32, height: f32, clear_color: (f32, f32, f32, f32)) {
+    pub(crate) fn render(
+        &mut self,
+        width: f32,
+        height: f32,
+        clear_color: Option<(f32, f32, f32, f32)>,
+    ) {
         let m00 = 2.0 / width;
         let m11 = -2.0 / height;
         let matrix = [
@@ -291,9 +296,11 @@ impl Renderer {
             gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
         }
 
-        unsafe {
-            gl::ClearColor(clear_color.0, clear_color.1, clear_color.2, clear_color.3);
-            gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
+        if let Some((r, g, b, a)) = clear_color {
+            unsafe {
+                gl::ClearColor(r, g, b, a);
+                gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
+            }
         }
 
         let legacy = self.legacy;
@@ -301,6 +308,9 @@ impl Renderer {
         unsafe {
             gl::Enable(gl::DEPTH_TEST);
             gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
+            gl::Enable(gl::CULL_FACE);
+            gl::FrontFace(gl::CW);
+            gl::CullFace(gl::BACK);
         }
 
         let mut call_indices: Vec<usize> = (0..self.calls.len()).collect();

@@ -4,11 +4,7 @@
 
 #![warn(missing_docs)]
 
-#[allow(missing_docs, unknown_lints, clippy::all)]
-pub mod gl {
-    //! OpenGL functions and constants.
-    include!(concat!(env!("OUT_DIR"), "/gl_bindings.rs"));
-}
+pub use gl;
 
 mod api;
 mod error;

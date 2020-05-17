@@ -117,7 +117,8 @@ impl Context {
     /// `clear_color`.
     ///
     /// The `clear_color` is defined between 0.0 and 1.0, and the
-    /// components are (red, green, blue, alpha).
+    /// components are (red, green, blue, alpha). None if you don't
+    /// want to clear the screen.
     ///
     /// See
     /// [`Context::start_frame`](struct.Context.html#method.start_frame)
@@ -127,7 +128,7 @@ impl Context {
     /// This should generally be called after
     /// [`GraphicsContext::finish_frame`](struct.GraphicsContext.html#method.finish_frame),
     /// but can also be used to redraw the previous frame.
-    pub fn render(&mut self, width: f32, height: f32, clear_color: (f32, f32, f32, f32)) {
+    pub fn render(&mut self, width: f32, height: f32, clear_color: Option<(f32, f32, f32, f32)>) {
         self.renderer.render(width, height, clear_color);
     }
 }
