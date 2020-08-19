@@ -6,7 +6,7 @@ use crate::types::*;
 
 use std::ops::Add;
 
-pub(crate) type GlyphId = u32;
+pub(crate) type GlyphId = u16;
 
 /// Defines the alignment of text.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

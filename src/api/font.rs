@@ -18,11 +18,11 @@ impl Font {
     /// The font is rasterized with
     /// [`rusttype`](https://crates.io/crates/rusttype).
     #[cfg(feature = "ttf")]
-    pub fn with_ttf(ctx: &mut Context, ttf_data: Vec<u8>) -> Result<Font, rusttype::Error> {
+    pub fn with_ttf(ctx: &mut Context, ttf_data: Vec<u8>) -> Option<Font> {
         let text = TextRenderer::with_ttf(&mut ctx.renderer, ttf_data)?;
         let handle = text.draw_call().clone();
         ctx.text_renderers.push(text);
-        Ok(Font {
+        Some(Font {
             index: ctx.text_renderers.len() - 1,
             spritesheet: Spritesheet { handle },
         })

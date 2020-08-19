@@ -49,13 +49,10 @@ impl TextRenderer {
     }
 
     #[cfg(feature = "ttf")]
-    pub(crate) fn with_ttf(
-        renderer: &mut Renderer,
-        ttf_data: Vec<u8>,
-    ) -> Result<TextRenderer, rusttype::Error> {
+    pub(crate) fn with_ttf(renderer: &mut Renderer, ttf_data: Vec<u8>) -> Option<TextRenderer> {
         let cache = GlyphCache::new(renderer, true);
         let font = Box::new(fonts::RustTypeProvider::new(ttf_data)?);
-        Ok(TextRenderer::with_params(cache, font))
+        Some(TextRenderer::with_params(cache, font))
     }
 
     fn with_params(cache: GlyphCache, font: Box<dyn FontProvider>) -> TextRenderer {

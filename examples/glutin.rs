@@ -94,7 +94,7 @@ fn main() -> Result<(), fae::Error> {
                 .finish();
 
             ctx.finish_frame();
-            fae_ctx.render(width, height);
+            fae_ctx.render(width, height, Some((1.0, 1.0, 1.0, 1.0)));
             context.swap_buffers().unwrap();
         }
         Event::MainEventsCleared => {

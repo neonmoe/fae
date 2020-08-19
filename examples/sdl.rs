@@ -74,7 +74,7 @@ fn main() {
             .finish();
 
         ctx.finish_frame();
-        fae_ctx.render(width, height);
+        fae_ctx.render(width, height, Some((1.0, 1.0, 1.0, 1.0)));
         window.gl_swap_window();
         fae_ctx.synchronize();
     }

@@ -4,7 +4,7 @@ use crate::text::GlyphCache;
 use crate::types::*;
 
 use fnv::FnvHashMap;
-use rusttype::{Font, FontCollection, Scale};
+use rusttype::{Font, Scale};
 
 type FontSize = i32;
 
@@ -22,14 +22,14 @@ pub(crate) struct RustTypeProvider<'a> {
 }
 
 impl<'a> RustTypeProvider<'a> {
-    pub fn new(ttf_data: Vec<u8>) -> Result<RustTypeProvider<'a>, rusttype::Error> {
-        let font = FontCollection::from_bytes(ttf_data)?.into_font()?;
+    pub fn new(ttf_data: Vec<u8>) -> Option<RustTypeProvider<'a>> {
+        let font = Font::try_from_vec(ttf_data)?;
         if log::log_enabled!(log::Level::Info) {
             log::info!("Loading font: {}", get_font_name(&font));
         }
         let units_per_em = font.units_per_em();
         let v_metrics = font.v_metrics_unscaled();
-        Ok(RustTypeProvider {
+        Some(RustTypeProvider {
             font,
             glyph_padding: 0.0,
             units_per_em: i32::from(units_per_em),
@@ -145,36 +145,15 @@ impl<'a> FontProvider for RustTypeProvider<'a> {
 
 // Gets a name out of the font_name_strings
 fn get_font_name(font: &Font) -> String {
-    use stb_truetype::{MicrosoftEid, PlatformEncodingLanguageId::*, UnicodeEid};
-    let mut font_name_parts = font
-        .font_name_strings()
-        .filter_map(|(s, plat, id)| {
-            let s = std::str::from_utf8(s).ok()?;
-            if id == 4
-                && match plat? {
-                    // I'm not sure how to interpret platform
-                    // specific encodings in all situations, but
-                    // this is my best guess as to which *should*
-                    // be proper readable utf-8.
-                    //
-                    // Source: https://docs.microsoft.com/en-us/typography/opentype/spec/name#platform-ids
-                    Unicode(Some(Ok(eid)), _) if eid == UnicodeEid::Unicode_2_0_Full => true,
-                    Microsoft(Some(Ok(eid)), _) if eid == MicrosoftEid::UnicodeFull => true,
-                    // The mac eids are just locales, and Roman works,
-                    // so maybe they're all UTF-8?
-                    Mac(_, _) => true,
-                    _ => false,
-                }
-            {
-                Some((s, id))
-            } else {
-                None
-            }
-        })
-        .collect::<Vec<(&str, u16)>>();
-    font_name_parts.dedup_by(|(_, a), (_, b)| a == b);
-    if font_name_parts.len() > 0 {
-        font_name_parts[0].0.to_string()
+    use owned_ttf_parser::AsFontRef;
+
+    let mut names = match font {
+        Font::Ref(font) => font.names(),
+        Font::Owned(font) => font.as_font().names(),
+    };
+    let font_name = names.find_map(|name| name.name_utf8());
+    if let Some(font_name) = font_name {
+        font_name
     } else {
         "<font name not found>".to_owned()
     }
