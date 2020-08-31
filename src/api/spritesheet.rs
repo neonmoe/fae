@@ -69,7 +69,12 @@ impl Spritesheet {
         ctx.renderer.draw(&self.handle)
     }
 
-    // TODO(0.6.0): Add a function to render inside a spritesheet in when not in legacy mode
+    // TODO(0.8.0): Add a function to render inside a spritesheet in when not in legacy mode
+
+    /// Returns the OpenGL texture id of this spritesheet.
+    pub fn get_texture(&self, ctx: &GraphicsContext) -> gl::types::GLuint {
+        ctx.renderer.get_texture(&self.handle)
+    }
 
     /// Upload an image into the specified region in the spritesheet.
     ///
@@ -105,14 +110,10 @@ impl Spritesheet {
             .upload_texture_region(&self.handle, region, image)
     }
 
-    /// Resize the spritesheet texture to a new width and height,
-    /// which must be equal or greater than the original
-    /// dimensions. The previous contents of the texture are preserved
-    /// in the origin corner of the texture.
-    ///
-    /// If `new_width` is less than the current width, or `new_height`
-    /// is less than the current height, this function will do nothing
-    /// and return false.
+    /// *Modern OpenGL only.* Resize the spritesheet texture to a new
+    /// width and height. The previous contents of the texture are
+    /// preserved in the origin corner of the texture if
+    /// `preserve_contents` is `true`.
     ///
     /// See also:
     /// [`Spritesheet::upload_texture_region`](struct.Spritesheet.html#method.upload_texture_region).
@@ -121,9 +122,10 @@ impl Spritesheet {
         ctx: &mut GraphicsContext,
         new_width: i32,
         new_height: i32,
+        preserve_contents: bool,
     ) -> bool {
         ctx.renderer
-            .resize_texture(&self.handle, new_width, new_height)
+            .resize_texture(&self.handle, new_width, new_height, preserve_contents)
     }
 }
 

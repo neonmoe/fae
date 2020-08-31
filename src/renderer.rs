@@ -54,9 +54,17 @@ struct Attributes {
 }
 
 #[derive(Clone, Debug)]
+struct TextureParams {
+    handle: TextureHandle,
+    size: (i32, i32),
+    format: GLuint,
+    pixel_format: GLuint,
+    pixel_type: GLuint,
+}
+
+#[derive(Clone, Debug)]
 struct DrawCall {
-    texture: TextureHandle,
-    texture_size: (i32, i32),
+    texture: TextureParams,
     program: ShaderProgram,
     attributes: Attributes,
     blend: bool,
@@ -152,15 +160,44 @@ impl Renderer {
             TextureWrapping::Repeat => gl::REPEAT,
             TextureWrapping::RepeatMirrored => gl::MIRRORED_REPEAT,
         };
-        let texture = create_texture(
+        let handle = create_texture(
             filter(minification_smoothing),
             filter(magnification_smoothing),
             get_wrap(wrap.0) as i32,
             get_wrap(wrap.1) as i32,
         );
+
+        let texture = if let Some(image) = image {
+            let texture = TextureParams {
+                handle,
+                size: (image.width, image.height),
+                format: image.format,
+                pixel_format: match image.format {
+                    gl::SRGB => gl::RGB,
+                    gl::SRGB_ALPHA => gl::RGBA,
+                    format => format,
+                },
+                pixel_type: image.pixel_type,
+            };
+            let pixels: Option<&[u8]> = if image.null_data {
+                None
+            } else {
+                Some(&image.pixels)
+            };
+            insert_texture(&texture, image.width, image.height, pixels);
+            texture
+        } else {
+            TextureParams {
+                handle: TextureHandle(0),
+                size: (0, 0),
+                format: gl::RED,
+                pixel_format: gl::RED,
+                pixel_type: gl::UNSIGNED_BYTE,
+            }
+        };
+
         self.calls.push(DrawCall {
             texture,
-            texture_size: (0, 0),
             program,
             attributes,
             blend: alpha_blending.blend,
@@ -168,22 +205,6 @@ impl Renderer {
             srgb,
             highest_depth: -1.0,
         });
-
-        if let Some(image) = image {
-            insert_texture(
-                &self.calls[index].texture,
-                image.format,
-                image.pixel_type,
-                image.width,
-                image.height,
-                if image.null_data {
-                    None
-                } else {
-                    Some(&image.pixels)
-                },
-            );
-            self.calls[index].texture_size = (image.width, image.height);
-        }
 
         DrawCallHandle { index }
     }
@@ -364,7 +385,7 @@ impl Renderer {
                     gl::BindVertexArray(call.attributes.vao.0);
                     gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, call.attributes.element_buffer.0);
                 }
-                gl::BindTexture(gl::TEXTURE_2D, call.texture.0);
+                gl::BindTexture(gl::TEXTURE_2D, call.texture.handle.0);
                 gl::BindBuffer(gl::ARRAY_BUFFER, call.attributes.vbo.0);
             }
             print_gl_errors(&format!("after initializing draw call #{}", i));
@@ -489,8 +510,12 @@ impl Renderer {
         }
     }
 
+    pub(crate) fn get_texture(&self, call: &DrawCallHandle) -> GLuint {
+        self.calls[call.index].texture.handle.0
+    }
+
     pub(crate) fn get_texture_size(&self, call: &DrawCallHandle) -> (i32, i32) {
-        self.calls[call.index].texture_size
+        self.calls[call.index].texture.size
     }
 
     pub(crate) fn upload_texture_region(
@@ -499,7 +524,7 @@ impl Renderer {
         region: RectPx,
         image: &Image,
     ) -> bool {
-        let (tex_width, tex_height) = self.calls[call.index].texture_size;
+        let (tex_width, tex_height) = self.calls[call.index].texture.size;
         if region.width == image.width
             && region.height == image.height
             && region.x + region.width <= tex_width
@@ -508,7 +533,7 @@ impl Renderer {
             && region.y >= 0
         {
             insert_sub_texture(
-                &self.calls[call.index].texture,
+                &self.calls[call.index].texture.handle,
                 region.x,
                 region.y,
                 region.width,
@@ -527,19 +552,21 @@ impl Renderer {
         call: &DrawCallHandle,
         new_width: i32,
         new_height: i32,
+        preserve_contents: bool,
     ) -> bool {
-        let (old_width, old_height) = self.calls[call.index].texture_size;
+        let (old_width, old_height) = self.calls[call.index].texture.size;
         if self.legacy {
             false
-        } else if new_width >= old_width && new_height >= old_height {
+        } else if new_width != old_width || new_height != old_height {
             resize_texture(
                 &self.calls[call.index].texture,
                 old_width,
                 old_height,
                 new_width,
                 new_height,
+                preserve_contents,
             );
-            self.calls[call.index].texture_size = (new_width, new_height);
+            self.calls[call.index].texture.size = (new_width, new_height);
             true
         } else {
             false
@@ -573,7 +600,7 @@ impl Drop for Renderer {
                 gl::DeleteShader(vertex_shader);
                 gl::DeleteShader(fragment_shader);
                 gl::DeleteProgram(program);
-                gl::DeleteTextures(1, [call.texture.0].as_ptr());
+                gl::DeleteTextures(1, [call.texture.handle.0].as_ptr());
                 gl::DeleteBuffers(1, [vbo.0].as_ptr());
                 if !legacy {
                     gl::DeleteBuffers(2, [vbo_static.0, element_buffer.0].as_ptr());
@@ -831,30 +858,19 @@ fn create_texture(min: GLint, mag: GLint, wrap_s: GLint, wrap_t: GLint) -> Textu
 }
 
 #[inline]
-fn insert_texture(
-    texture: &TextureHandle,
-    format: GLuint,
-    pixel_type: GLuint,
-    width: GLint,
-    height: GLint,
-    pixels: Option<&[u8]>,
-) {
+fn insert_texture(texture: &TextureParams, width: GLint, height: GLint, pixels: Option<&[u8]>) {
     unsafe {
-        gl::BindTexture(gl::TEXTURE_2D, texture.0);
+        gl::BindTexture(gl::TEXTURE_2D, texture.handle.0);
         gl::PixelStorei(gl::UNPACK_ALIGNMENT, 1);
         gl::TexImage2D(
             gl::TEXTURE_2D,
             0,
-            format as GLint,
+            texture.format as GLint,
             width,
             height,
             0,
-            match format {
-                gl::SRGB => gl::RGB,
-                gl::SRGB_ALPHA => gl::RGBA,
-                format => format,
-            },
-            pixel_type,
+            texture.pixel_format,
+            texture.pixel_type,
             if let Some(pixels) = pixels {
                 pixels.as_ptr() as *const _
             } else {
@@ -893,43 +909,52 @@ fn insert_sub_texture(
 }
 
 fn resize_texture(
-    texture: &TextureHandle,
+    texture: &TextureParams,
     old_width: i32,
     old_height: i32,
     new_width: i32,
     new_height: i32,
+    preserve_contents: bool,
 ) {
     let mut fbo = 0;
     let mut temp_tex = 0;
+    let format = texture.format;
+    let pixel_format = texture.pixel_format;
+    let pixel_type = texture.pixel_type;
     unsafe {
-        // Create framebuffer and attach the original texture onto it
-        gl::GenFramebuffers(1, &mut fbo);
-        gl::BindFramebuffer(gl::FRAMEBUFFER, fbo);
-        gl::FramebufferTexture(gl::FRAMEBUFFER, gl::COLOR_ATTACHMENT0, texture.0, 0);
-        // Create temp texture and copy over the texture from the framebuffer
-        gl::GenTextures(1, &mut temp_tex);
-        gl::BindTexture(gl::TEXTURE_2D, temp_tex);
-        gl::ReadBuffer(gl::COLOR_ATTACHMENT0);
-        gl::CopyTexImage2D(gl::TEXTURE_2D, 0, gl::RED, 0, 0, old_width, old_height, 0);
-        // Re-create the original texture
-        gl::BindTexture(gl::TEXTURE_2D, texture.0);
+        if preserve_contents {
+            // Create framebuffer and attach the original texture onto it
+            gl::GenFramebuffers(1, &mut fbo);
+            gl::BindFramebuffer(gl::FRAMEBUFFER, fbo);
+            gl::FramebufferTexture(gl::FRAMEBUFFER, gl::COLOR_ATTACHMENT0, texture.handle.0, 0);
+            // Create temp texture and copy over the texture from the framebuffer
+            gl::GenTextures(1, &mut temp_tex);
+            gl::BindTexture(gl::TEXTURE_2D, temp_tex);
+            gl::ReadBuffer(gl::COLOR_ATTACHMENT0);
+            gl::CopyTexImage2D(gl::TEXTURE_2D, 0, format, 0, 0, old_width, old_height, 0);
+        }
+        // Create the new texture
+        gl::BindTexture(gl::TEXTURE_2D, texture.handle.0);
         gl::TexImage2D(
             gl::TEXTURE_2D,
             0,
-            gl::RED as GLint,
+            format as GLint,
             new_width,
             new_height,
             0,
-            gl::RED,
-            gl::UNSIGNED_BYTE,
+            pixel_format,
+            pixel_type,
             std::ptr::null(),
         );
-        // Attach the temp texture to the framebuffer and draw it onto the original texture
-        gl::FramebufferTexture(gl::FRAMEBUFFER, gl::COLOR_ATTACHMENT0, temp_tex, 0);
-        gl::CopyTexSubImage2D(gl::TEXTURE_2D, 0, 0, 0, 0, 0, old_width, old_height);
-        // Cleanup
-        gl::DeleteTextures(1, &temp_tex);
-        gl::DeleteFramebuffers(1, &fbo);
+        if preserve_contents {
+            // Attach the temp texture to the framebuffer and draw it onto the new texture
+            let (copy_width, copy_height) = (old_width.min(new_width), old_height.min(new_height));
+            gl::FramebufferTexture(gl::FRAMEBUFFER, gl::COLOR_ATTACHMENT0, temp_tex, 0);
+            gl::CopyTexSubImage2D(gl::TEXTURE_2D, 0, 0, 0, 0, 0, copy_width, copy_height);
+            // Cleanup
+            gl::DeleteTextures(1, &temp_tex);
+            gl::DeleteFramebuffers(1, &fbo);
+        }
     }
     print_gl_errors("after resize_texture");
 }

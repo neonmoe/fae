@@ -74,7 +74,7 @@ impl GlyphCache {
     pub fn resize_if_needed(&mut self, renderer: &mut Renderer) {
         if let Some(size) = self.requested_resize {
             self.requested_resize = None;
-            renderer.resize_texture(&self.call, size, size);
+            renderer.resize_texture(&self.call, size, size, true);
             self.width = size;
             self.height = size;
             for col in &mut self.columns {
