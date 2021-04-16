@@ -11,6 +11,10 @@ against other similar crates, nor do I have the experience to know if
 this crate is a good implementation of a 2D renderer. I'm making it to
 power my own games, because of NIH.
 
+Update 2021-04-16: I personally use SDL's render module for the
+usecase I originally built this for. So, consider
+[rust-sdl2](https://crates.io/crates/sdl2)!
+
 ## [Documentation][docs]
 See the [`examples/`](examples/) as well.
 
